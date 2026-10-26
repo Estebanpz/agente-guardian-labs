@@ -62,6 +62,20 @@ Arranca la API (`http://127.0.0.1:3000`) y la interfaz (`http://localhost:5173`)
 | **Chat** | Texto libre del monitor (incluye fuera de alcance, intento de eludir reglas y datos prohibidos) |
 | **Salas** | Aforo y estado de los equipos según inventario y mantenimiento |
 
+### Capturas
+
+**Puerta:** caso combinado E-006. El motor aplica R13 (dato desconocido y fuentes en conflicto a la vez) y escala.
+
+![Vista Puerta con el caso E-006](docs/capturas/interfaz-puerta.png)
+
+**Chat:** una pregunta fuera de alcance y una solicitud de reserva, que no es función de este agente.
+
+![Vista Chat](docs/capturas/interfaz-chat.png)
+
+**Salas:** aforo y estado de los equipos; PC-07 aparece en conflicto entre inventario y mantenimiento.
+
+![Vista Salas](docs/capturas/interfaz-salas.png)
+
 ### Comandos
 
 | Comando | Qué hace |
