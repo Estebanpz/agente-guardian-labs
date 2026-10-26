@@ -34,10 +34,10 @@ app.post("/evaluar", async (req, res) => {
 
 // Texto libre del monitor.
 app.post("/mensaje", async (req, res) => {
-  const v = z.object({ texto: z.string().min(1).max(500) }).safeParse(req.body);
+  const v = z.object({ texto: z.string().min(1).max(500), laboratorio: z.enum(["sala-1", "sala-2", "sala-3"]).optional() }).safeParse(req.body);
   if (!v.success) return void res.status(400).json({ error: "Falta el campo 'texto' (1 a 500 caracteres)" });
   try {
-    res.json(await mensaje(v.data.texto));
+    res.json(await mensaje(v.data.texto, { laboratorio: v.data.laboratorio }));
   } catch (e) {
     console.error("[http]", (e as Error).message);
     res.status(500).json({ error: "Error interno" });

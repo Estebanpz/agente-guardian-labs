@@ -13,7 +13,7 @@ const casos: [string, TipoIntencion][] = [
 
 let fallos = 0;
 for (const [texto, esperado] of casos) {
-  const obtenido = await interpretar(texto);
+  const obtenido = (await interpretar(texto)).intencion;
   const ok = obtenido === esperado;
   if (!ok) fallos++;
   console.log(`${ok ? "✅" : "❌"} ${obtenido.padEnd(22)} <- ${texto}`);
