@@ -1,8 +1,7 @@
-import { solicitar } from "./orquestador.js";
+import { mensaje, solicitar } from "./orquestador.js";
 
-const id = process.argv[2] ?? "E-001";
+const arg = process.argv.slice(2).join(" ") || "E-001";
 
-// Indicador de espera mientras el modelo local redacta.
 const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 let i = 0;
 const espera = setInterval(
@@ -10,12 +9,10 @@ const espera = setInterval(
   100,
 );
 
-const r = await solicitar({
-  id_sintetico: id,
-  laboratorio: "sala-1",
-  franja: "08:00–10:00",
-  tipo_evento: "ingreso",
-});
+// Un id solo (E-006) va directo al motor; cualquier otra cosa es texto libre.
+const r = /^E-\d{3}$/.test(arg)
+  ? await solicitar({ id_sintetico: arg, laboratorio: "sala-1", franja: "08:00–10:00", tipo_evento: "ingreso" })
+  : await mensaje(arg);
 
 clearInterval(espera);
 process.stdout.write("\r" + " ".repeat(40) + "\r");
