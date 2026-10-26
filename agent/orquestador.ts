@@ -4,6 +4,7 @@ import { evaluar } from "./tools/motor.js";
 import { redactar } from "./llm/redactor.js";
 import { interpretar } from "./llm/interprete.js";
 import { casos } from "../data/casos.js";
+import { datosProhibidos } from "./tools/privacidad.js";
 import { equipos } from "../data/equipos.js";
 
 const LOG = new URL("../logs/evaluaciones.jsonl", import.meta.url);
@@ -41,6 +42,16 @@ export async function solicitar(datos: unknown, alerta?: string) {
 
 // Texto libre del monitor.
 export async function mensaje(texto: string) {
+  // Paso 2 del taller: datos prohibidos. No se llama al modelo ni se guarda el texto.
+  const prohibidos = datosProhibidos(texto);
+  if (prohibidos.length) {
+    registrar({ intencion: "datos_prohibidos", tipos: prohibidos });
+    return {
+      intencion: "datos_prohibidos",
+      respuesta: `El mensaje contiene datos personales (${prohibidos.join(", ")}). Use solo el identificador sintético (por ejemplo E-001).`,
+    };
+  }
+
   const intencion = await interpretar(texto);
   const id = texto.match(/E-\d{3}/)?.[0]; // el id se extrae con regex, no con el modelo
   const resumen = texto.slice(0, 200);

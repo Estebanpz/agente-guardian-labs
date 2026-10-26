@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx agent/index.ts",
     "typecheck": "tsc",
-    "pruebas": "tsx evals/correr-pruebas.ts && tsx evals/regresion.ts && tsx evals/r12.ts && tsx evals/prueba-intencion.ts",
+    "pruebas": "tsx evals/correr-pruebas.ts && tsx evals/regresion.ts && tsx evals/r12.ts && tsx evals/privacidad.ts && tsx evals/prueba-intencion.ts",
     "e2e": "tsx evals/e2e.ts",
     "serve": "tsx agent/channels/http.ts"
   },
