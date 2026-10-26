@@ -9,7 +9,8 @@
     "typecheck": "tsc",
     "pruebas": "tsx evals/correr-pruebas.ts && tsx evals/regresion.ts && tsx evals/r12.ts && tsx evals/privacidad.ts && tsx evals/prueba-intencion.ts",
     "e2e": "tsx evals/e2e.ts",
-    "serve": "tsx agent/channels/http.ts"
+    "serve": "tsx agent/channels/http.ts",
+    "app": "concurrently --kill-others --names api,web -c blue,magenta \"npm run serve\" \"npm --prefix web run dev\""
   },
   "keywords": [],
   "author": "",
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
+    "concurrently": "^10.0.6",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
