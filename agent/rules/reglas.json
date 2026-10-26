@@ -1,0 +1,109 @@
+{
+  "version": "1.0.0",
+  "reglas": [
+    {
+      "id": "R1",
+      "prioridad": 1,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "negar_equipos",
+      "descripcion": "Inducción de seguridad vencida: negar uso de equipos y remitir a inducción."
+    },
+    {
+      "id": "R13",
+      "prioridad": 2,
+      "especificidad": 3,
+      "tipo": "bloqueante",
+      "efecto": "escalar",
+      "descripcion": "Dato crítico desconocido y fuentes en conflicto a la vez (R2+R3): no concluir, registrar ambos y escalar."
+    },
+    {
+      "id": "R2",
+      "prioridad": 2,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "escalar",
+      "descripcion": "Algún hecho crítico desconocido: no concluir, indicar qué dato falta y escalar al monitor."
+    },
+    {
+      "id": "R3",
+      "prioridad": 2,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "escalar",
+      "descripcion": "Dos fuentes con estados incompatibles: registrar contradicción, bloquear la sugerencia y escalar."
+    },
+    {
+      "id": "R4",
+      "prioridad": 3,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "negar_ingreso",
+      "descripcion": "Carné no vigente: negar ingreso y remitir a registro."
+    },
+    {
+      "id": "R5",
+      "prioridad": 4,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "escalar_coordinacion",
+      "descripcion": "Reserva creada por rol no autorizado: reserva no válida, escalar a coordinación."
+    },
+    {
+      "id": "R6",
+      "prioridad": 4,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "escalar_coordinacion",
+      "descripcion": "Aprobación verbal: no se acepta, registrar y escalar a coordinación."
+    },
+    {
+      "id": "R7",
+      "prioridad": 5,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "negar_ingreso",
+      "descripcion": "Aforo completo: negar ingreso nuevo y ofrecer lista de espera."
+    },
+    {
+      "id": "R8",
+      "prioridad": 6,
+      "especificidad": 1,
+      "tipo": "informativa",
+      "efecto": "puesto_accesible",
+      "descripcion": "Necesidad de accesibilidad: asignar primero puesto accesible; si no hay, escalar."
+    },
+    {
+      "id": "R9",
+      "prioridad": 6,
+      "especificidad": 1,
+      "tipo": "informativa",
+      "efecto": "excluir_equipo",
+      "descripcion": "Equipo no disponible: excluirlo de las sugerencias."
+    },
+    {
+      "id": "R10",
+      "prioridad": 7,
+      "especificidad": 1,
+      "tipo": "recomendacion",
+      "efecto": "recomendar_ingreso",
+      "descripcion": "Ninguna regla bloquea y la reserva es válida: recomendar ingreso y sugerir equipo."
+    },
+    {
+      "id": "R11",
+      "prioridad": 8,
+      "especificidad": 1,
+      "tipo": "asistencia",
+      "efecto": "asistencia_presente",
+      "descripcion": "Llegada hasta 15 min después del inicio: presente; si es posterior, tardía."
+    },
+    {
+      "id": "R12",
+      "prioridad": 8,
+      "especificidad": 1,
+      "tipo": "asistencia",
+      "efecto": "asistencia_sin_registro",
+      "descripcion": "Sin entrada al cierre de la franja: sin registro (no ausente definitivo)."
+    }
+  ]
+}
