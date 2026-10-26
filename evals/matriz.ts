@@ -27,7 +27,7 @@ const filas: Fila[] = [];
 
 // 1) Motor de reglas (deterministas, sin modelo).
 type Esperado = {
-  id: string; tipo: string; caso: string; regla: string; evento?: "ingreso" | "cierre";
+  id: string; tipo: string; caso: string; regla: string; evento?: "ingreso" | "cierre"; sinAccesibles?: boolean;
   decision: Decision["decision"]; reglas: string[]; equipo: string | null; notificar: string[];
   asistencia: Decision["estado_asistencia"];
 };
@@ -40,13 +40,17 @@ const motor: Esperado[] = [
   { id: "P-05", tipo: "Contradicción", caso: "E-008", regla: "R3, R9", decision: "escalar", reglas: ["R3", "R9"], equipo: "PC-01", notificar: ["mantenimiento"], asistencia: "no_aplica" },
   { id: "P-09", tipo: "Combinado (desconocido + contradicción)", caso: "E-006", regla: "R13", decision: "escalar", reglas: ["R13", "R9"], equipo: null, notificar: ["mantenimiento"], asistencia: "no_aplica" },
   { id: "P-10", tipo: "Normal negativo", caso: "E-007", regla: "R4", decision: "negar", reglas: ["R4"], equipo: null, notificar: [], asistencia: "no_aplica" },
+  { id: "P-11a", tipo: "Accesibilidad (hay puesto)", caso: "E-012", regla: "R8", decision: "permitir", reglas: ["R8", "R10", "R11"], equipo: "PC-03", notificar: [], asistencia: "presente" },
+  { id: "P-11b", tipo: "Accesibilidad (sin puesto libre)", caso: "E-012", regla: "R8", sinAccesibles: true, decision: "escalar", reglas: ["R8"], equipo: null, notificar: [], asistencia: "no_aplica" },
   { id: "R12", tipo: "Asistencia al cierre", caso: "E-011", regla: "R12", evento: "cierre", decision: "escalar", reglas: ["R12"], equipo: null, notificar: [], asistencia: "sin_registro" },
 ];
 for (const x of motor) {
-  const d = evaluar(casos[x.caso], entrada(x.caso, x.evento), eqSala1);
+  // P-11b simula que los puestos accesibles de la sala están ocupados o fuera de servicio.
+  const lista = x.sinAccesibles ? eqSala1.filter((q) => !q.accesible) : eqSala1;
+  const d = evaluar(casos[x.caso], entrada(x.caso, x.evento), lista);
   const esp = { decision: x.decision, reglas_aplicadas: x.reglas, equipo_sugerido: x.equipo, notificar: x.notificar, estado_asistencia: x.asistencia };
   filas.push({
-    id: x.id, tipo: x.tipo, entrada: `${x.caso}${x.evento === "cierre" ? " (cierre)" : ""}`, regla: x.regla,
+    id: x.id, tipo: x.tipo, entrada: `${x.caso}${x.evento === "cierre" ? " (cierre)" : ""}${x.sinAccesibles ? " (sin puestos accesibles libres)" : ""}`, regla: x.regla,
     esperado: resumir(esp), observado: resumir(d), ok: resumir(esp) === resumir(d),
   });
 }

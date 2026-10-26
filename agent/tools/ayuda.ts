@@ -19,7 +19,8 @@ const PATRONES: [Tema, RegExp][] = [
   ["carne", /\bcarne(t|s|ts)?\b/],
   ["franjas", /\bfranjas?\b/],
   ["reglas", /\b(reglas?|restricciones?|requisitos?|condiciones)\b/],
-  ["reserva", /\b(agendar|programar|reservar|apartar|asignar)\b/],
+  // Reserva: verbos de programar, o "sala" junto a "recomendar"/"programación" (no "nota de programación").
+  ["reserva", /\b(agendar|programar|reservar|apartar|asignar)\b|\bsalas?\b.{0,40}\b(recomiend\w*|programacion\w*)|\b(recomiend\w*|programacion\w*)\b.{0,40}\bsalas?\b/],
   ["salas", /\b(salas?|equipos?)\b.{0,25}\b(disponibles?|libres?|ocupadas?|ocupados?)\b|\bhay salas?\b|\bcupos?\b|\baforo\b/],
 ];
 

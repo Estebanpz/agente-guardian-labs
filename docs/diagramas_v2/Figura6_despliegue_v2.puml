@@ -1,0 +1,46 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam titleFontSize 17
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 200
+title Diagrama de despliegue\nVersión 2.0 · Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel · Octubre 2026
+
+node "Equipo local (Linux Mint 22.3 · Intel Core i3-1215U · 11 GiB RAM)" as PC {
+  node "Navegador" as NAV
+  node "Servidor de desarrollo Vite\nlocalhost:5173" as VITE {
+    artifact "Interfaz web (React)" as WEB
+  }
+  node "Node.js 24\n127.0.0.1:3000" as NODE {
+    artifact "API Express + agente\n(orquestador, motor, intérprete)" as API
+  }
+  node "Ollama 0.34.2\n127.0.0.1:11434" as OLL {
+    artifact "llama3.2:3b (Q4_K_M, 2,0 GB)" as MOD
+  }
+  folder "Archivos del proyecto" as FS {
+    file "rules/reglas.json\n(versión 1.0.0)" as R
+    file "data/ (casos, salas, equipos)" as D
+    file "logs/evaluaciones.jsonl" as L
+  }
+}
+cloud "Vercel AI Gateway\n(solo comparación,\napagado por defecto)" as VER
+
+NAV --> WEB : HTTP
+WEB --> API : proxy /api
+API --> MOD : HTTP local
+API --> R
+API --> D
+API --> L
+API ..> VER : HTTPS (PROVEEDOR=vercel)
+
+legend right
+  Flecha continua: uso normal
+  Flecha punteada: opcional, desactivado
+  La API y Ollama escuchan solo en 127.0.0.1
+  (sin autenticación, sin acceso desde la red)
+endlegend
+caption Nota. Elaboración propia con notación UML 2.5.1.
+@enduml

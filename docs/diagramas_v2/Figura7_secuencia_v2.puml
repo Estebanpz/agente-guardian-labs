@@ -1,0 +1,54 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam titleFontSize 17
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 200
+skinparam maxMessageSize 190
+skinparam ParticipantPadding 6
+title Diagrama de secuencia implementado: mensaje en texto libre\nVersión 2.0 · Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel · Octubre 2026
+
+actor Monitor
+participant "Interfaz" as UI
+participant "Orquestador" as ORQ
+participant "Intérprete\n(guardia + modelo)" as INT
+participant "Herramienta\nlógica (motor)" as MOT
+participant "Redactor\n(modelo)" as RED
+database "Base y\nregistro" as KB
+
+Monitor -> UI : Escribe el mensaje\ny elige la sala
+UI -> ORQ : POST /mensaje (texto, sala)
+ORQ -> ORQ : ¿Datos prohibidos?\n(cédula, correo, teléfono)
+alt Hay datos prohibidos
+  ORQ --> UI : Rechazo, sin llamar al modelo\ny sin guardar el texto
+else Texto permitido
+  ORQ -> INT : interpretar(texto)
+  INT --> ORQ : intención + datos candidatos (JSON)
+  alt Modelo no responde
+    ORQ --> UI : Aviso "modelo no disponible"
+  else Ayuda, estado de salas o reserva
+    ORQ -> KB : Consultar salas y reglas
+    ORQ --> UI : Respuesta armada con los datos
+  else Fuera de alcance
+    ORQ --> UI : Mensaje fijo de alcance
+  else Consulta de ingreso o intento de eludir reglas
+    ORQ -> ORQ : Verificar candidatos contra el texto
+    alt Falta el ID o la sala
+      ORQ --> UI : Pedir aclaración
+    else Datos completos
+      ORQ -> MOT : evaluar(hechos, entrada, equipos de la sala)
+      MOT -> KB : Reglas R1–R13 y hechos
+      MOT --> ORQ : decisión + reglas + traza
+      ORQ -> RED : Redactar con los motivos de la traza
+      RED --> ORQ : Explicación (no cambia la decisión)
+      ORQ -> KB : Guardar entrada, versión, decisión y traza
+      ORQ --> UI : Recomendación + traza (+ alerta si hubo intento de eludir)
+    end
+  end
+end
+UI --> Monitor : Mostrar resultado\n(la decisión final es del monitor)
+caption Nota. Elaboración propia con notación UML 2.5.1.
+@enduml

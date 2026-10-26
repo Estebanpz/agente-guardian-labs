@@ -1,0 +1,52 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 16
+skinparam defaultFontName Arial
+skinparam titleFontSize 17
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 200
+
+title Diagrama de componentes implementado\nVersión 2.0 · Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel · Octubre 2026
+
+package "Interfaz (web/)" {
+  component "Vistas Puerta, Chat y Salas\n(React + Bootstrap)" as UI
+}
+package "Agente (agent/)" {
+  component "Canal HTTP\nchannels/http.ts (Express)" as HTTP
+  component "Orquestador\norquestador.ts" as ORQ
+  component "Filtro de datos prohibidos\ntools/privacidad.ts" as PRIV
+  component "Guardia de manipulación\nllm/guardia.ts" as GUA
+  component "Intérprete\nllm/interprete.ts" as INT
+  component "Redactor\nllm/redactor.ts" as RED
+  component "Proveedor del modelo\nllm/proveedor.ts" as PROV
+  component "Herramienta lógica\ntools/motor.ts (evaluar)" as MOT
+  component "Respuestas informativas\ntools/ayuda.ts · tools/salas.ts" as AYU
+}
+component "Ollama + llama3.2:3b\n(local)" as LLM
+database "Base de conocimiento\nrules/reglas.json · data/" as KB
+database "Registro\nlogs/evaluaciones.jsonl" as LOG
+
+UI --> HTTP : /evaluar, /mensaje, /salas
+HTTP --> ORQ : entrada validada (Zod)
+ORQ --> PRIV : 1. revisar texto
+ORQ --> INT : 2. intención y datos candidatos
+INT --> GUA : patrones (sin modelo)
+INT --> PROV : JSON estructurado
+RED --> PROV : explicación
+PROV --> LLM
+ORQ --> MOT : 3. hechos + entrada
+MOT --> KB : reglas y hechos
+ORQ --> AYU : preguntas informativas
+AYU --> KB
+ORQ --> RED : 4. decisión
+ORQ --> LOG : 5. entrada, versión,\ndecisión, traza
+
+legend right
+  La herramienta lógica (motor) es la única que decide:
+  permitir, negar o escalar.
+  El modelo (Ollama) solo interpreta y redacta.
+endlegend
+caption Nota. Elaboración propia con notación UML 2.5.1. Los números indican el orden del ciclo.
+@enduml

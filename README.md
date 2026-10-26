@@ -166,6 +166,7 @@ La tolerancia de asistencia es un parámetro de `agent/rules/reglas.json` (`tole
 | P-08 | E-010 | Regresión: con tolerancia 10 min, solo la llegada a los 12 min cambia a tardía |
 | P-09 | E-006 | Escalar por R13, sin sugerir PC-07 |
 | P-10 | E-007 | Negar por R4 |
+| P-11 | E-012 | Accesibilidad (R8): con puesto accesible libre sugiere PC-03; sin puestos accesibles libres, escala |
 
 ## Estructura
 

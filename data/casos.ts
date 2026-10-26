@@ -22,4 +22,5 @@ export const casos: Record<string, Hechos> = {
   "E-009": { ...base, aprobacion_coordinacion: "verbal" },          // P-07 R6
   "E-010": { ...base, hora_llegada: "08:12" },                      // P-08 llegada a 12 min
   "E-011": { ...base, entrada_registrada: false }, // R12: cierre sin registro
+  "E-012": { ...base, necesidad_accesibilidad: true }, // R8: necesita puesto accesible
 };

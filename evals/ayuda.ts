@@ -7,6 +7,7 @@ const casos: [string, string[]][] = [
   ["dime qué salas hay disponibles y en qué franjas horarias?", ["franjas", "salas"]],
   ["que es la inducción de seguridad?", ["induccion"]],
   ["¿Qué pasa si el carné está vencido?", ["carne"]],
+  ["que salas me recomiendas para una programaciónn de 12:00 - 14:00?", ["reserva"]],
   ["¿Cuál es mi nota de programación?", []],
   ["¿Qué horario tiene la biblioteca?", []],
 ];
