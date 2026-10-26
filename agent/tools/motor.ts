@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { Decision, type EntradaEvaluar, type Hechos } from "./esquemas";
+import { Decision, type Equipo, type EntradaEvaluar, type Hechos } from "./esquemas.js";
 
 type Regla = {
   id: string; prioridad: number; especificidad: number;
@@ -32,12 +32,12 @@ function contradicciones(h: Hechos): string[] {
   const i = h.equipo_estado_inventario;
   const m = h.equipo_estado_mantenimiento;
   if (i !== "desconocido" && m !== "desconocido" && i !== m) {
-    return [`equipo: inventario=${i} vs mantenimiento=${m}`];
+    return [`${h.equipo_id}: inventario=${i} vs mantenimiento=${m}`];
   }
   return [];
 }
 
-export function evaluar(h: Hechos, e: EntradaEvaluar): Decision {
+export function evaluar(h: Hechos, e: EntradaEvaluar, equipos: Equipo[] = []): Decision {
   const desc = desconocidos(h);
   const contr = contradicciones(h);
   const equipoNoDisp =
@@ -90,6 +90,28 @@ export function evaluar(h: Hechos, e: EntradaEvaluar): Decision {
     traza.push("Ninguna regla aplicable: se escala por seguridad.");
   }
 
+  // Sugerencia de equipo (informativa; el monitor puede ignorarla).
+  // Nunca se sugiere si hay datos desconocidos (R13/R2) ni si se niega el ingreso.
+  let equipo_sugerido: string | null = null;
+  const puedeSugerir =
+    desc.length === 0 && (decision === "permitir" || (decision === "escalar" && aplica.R3));
+  if (puedeSugerir) {
+    const propio = !equipoNoDisp && !h.necesidad_accesibilidad ? h.equipo_id : null;
+    const ok = (q: Equipo) =>
+      q.id !== h.equipo_id &&
+      q.inventario === "disponible" &&
+      q.mantenimiento === "disponible" &&
+      (!h.necesidad_accesibilidad || q.accesible);
+    equipo_sugerido = propio ?? equipos.find(ok)?.id ?? null;
+  }
+
+  // R8: si necesita puesto accesible y no hay, se escala.
+  if (decision === "permitir" && aplica.R8 && !equipo_sugerido) {
+    decision = "escalar";
+    aplicadas = aplicadas.filter((r) => r.id !== "R10");
+    traza.push("R8: no hay puesto accesible disponible; escalar.");
+  }
+
   // Asistencia (R11). R12 queda pendiente: necesita el registro de entradas.
   let estado_asistencia: "presente" | "tardia" | "sin_registro" | "no_aplica" = "no_aplica";
   if (decision === "permitir" && e.tipo_evento === "ingreso") {
@@ -99,16 +121,16 @@ export function evaluar(h: Hechos, e: EntradaEvaluar): Decision {
     traza.push(`R11: ${estado_asistencia}`);
   }
 
-  // Sugerencia informativa: el monitor puede ignorarla.
-  const equipo_sugerido =
-    decision === "permitir" && !equipoNoDisp
-      ? h.necesidad_accesibilidad ? "puesto accesible" : "equipo disponible"
-      : null;
+  // A quién avisar.
+  const notificar: string[] = [];
+  if (aplica.R13 || aplica.R3) notificar.push("mantenimiento");
+  if (aplica.R5 || aplica.R6) notificar.push("coordinación");
 
   return Decision.parse({
     decision,
     reglas_aplicadas: aplicadas.map((r) => r.id),
     equipo_sugerido,
+    notificar,
     estado_asistencia,
     hechos_desconocidos: desc,
     contradicciones: contr,

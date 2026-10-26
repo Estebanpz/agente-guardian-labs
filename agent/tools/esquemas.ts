@@ -16,6 +16,7 @@ export const Hechos = z.object({
     equipo_estado_mantenimiento: z.enum(["disponible", "mantenimiento", "diagnostico", "desconocido"]),
     necesidad_accesibilidad: z.boolean(),
     hora_llegada: z.string().regex(/^\d{2}:\d{2}$/), // Formato HH:mm
+    equipo_id: z.string().min(1),
 });
 
 // Entrada de la Herramienta evaluar_ingreso (sección 11.2).
@@ -30,6 +31,7 @@ export const Decision = z.object({
     decision: z.enum(["permitir", "negar", "escalar"]),
     reglas_aplicadas: z.array(z.string()),
     equipo_sugerido: z.string().nullable(),
+  notificar: z.array(z.string()),
     estado_asistencia: z.enum(["presente", "tardia", "sin_registro", "no_aplica"]),
     hechos_desconocidos: z.array(z.string()),
     contradicciones: z.array(z.string()),
@@ -40,3 +42,11 @@ export const Decision = z.object({
 export type Hechos = z.infer<typeof Hechos>;
 export type EntradaEvaluar = z.infer<typeof EntradaEvaluar>;
 export type Decision = z.infer<typeof Decision>;
+const EstadoEquipo = z.enum(["disponible", "mantenimiento", "diagnostico", "desconocido"]);
+export const Equipo = z.object({
+  id: z.string(),
+  inventario: EstadoEquipo,
+  mantenimiento: EstadoEquipo,
+  accesible: z.boolean(),
+});
+export type Equipo = z.infer<typeof Equipo>;

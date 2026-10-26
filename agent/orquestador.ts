@@ -4,6 +4,7 @@ import { evaluar } from "./tools/motor.js";
 import { redactar } from "./llm/redactor.js";
 import { interpretar } from "./llm/interprete.js";
 import { casos } from "../data/casos.js";
+import { equipos } from "../data/equipos.js";
 
 const LOG = new URL("../logs/evaluaciones.jsonl", import.meta.url);
 const registrar = (r: object) =>
@@ -23,7 +24,7 @@ export async function solicitar(datos: unknown, alerta?: string) {
   }
 
   // 3. El motor decide (determinista).
-  const decision = evaluar(hechos, entrada);
+  const decision = evaluar(hechos, entrada, equipos);
 
   // 4. El modelo solo redacta; si falla, la decisión no se pierde.
   let explicacion: string;
