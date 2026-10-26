@@ -88,3 +88,6 @@ body {
 
 .gl-vacio img { max-width: 260px; width: 70%; }
 footer { color: var(--gl-suave); font-size: .8rem; }
+
+/* Entrada del chat: crece con el texto */
+.gl-entrada { resize: none; overflow-y: auto; max-height: 160px; line-height: 1.45; }

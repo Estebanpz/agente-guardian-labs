@@ -14,6 +14,8 @@ const SUGERENCIAS = [
   "Mi cédula es 1070612345, ¿puedo entrar?",
 ];
 
+const MAX = 500;
+
 const ETIQUETAS = {
   fuera_de_alcance: { texto: "Fuera de alcance", clase: "text-bg-secondary", icono: "bi-slash-circle" },
   datos_prohibidos: { texto: "Datos personales bloqueados", clase: "text-bg-danger", icono: "bi-incognito" },
@@ -21,6 +23,7 @@ const ETIQUETAS = {
   aclaracion: { texto: "Necesito un dato", clase: "text-bg-primary", icono: "bi-question-circle" },
   ayuda: { texto: "Ayuda", clase: "text-bg-info", icono: "bi-info-circle" },
   consulta_salas: { texto: "Estado de salas", clase: "text-bg-success", icono: "bi-grid-3x3-gap" },
+  solicitud_reserva: { texto: "Reservas: no es mi función", clase: "text-bg-warning", icono: "bi-calendar-x" },
 };
 
 function RespuestaAgente({ r }) {
@@ -47,6 +50,15 @@ export default function Chat() {
   const [sala, setSala] = useState("sala-1");
   const [cargando, setCargando] = useState(false);
   const fin = useRef(null);
+  const entrada = useRef(null);
+
+  // La caja crece con el texto (hasta un máximo) y vuelve a una línea al enviar.
+  useEffect(() => {
+    const el = entrada.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [texto]);
 
   useEffect(() => {
     fin.current?.scrollIntoView({ behavior: "smooth" });
@@ -112,15 +124,30 @@ export default function Chat() {
           </div>
 
           <div className="card-footer bg-white py-3">
-            <form className="d-flex gap-2" onSubmit={(e) => { e.preventDefault(); enviar(texto); }}>
-              <input
-                className="form-control"
-                placeholder="Ej.: Soy E-003, ¿puede entrar a la sala 1?"
-                value={texto}
-                maxLength={500}
-                onChange={(e) => setTexto(e.target.value)}
-              />
-              <button className="btn btn-gl px-3" disabled={cargando || !texto.trim()} aria-label="Enviar">
+            <form className="d-flex gap-2 align-items-end" onSubmit={(e) => { e.preventDefault(); enviar(texto); }}>
+              <div className="flex-grow-1">
+                <textarea
+                  ref={entrada}
+                  rows={1}
+                  className="form-control gl-entrada"
+                  placeholder="Ej.: Soy E-003, ¿puede entrar a la sala 1?"
+                  value={texto}
+                  maxLength={MAX}
+                  onChange={(e) => setTexto(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter envía; Shift+Enter hace un salto de línea.
+                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      enviar(texto);
+                    }
+                  }}
+                />
+                <div className="d-flex justify-content-between small text-secondary mt-1 px-1">
+                  <span className="d-none d-sm-inline">Enter para enviar · Shift+Enter para nueva línea</span>
+                  <span className={texto.length > MAX * 0.9 ? "text-danger fw-semibold" : ""}>{texto.length}/{MAX}</span>
+                </div>
+              </div>
+              <button className="btn btn-gl px-3 mb-4" disabled={cargando || !texto.trim()} aria-label="Enviar">
                 <i className="bi bi-send-fill" />
               </button>
             </form>

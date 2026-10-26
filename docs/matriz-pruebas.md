@@ -2,7 +2,7 @@
 
 | Dato | Valor |
 |---|---|
-| Fecha de ejecución | 26/10/2026, 4:52:13 p. m. |
+| Fecha de ejecución | 26/10/2026, 5:06:19 p. m. |
 | Versión de las reglas | 1.0.0 |
 | Proveedor y modelo | ollama:llama3.2:3b |
 | Versión de Ollama | 0.34.2 |
@@ -40,3 +40,4 @@ producen la misma decisión. P-06, P-07, S-01 y S-02 pasan por el modelo local.
 | 5 | P-05 esperaba "sugerir otro equipo", pero el motor solo excluía el equipo en conflicto. | Inventario sintético por sala y sugerencia de un equipo libre de la misma sala. |
 | 6 | El taller exige validar datos prohibidos y el agente no lo hacía. | Filtro de cédula, correo y teléfono antes del modelo, con pruebas de falsos positivos. |
 | 7 | El modelo podía proponer un id o una sala que no estaban en el texto. | El orquestador verifica los datos candidatos contra el texto y pide aclaración si faltan. |
+| 8 | Prueba manual del monitor: "¿quién eres?" y "¿qué salas hay disponibles?" se respondían como fuera de alcance, y "quiero programar la sala 1…" se respondía con el estado de las salas. | Nuevas intenciones `ayuda`, `consulta_salas` y `solicitud_reserva`, con respuestas armadas desde los datos (sin modelo). La frase "¿Hay cupo en la sala 1…?" pasó de `consulta_ingreso` a `consulta_salas`: la prueba se ajustó porque cambió la clasificación, no para ocultar un fallo. |

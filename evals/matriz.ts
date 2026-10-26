@@ -128,6 +128,7 @@ const historial = `## Fallos encontrados durante el desarrollo y correcciones
 | 5 | P-05 esperaba "sugerir otro equipo", pero el motor solo excluía el equipo en conflicto. | Inventario sintético por sala y sugerencia de un equipo libre de la misma sala. |
 | 6 | El taller exige validar datos prohibidos y el agente no lo hacía. | Filtro de cédula, correo y teléfono antes del modelo, con pruebas de falsos positivos. |
 | 7 | El modelo podía proponer un id o una sala que no estaban en el texto. | El orquestador verifica los datos candidatos contra el texto y pide aclaración si faltan. |
+| 8 | Prueba manual del monitor: \"¿quién eres?\" y \"¿qué salas hay disponibles?\" se respondían como fuera de alcance, y \"quiero programar la sala 1…\" se respondía con el estado de las salas. | Nuevas intenciones \`ayuda\`, \`consulta_salas\` y \`solicitud_reserva\`, con respuestas armadas desde los datos (sin modelo). La frase \"¿Hay cupo en la sala 1…?\" pasó de \`consulta_ingreso\` a \`consulta_salas\`: la prueba se ajustó porque cambió la clasificación, no para ocultar un fallo. |
 `;
 
 const salidaMd = `# Matriz de pruebas: esperado vs. observado

@@ -67,15 +67,39 @@ export async function mensaje(texto: string, contexto: { laboratorio?: SalaId; f
     return { intencion: c.intencion, respuesta };
   }
 
+  // Reservas: no es función de este agente (la asignación de salas es otro proceso).
+  if (c.intencion === "solicitud_reserva") {
+    const respuesta = [
+      "No programo, reservo ni asigno salas o equipos: eso lo gestiona coordinación en el sistema de reservas.",
+      "Yo trabajo en la puerta: evalúo si una persona puede ingresar ahora, registro la asistencia e informo el estado de las salas.",
+      "Si quiere, pregúnteme por el estado de la sala.",
+    ].join("\n");
+    registrar({ texto: resumen, intencion: c.intencion, respuesta });
+    return { intencion: c.intencion, respuesta };
+  }
+
   // Ayuda: texto fijo, sin modelo.
   if (c.intencion === "ayuda") {
-    const respuesta = [
-      "Soy el asistente del monitor de los laboratorios de sistemas. Puedo:",
-      "• Evaluar si una persona puede ingresar (escriba su id, por ejemplo E-001, y la sala).",
-      "• Registrar la salida o la asistencia al cierre de la franja.",
-      "• Informar el estado de las salas: aforo, franjas y equipos.",
-      "Yo recomiendo con base en las reglas R1–R13; la decisión final siempre es suya.",
-    ].join("\n");
+    // Pregunta concreta sobre el ID: respuesta corta y directa.
+    const preguntaId = /\b(id|ids|identificador(es)?)\b/i.test(texto);
+    const respuesta = (preguntaId
+      ? [
+          "El ID es el código con el que identifico a una persona sin usar sus datos personales. Ejemplo: E-001.",
+          "• Para qué sirve: con el ID busco en la base el carné, la inducción de seguridad, la reserva y la hora de llegada de esa persona, y con eso aplico las reglas.",
+          "• ¿Se puede inventar? No sirve de nada: si el ID no está en la base, no evalúo nada y le paso la solicitud a usted, el monitor.",
+          "• En este prototipo: los IDs válidos son E-001 a E-011 y son de prueba, no son personas reales.",
+          "• En un uso real: el ID lo entregaría el sistema de carnetización de la universidad.",
+        ]
+      : [
+          "Soy el asistente del monitor de los laboratorios de sistemas. Puedo:",
+          "• Evaluar si una persona puede ingresar (escriba su ID, por ejemplo E-001, y la sala).",
+          "• Registrar la salida o la asistencia al cierre de la franja.",
+          "• Informar el estado de las salas: aforo, franjas y equipos.",
+          "No programo ni reservo salas: eso lo hace coordinación.",
+          "Yo recomiendo con base en las reglas R1–R13; la decisión final siempre es suya.",
+          "¿Dudas sobre el ID? Pregúnteme \"¿qué es el ID?\".",
+        ]
+    ).join("\n");
     registrar({ texto: resumen, intencion: c.intencion, respuesta });
     return { intencion: c.intencion, respuesta };
   }
