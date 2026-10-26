@@ -45,6 +45,7 @@ export type EntradaEvaluar = z.infer<typeof EntradaEvaluar>;
 export type Decision = z.infer<typeof Decision>;
 const EstadoEquipo = z.enum(["disponible", "mantenimiento", "diagnostico", "desconocido"]);
 export const Equipo = z.object({
+  sala: z.string(),
   id: z.string(),
   inventario: EstadoEquipo,
   mantenimiento: EstadoEquipo,

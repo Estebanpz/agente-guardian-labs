@@ -24,7 +24,7 @@ export async function solicitar(datos: unknown, alerta?: string) {
   }
 
   // 3. El motor decide (determinista).
-  const decision = evaluar(hechos, entrada, equipos);
+  const decision = evaluar(hechos, entrada, equipos.filter((q) => q.sala === entrada.laboratorio));
 
   // 4. El modelo solo redacta; si falla, la decisión no se pierde.
   let explicacion: string;
