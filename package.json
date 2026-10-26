@@ -8,7 +8,8 @@
     "pruebas": "tsx evals/correr-pruebas.ts && tsx evals/regresion.ts && tsx evals/r12.ts && tsx evals/privacidad.ts && tsx evals/prueba-intencion.ts",
     "e2e": "tsx evals/e2e.ts",
     "serve": "tsx agent/channels/http.ts",
-    "app": "concurrently --kill-others --names api,web -c blue,magenta \"npm run serve\" \"npm --prefix web run dev\""
+    "app": "concurrently --kill-others --names api,web -c blue,magenta \"npm run serve\" \"npm --prefix web run dev\"",
+    "matriz": "tsx evals/matriz.ts"
   },
   "keywords": [],
   "author": "Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel",

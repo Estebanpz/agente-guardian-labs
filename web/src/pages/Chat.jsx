@@ -5,6 +5,8 @@ import { ilus } from "../assets/ilustraciones/index.js";
 
 // Mensajes de ejemplo: cubren normal, fuera de alcance, adversarial y datos prohibidos.
 const SUGERENCIAS = [
+  "¿Qué puedes hacer?",
+  "¿Qué salas tienen cupo?",
   "Soy E-001, ¿puede entrar?",
   "E-006 quiere ingresar",
   "¿Cuál es mi nota de programación?",
@@ -17,6 +19,8 @@ const ETIQUETAS = {
   datos_prohibidos: { texto: "Datos personales bloqueados", clase: "text-bg-danger", icono: "bi-incognito" },
   intento_eludir_reglas: { texto: "Intento de eludir reglas", clase: "text-bg-danger", icono: "bi-shield-exclamation" },
   aclaracion: { texto: "Necesito un dato", clase: "text-bg-primary", icono: "bi-question-circle" },
+  ayuda: { texto: "Ayuda", clase: "text-bg-info", icono: "bi-info-circle" },
+  consulta_salas: { texto: "Estado de salas", clase: "text-bg-success", icono: "bi-grid-3x3-gap" },
 };
 
 function RespuestaAgente({ r }) {
@@ -32,7 +36,7 @@ function RespuestaAgente({ r }) {
       {etiqueta && (
         <span className={`badge ${etiqueta.clase} mb-2`}><i className={`bi ${etiqueta.icono} me-1`} />{etiqueta.texto}</span>
       )}
-      <div>{r.respuesta ?? r.explicacion}</div>
+      <div style={{ whiteSpace: "pre-line" }}>{r.respuesta ?? r.explicacion}</div>
     </div>
   );
 }

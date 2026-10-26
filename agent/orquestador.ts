@@ -4,6 +4,7 @@ import { evaluar } from "./tools/motor.js";
 import { redactar } from "./llm/redactor.js";
 import { interpretar, porRegex } from "./llm/interprete.js";
 import { datosProhibidos } from "./tools/privacidad.js";
+import { resumenSalas } from "./tools/salas.js";
 import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import { salas } from "../data/salas.js";
@@ -62,6 +63,43 @@ export async function mensaje(texto: string, contexto: { laboratorio?: SalaId; f
   if (c.intencion === "fuera_de_alcance") {
     const respuesta =
       "Esa consulta está fuera de mi alcance. Solo oriento sobre ingreso, uso de equipos y asistencia en los laboratorios de sistemas.";
+    registrar({ texto: resumen, intencion: c.intencion, respuesta });
+    return { intencion: c.intencion, respuesta };
+  }
+
+  // Ayuda: texto fijo, sin modelo.
+  if (c.intencion === "ayuda") {
+    const respuesta = [
+      "Soy el asistente del monitor de los laboratorios de sistemas. Puedo:",
+      "• Evaluar si una persona puede ingresar (escriba su id, por ejemplo E-001, y la sala).",
+      "• Registrar la salida o la asistencia al cierre de la franja.",
+      "• Informar el estado de las salas: aforo, franjas y equipos.",
+      "Yo recomiendo con base en las reglas R1–R13; la decisión final siempre es suya.",
+    ].join("\n");
+    registrar({ texto: resumen, intencion: c.intencion, respuesta });
+    return { intencion: c.intencion, respuesta };
+  }
+
+  // Estado de salas: se arma con los datos, el modelo no inventa cupos ni franjas.
+  if (c.intencion === "consulta_salas") {
+    const lab = porRegex(texto).laboratorio;
+    const salasR = resumenSalas().filter((s) => !lab || s.id === lab);
+    const lineas = salasR.map((s) => {
+      const revisar = s.equipos
+        .filter((q) => q.estado === "conflicto" || q.estado === "desconocido")
+        .map((q) => `${q.id} (${q.estado})`);
+      return (
+        `• ${s.nombre}: ${s.franja ? `franja ${s.franja}` : "sin franja activa"} · aforo ${s.aforo_actual}/${s.capacidad}` +
+        `${s.lleno ? " (llena)" : ""} · ${s.disponibles} de ${s.equipos.length} equipos disponibles` +
+        (revisar.length ? ` · revisar: ${revisar.join(", ")}` : "")
+      );
+    });
+    const conCupo = salasR.filter((s) => s.franja && !s.lleno).map((s) => s.nombre);
+    const respuesta = [
+      "Estado actual de las salas:",
+      ...lineas,
+      conCupo.length ? `Con cupo en este momento: ${conCupo.join(", ")}.` : "Ninguna sala con franja activa tiene cupo ahora.",
+    ].join("\n");
     registrar({ texto: resumen, intencion: c.intencion, respuesta });
     return { intencion: c.intencion, respuesta };
   }
