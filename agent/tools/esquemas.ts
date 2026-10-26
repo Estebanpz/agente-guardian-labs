@@ -17,6 +17,7 @@ export const Hechos = z.object({
     necesidad_accesibilidad: z.boolean(),
     hora_llegada: z.string().regex(/^\d{2}:\d{2}$/), // Formato HH:mm
     equipo_id: z.string().min(1),
+    entrada_registrada: z.boolean(),
 });
 
 // Entrada de la Herramienta evaluar_ingreso (sección 11.2).
@@ -24,7 +25,7 @@ export const EntradaEvaluar = z.object({
     id_sintetico: z.string().min(1),
     laboratorio: z.enum(["sala-1", "sala-2", "sala-3"]),//Nombres reales de las salas - validar
     franja: z.string().regex(/^\d{2}:\d{2}–\d{2}:\d{2}$/), // Ej. "09:00-11:00"
-    tipo_evento: z.enum(["ingreso", "salida"])
+    tipo_evento: z.enum(["ingreso", "salida", "cierre"])
 });
 //Salida estructurada de la Herramienta
 export const Decision = z.object({

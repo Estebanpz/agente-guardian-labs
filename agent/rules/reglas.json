@@ -1,5 +1,6 @@
 {
   "version": "1.0.0",
+  "parametros": { "tolerancia_asistencia_min": 15 },
   "reglas": [
     {
       "id": "R1",
@@ -95,7 +96,7 @@
       "especificidad": 1,
       "tipo": "asistencia",
       "efecto": "asistencia_presente",
-      "descripcion": "Llegada hasta 15 min después del inicio: presente; si es posterior, tardía."
+      "descripcion": "Llegada dentro de la tolerancia configurada después del inicio: presente; si es posterior, tardía."
     },
     {
       "id": "R12",

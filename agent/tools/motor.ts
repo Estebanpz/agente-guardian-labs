@@ -8,7 +8,7 @@ type Regla = {
 
 const base = JSON.parse(
   readFileSync(new URL("../rules/reglas.json", import.meta.url), "utf-8"),
-) as { version: string; reglas: Regla[] };
+) as { version: string; parametros: { tolerancia_asistencia_min: number }; reglas: Regla[] };
 
 const aMin = (hhmm: string) => {
   const [h, m] = hhmm.split(":").map(Number);
@@ -37,14 +37,34 @@ function contradicciones(h: Hechos): string[] {
   return [];
 }
 
-export function evaluar(h: Hechos, e: EntradaEvaluar, equipos: Equipo[] = []): Decision {
+export function evaluar(h: Hechos, e: EntradaEvaluar, equipos: Equipo[] = [],
+  opciones: { tolerancia?: number } = {},
+): Decision {
+  // R12: al cierre de la franja, sin entrada registrada -> "sin registro" (no ausente definitivo).
+  if (e.tipo_evento === "cierre") {
+    const r12 = base.reglas.find((r) => r.id === "R12")!;
+    const sinRegistro = !h.entrada_registrada;
+    return Decision.parse({
+      decision: sinRegistro ? "escalar" : "permitir",
+      reglas_aplicadas: sinRegistro ? ["R12"] : [],
+      equipo_sugerido: null,
+      notificar: [],
+      estado_asistencia: sinRegistro ? "sin_registro" : "no_aplica",
+      hechos_desconocidos: [],
+      contradicciones: [],
+      version_reglas: base.version,
+      traza: [sinRegistro ? `R12: ${r12.descripcion}` : "Entrada registrada; sin acción al cierre."],
+    });
+  }
+
   const desc = desconocidos(h);
   const contr = contradicciones(h);
   const equipoNoDisp =
     h.equipo_estado_inventario !== "disponible" ||
     h.equipo_estado_mantenimiento !== "disponible";
   const inicio = aMin(e.franja.split("–")[0]);
-  const tarde = aMin(h.hora_llegada) > inicio + 15;
+  const tol = opciones.tolerancia ?? base.parametros.tolerancia_asistencia_min;
+  const tarde = aMin(h.hora_llegada) > inicio + tol;
 
   const aplica: Record<string, boolean> = {
     R1: h.induccion_seguridad === "vencida",

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { chat } from "./proveedor.js";
+import { esIntentoDeElusion } from "./guardia.js";
 
 export const Intencion = z.object({
   intencion: z.enum(["consulta_ingreso", "fuera_de_alcance", "intento_eludir_reglas"]),
@@ -29,6 +30,7 @@ const guia = ejemplos.flatMap(([texto, intencion]) => [
 ]);
 
 export async function interpretar(texto: string): Promise<TipoIntencion> {
+  if (esIntentoDeElusion(texto)) return "intento_eludir_reglas"; // capa 1: sin modelo
   try {
     const salida = await chat(
       [{ role: "system", content: SISTEMA }, ...guia, { role: "user", content: texto }],

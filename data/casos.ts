@@ -6,7 +6,7 @@ const base: Hechos = {
   reserva_valida: "verdadero", reserva_creada_por_rol_autorizado: "verdadero",
   aprobacion_coordinacion: "escrita", aforo_actual: 10, capacidad: 25,
   equipo_estado_inventario: "disponible", equipo_estado_mantenimiento: "disponible",
-  necesidad_accesibilidad: false, hora_llegada: "08:05", equipo_id: "PC-01",
+  necesidad_accesibilidad: false, hora_llegada: "08:05", equipo_id: "PC-01", entrada_registrada: true,
 };
 
 export const casos: Record<string, Hechos> = {
@@ -21,4 +21,5 @@ export const casos: Record<string, Hechos> = {
   "E-008": { ...base, equipo_estado_mantenimiento: "diagnostico", equipo_id: "PC-07" }, // P-05 R3
   "E-009": { ...base, aprobacion_coordinacion: "verbal" },          // P-07 R6
   "E-010": { ...base, hora_llegada: "08:12" },                      // P-08 llegada a 12 min
+  "E-011": { ...base, entrada_registrada: false }, // R12: cierre sin registro
 };
