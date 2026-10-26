@@ -129,6 +129,8 @@ const historial = `## Fallos encontrados durante el desarrollo y correcciones
 | 6 | El taller exige validar datos prohibidos y el agente no lo hacía. | Filtro de cédula, correo y teléfono antes del modelo, con pruebas de falsos positivos. |
 | 7 | El modelo podía proponer un id o una sala que no estaban en el texto. | El orquestador verifica los datos candidatos contra el texto y pide aclaración si faltan. |
 | 8 | Prueba manual del monitor: \"¿quién eres?\" y \"¿qué salas hay disponibles?\" se respondían como fuera de alcance, y \"quiero programar la sala 1…\" se respondía con el estado de las salas. | Nuevas intenciones \`ayuda\`, \`consulta_salas\` y \`solicitud_reserva\`, con respuestas armadas desde los datos (sin modelo). La frase \"¿Hay cupo en la sala 1…?\" pasó de \`consulta_ingreso\` a \`consulta_salas\`: la prueba se ajustó porque cambió la clasificación, no para ocultar un fallo. |
+| 9 | Con el proveedor de comparación (Vercel), el límite de 5 solicitudes por minuto (error 429) hizo que una pregunta válida se respondiera como fuera de alcance: el respaldo ocultaba el fallo del modelo. | Si el modelo no responde, el agente lo dice (\`error_modelo\`) y remite a la vista Puerta, que no depende del modelo. Las pruebas oficiales se corren con Ollama. |
+| 10 | \"¿Qué es la inducción de seguridad?\" se respondía como fuera de alcance. | Temas de ayuda para la inducción de seguridad y el carné, con la regla que aplica a cada caso. |
 `;
 
 const salidaMd = `# Matriz de pruebas: esperado vs. observado

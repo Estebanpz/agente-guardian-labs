@@ -22,6 +22,7 @@ const ETIQUETAS = {
   intento_eludir_reglas: { texto: "Intento de eludir reglas", clase: "text-bg-danger", icono: "bi-shield-exclamation" },
   aclaracion: { texto: "Necesito un dato", clase: "text-bg-primary", icono: "bi-question-circle" },
   ayuda: { texto: "Ayuda", clase: "text-bg-info", icono: "bi-info-circle" },
+  error_modelo: { texto: "Modelo no disponible", clase: "text-bg-dark", icono: "bi-exclamation-octagon" },
   consulta_salas: { texto: "Estado de salas", clase: "text-bg-success", icono: "bi-grid-3x3-gap" },
   solicitud_reserva: { texto: "Reservas: no es mi función", clase: "text-bg-warning", icono: "bi-calendar-x" },
 };

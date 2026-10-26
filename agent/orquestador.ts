@@ -4,7 +4,7 @@ import { evaluar } from "./tools/motor.js";
 import { redactar } from "./llm/redactor.js";
 import { interpretar, porRegex } from "./llm/interprete.js";
 import { datosProhibidos } from "./tools/privacidad.js";
-import { resumenSalas } from "./tools/salas.js";
+import { AYUDA_GENERAL, TEXTO_RESERVA, estadoSalas, responderTemas, temasDe } from "./tools/ayuda.js";
 import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import { salas } from "../data/salas.js";
@@ -60,70 +60,36 @@ export async function mensaje(texto: string, contexto: { laboratorio?: SalaId; f
   const c = await interpretar(texto);
   const resumen = texto.slice(0, 200);
 
+  // El modelo no respondió (apagado, sin red o límite de uso): se informa, no se supone nada.
+  if (c.fallo && !temasDe(texto).length) {
+    const respuesta =
+      "No pude interpretar el mensaje porque el modelo no respondió. Intente de nuevo, o use la vista Puerta, que evalúa con las reglas sin depender del modelo.";
+    registrar({ texto: resumen, intencion: "error_modelo", respuesta });
+    return { intencion: "error_modelo", respuesta };
+  }
+
+  // Preguntas informativas: respuestas armadas con los datos y las reglas, sin modelo.
+  // Si el mensaje trae varias preguntas, se responde cada tema detectado.
+  const temas = temasDe(texto);
+  // Si el modelo dijo "fuera de alcance" pero el texto pregunta por el ID, las franjas, las reglas
+  // o el agente mismo, se responde igual (pasa con preguntas de seguimiento sin contexto).
+  const rescatables = temas.filter((t) => t !== "salas" && t !== "reserva");
+  const informativa = c.intencion === "ayuda" || c.intencion === "consulta_salas" || c.intencion === "solicitud_reserva";
+  if (informativa || (c.intencion === "fuera_de_alcance" && rescatables.length)) {
+    const intencion = informativa ? c.intencion : "ayuda";
+    const lista = informativa ? temas : rescatables;
+    let respuesta: string;
+    if (lista.length) respuesta = responderTemas(lista, texto);
+    else if (c.intencion === "consulta_salas") respuesta = estadoSalas(texto);
+    else if (c.intencion === "solicitud_reserva") respuesta = TEXTO_RESERVA;
+    else respuesta = AYUDA_GENERAL;
+    registrar({ texto: resumen, intencion, temas: lista, respuesta });
+    return { intencion, temas: lista, respuesta };
+  }
+
   if (c.intencion === "fuera_de_alcance") {
     const respuesta =
       "Esa consulta está fuera de mi alcance. Solo oriento sobre ingreso, uso de equipos y asistencia en los laboratorios de sistemas.";
-    registrar({ texto: resumen, intencion: c.intencion, respuesta });
-    return { intencion: c.intencion, respuesta };
-  }
-
-  // Reservas: no es función de este agente (la asignación de salas es otro proceso).
-  if (c.intencion === "solicitud_reserva") {
-    const respuesta = [
-      "No programo, reservo ni asigno salas o equipos: eso lo gestiona coordinación en el sistema de reservas.",
-      "Yo trabajo en la puerta: evalúo si una persona puede ingresar ahora, registro la asistencia e informo el estado de las salas.",
-      "Si quiere, pregúnteme por el estado de la sala.",
-    ].join("\n");
-    registrar({ texto: resumen, intencion: c.intencion, respuesta });
-    return { intencion: c.intencion, respuesta };
-  }
-
-  // Ayuda: texto fijo, sin modelo.
-  if (c.intencion === "ayuda") {
-    // Pregunta concreta sobre el ID: respuesta corta y directa.
-    const preguntaId = /\b(id|ids|identificador(es)?)\b/i.test(texto);
-    const respuesta = (preguntaId
-      ? [
-          "El ID es el código con el que identifico a una persona sin usar sus datos personales. Ejemplo: E-001.",
-          "• Para qué sirve: con el ID busco en la base el carné, la inducción de seguridad, la reserva y la hora de llegada de esa persona, y con eso aplico las reglas.",
-          "• ¿Se puede inventar? No sirve de nada: si el ID no está en la base, no evalúo nada y le paso la solicitud a usted, el monitor.",
-          "• En este prototipo: los IDs válidos son E-001 a E-011 y son de prueba, no son personas reales.",
-          "• En un uso real: el ID lo entregaría el sistema de carnetización de la universidad.",
-        ]
-      : [
-          "Soy el asistente del monitor de los laboratorios de sistemas. Puedo:",
-          "• Evaluar si una persona puede ingresar (escriba su ID, por ejemplo E-001, y la sala).",
-          "• Registrar la salida o la asistencia al cierre de la franja.",
-          "• Informar el estado de las salas: aforo, franjas y equipos.",
-          "No programo ni reservo salas: eso lo hace coordinación.",
-          "Yo recomiendo con base en las reglas R1–R13; la decisión final siempre es suya.",
-          "¿Dudas sobre el ID? Pregúnteme \"¿qué es el ID?\".",
-        ]
-    ).join("\n");
-    registrar({ texto: resumen, intencion: c.intencion, respuesta });
-    return { intencion: c.intencion, respuesta };
-  }
-
-  // Estado de salas: se arma con los datos, el modelo no inventa cupos ni franjas.
-  if (c.intencion === "consulta_salas") {
-    const lab = porRegex(texto).laboratorio;
-    const salasR = resumenSalas().filter((s) => !lab || s.id === lab);
-    const lineas = salasR.map((s) => {
-      const revisar = s.equipos
-        .filter((q) => q.estado === "conflicto" || q.estado === "desconocido")
-        .map((q) => `${q.id} (${q.estado})`);
-      return (
-        `• ${s.nombre}: ${s.franja ? `franja ${s.franja}` : "sin franja activa"} · aforo ${s.aforo_actual}/${s.capacidad}` +
-        `${s.lleno ? " (llena)" : ""} · ${s.disponibles} de ${s.equipos.length} equipos disponibles` +
-        (revisar.length ? ` · revisar: ${revisar.join(", ")}` : "")
-      );
-    });
-    const conCupo = salasR.filter((s) => s.franja && !s.lleno).map((s) => s.nombre);
-    const respuesta = [
-      "Estado actual de las salas:",
-      ...lineas,
-      conCupo.length ? `Con cupo en este momento: ${conCupo.join(", ")}.` : "Ninguna sala con franja activa tiene cupo ahora.",
-    ].join("\n");
     registrar({ texto: resumen, intencion: c.intencion, respuesta });
     return { intencion: c.intencion, respuesta };
   }

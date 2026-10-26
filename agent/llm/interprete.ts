@@ -62,7 +62,7 @@ export const porRegex = (texto: string) => {
   };
 };
 
-export async function interpretar(texto: string): Promise<Interpretacion> {
+export async function interpretar(texto: string): Promise<Interpretacion & { fallo?: string }> {
   if (esIntentoDeElusion(texto)) {
     // Capa 1: sin modelo.
     return { intencion: "intento_eludir_reglas", ...porRegex(texto), tipo_evento: null };
@@ -74,7 +74,9 @@ export async function interpretar(texto: string): Promise<Interpretacion> {
     );
     return Interpretacion.parse(JSON.parse(salida));
   } catch (e) {
-    console.error("[llm]", (e as Error).message);
-    return { intencion: "fuera_de_alcance", id_sintetico: null, laboratorio: null, tipo_evento: null };
+    const fallo = (e as Error).message;
+    console.error("[llm]", fallo);
+    // Sin modelo no se clasifica nada: el orquestador lo informa en vez de suponer una intención.
+    return { intencion: "fuera_de_alcance", id_sintetico: null, laboratorio: null, tipo_evento: null, fallo };
   }
 }
