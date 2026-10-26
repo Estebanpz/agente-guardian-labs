@@ -1,10 +1,8 @@
 {
   "name": "agente-guardian-labs",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Agente lógico local (Ollama + motor de reglas) para el control de ingreso a los laboratorios de sistemas de UniEspinal. Proyecto académico.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx agent/index.ts",
     "typecheck": "tsc",
     "pruebas": "tsx evals/correr-pruebas.ts && tsx evals/regresion.ts && tsx evals/r12.ts && tsx evals/privacidad.ts && tsx evals/prueba-intencion.ts",
@@ -13,8 +11,8 @@
     "app": "concurrently --kill-others --names api,web -c blue,magenta \"npm run serve\" \"npm --prefix web run dev\""
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel",
+  "license": "UNLICENSED",
   "type": "module",
   "dependencies": {
     "express": "^5.3.0",
@@ -27,5 +25,6 @@
     "concurrently": "^10.0.6",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
-  }
+  },
+  "private": true
 }
