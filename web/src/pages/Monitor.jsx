@@ -3,7 +3,7 @@ import { api } from "../api.js";
 import TarjetaDecision from "../components/TarjetaDecision.jsx";
 import CasoInfo from "../components/CasoInfo.jsx";
 import { Cargando, ErrorApi, Vacio } from "../components/Estado.jsx";
-import { ilus } from "../assets/ilustraciones/index.js";
+import Ilustracion from "../components/Ilustracion.jsx";
 
 // Ids sintéticos de respaldo si la API no responde (los reales vienen de GET /casos).
 const CASOS = Array.from({ length: 12 }, (_, i) => `E-${String(i + 1).padStart(3, "0")}`);
@@ -80,7 +80,7 @@ export default function Monitor() {
             Evalúa el ingreso con las reglas R1–R13. El agente recomienda; usted decide.
           </p>
         </div>
-        <img src={ilus.autenticacion} alt="" className="d-none d-md-block" />
+        <Ilustracion nombre="autenticacion" ancho={166} prioridad className="d-none d-md-block" />
       </section>
 
       <div className="row g-4">
@@ -145,16 +145,18 @@ export default function Monitor() {
         </div>
 
         <div className="col-lg-7">
+          <div className="position-sticky" style={{ top: 80 }}>
           {cargando && <Cargando />}
           {!cargando && error && <ErrorApi mensaje={error} />}
           {!cargando && !error && resultado && <TarjetaDecision resultado={resultado} />}
           {!cargando && !error && !resultado && (
             <Vacio
-              img={ilus.autenticacion}
-              titulo="Sin solicitudes todavía"
+              nombre="elegir"
+              titulo="Elija un caso y evalúe"
               texto="Llene la solicitud o elija un caso de demostración para ver la recomendación."
             />
           )}
+          </div>
         </div>
       </div>
     </>

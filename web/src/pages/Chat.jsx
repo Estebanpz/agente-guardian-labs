@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import TarjetaDecision from "../components/TarjetaDecision.jsx";
-import { ilus } from "../assets/ilustraciones/index.js";
+import Ilustracion from "../components/Ilustracion.jsx";
 
 // Mensajes de ejemplo: cubren normal, fuera de alcance, adversarial y datos prohibidos.
 const SUGERENCIAS = [
@@ -103,7 +103,7 @@ export default function Chat() {
           <div className="card-body gl-chat">
             {mensajes.length === 0 && (
               <div className="text-center gl-vacio py-4">
-                <img src={ilus.chat} alt="" className="mb-3" />
+                <Ilustracion nombre="chat" ancho={200} className="mb-3" />
                 <h6>¿En qué le ayudo en la puerta?</h6>
                 <p className="gl-subtitulo small mb-0">Pruebe una de las sugerencias de la derecha.</p>
               </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { Cargando, ErrorApi } from "../components/Estado.jsx";
-import { ilus } from "../assets/ilustraciones/index.js";
+import Ilustracion from "../components/Ilustracion.jsx";
 
 const ESTADOS = {
   disponible: { texto: "Disponible", icono: "bi-check-circle" },
@@ -106,7 +106,7 @@ export default function Salas() {
           </button>
           {actualizado && <small className="ms-2 opacity-75">Actualizado {actualizado.toLocaleTimeString()}</small>}
         </div>
-        <img src={ilus.salas} alt="" className="d-none d-md-block" />
+        <Ilustracion nombre="salas" ancho={174} prioridad className="d-none d-md-block" />
       </section>
 
       {cargando && <Cargando texto="Cargando salas…" />}

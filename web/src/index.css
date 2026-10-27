@@ -34,7 +34,7 @@ body {
   background: linear-gradient(135deg, var(--gl-primario), var(--gl-acento));
   color: #fff; border-radius: 1.25rem; overflow: hidden;
 }
-.gl-hero img { max-height: 130px; }
+.gl-ilus { height: auto; max-width: 100%; }
 .gl-subtitulo { color: var(--gl-suave); }
 .form-label { font-weight: 600; font-size: .85rem; color: var(--gl-suave); }
 .btn-gl { background: var(--gl-primario); border-color: var(--gl-primario); color: #fff; }
@@ -86,7 +86,7 @@ body {
 .gl-eq-desconocido { background: #eef0fb; color: var(--gl-primario); border: 1px dashed #c7c9ef; }
 .gl-stat { font-size: 1.6rem; font-weight: 700; line-height: 1; }
 
-.gl-vacio img { max-width: 260px; width: 70%; }
+
 footer { color: var(--gl-suave); font-size: .8rem; }
 
 /* Entrada del chat: crece con el texto */

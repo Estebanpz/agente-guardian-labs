@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { ilus } from "../assets/ilustraciones/index.js";
+import Ilustracion from "./Ilustracion.jsx";
 
 const META = {
-  permitir: { titulo: "Permitir ingreso", icono: "bi-check-circle-fill", img: ilus.permitir },
-  negar: { titulo: "Negar", icono: "bi-x-octagon-fill", img: ilus.negado },
-  escalar: { titulo: "Escalar a una persona", icono: "bi-exclamation-triangle-fill", img: ilus.escalar },
+  permitir: { titulo: "Permitir ingreso", icono: "bi-check-circle-fill", img: "permitir" },
+  negar: { titulo: "Negar", icono: "bi-x-octagon-fill", img: "negado" },
+  escalar: { titulo: "Escalar a una persona", icono: "bi-exclamation-triangle-fill", img: "escalar" },
 };
 
 const ASISTENCIA = { presente: "Presente", tardia: "Tardía", sin_registro: "Sin registro", no_aplica: "No aplica" };
@@ -37,7 +37,7 @@ export default function TarjetaDecision({ resultado, compacta = false }) {
             </h4>
             <p className="mb-3">{resultado.explicacion}</p>
           </div>
-          {!compacta && <img src={m.img} alt="" className="d-none d-md-block" style={{ width: 130 }} />}
+          {!compacta && <Ilustracion nombre={m.img} ancho={130} className="d-none d-md-block" />}
         </div>
 
         {resultado.alerta && (
