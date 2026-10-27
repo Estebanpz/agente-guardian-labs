@@ -4,11 +4,11 @@ import { Cargando, ErrorApi } from "../components/Estado.jsx";
 import Ilustracion from "../components/Ilustracion.jsx";
 
 const ESTADOS = {
-  disponible: { texto: "Disponible", icono: "bi-check-circle" },
-  mantenimiento: { texto: "Mantenimiento", icono: "bi-tools" },
-  diagnostico: { texto: "Diagnóstico", icono: "bi-activity" },
-  conflicto: { texto: "Conflicto entre fuentes", icono: "bi-exclamation-triangle" },
-  desconocido: { texto: "Desconocido", icono: "bi-question-lg" },
+  disponible: { texto: "Disponible", icono: "bi-check-circle", desc: "Inventario y mantenimiento coinciden: se puede usar y sugerir." },
+  mantenimiento: { texto: "Mantenimiento", icono: "bi-tools", desc: "Las dos fuentes lo reportan en reparación: no se sugiere (R9)." },
+  diagnostico: { texto: "Diagnóstico", icono: "bi-activity", desc: "Mantenimiento lo está revisando: no se sugiere hasta que termine (R9)." },
+  conflicto: { texto: "Conflicto entre fuentes", icono: "bi-exclamation-triangle", desc: "Inventario y mantenimiento no coinciden: se excluye, se escala y se avisa a mantenimiento (R3)." },
+  desconocido: { texto: "Desconocido", icono: "bi-question-lg", desc: "Falta el dato de una fuente: no se supone que funciona (R2)." },
 };
 
 const colorAforo = (p) => (p >= 100 ? "bg-danger" : p >= 70 ? "bg-warning" : "bg-success");
@@ -47,7 +47,7 @@ function TarjetaSala({ s }) {
             <div key={q.id} className="col">
               <div
                 className={`gl-equipo gl-eq-${q.estado}`}
-                title={`${ESTADOS[q.estado].texto} · Inventario: ${q.inventario} · Mantenimiento: ${q.mantenimiento}${q.accesible ? " · Puesto accesible" : ""}`}
+                title={`${ESTADOS[q.estado].texto}: ${ESTADOS[q.estado].desc} · Inventario: ${q.inventario} · Mantenimiento: ${q.mantenimiento}${q.accesible ? " · Puesto accesible" : ""}`}
               >
                 <i className={`bi ${ESTADOS[q.estado].icono}`} />
                 {q.id}
@@ -136,16 +136,24 @@ export default function Salas() {
           </div>
 
           <div className="card">
-            <div className="card-body d-flex flex-wrap gap-3 small">
-              <strong className="me-2">Leyenda:</strong>
-              {Object.entries(ESTADOS).map(([k, v]) => (
-                <span key={k} className={`gl-equipo gl-eq-${k} px-2 py-1 d-inline-flex align-items-center gap-1`}>
-                  <i className={`bi ${v.icono} d-inline`} style={{ fontSize: ".85rem" }} />{v.texto}
-                </span>
-              ))}
-              <span className="d-inline-flex align-items-center gap-1 text-secondary">
-                <i className="bi bi-universal-access" />Puesto accesible
-              </span>
+            <div className="card-body">
+              <h6 className="mb-3"><i className="bi bi-info-circle me-2" />Leyenda</h6>
+              <div className="row g-3 small">
+                {Object.entries(ESTADOS).map(([k, v]) => (
+                  <div key={k} className="col-md-6 col-lg-4 d-flex align-items-start gap-2">
+                    <span className={`gl-equipo gl-eq-${k} px-2 py-1 d-inline-flex align-items-center gap-1 flex-shrink-0`}>
+                      <i className={`bi ${v.icono} d-inline`} style={{ fontSize: ".85rem" }} />{v.texto}
+                    </span>
+                    <span className="text-secondary">{v.desc}</span>
+                  </div>
+                ))}
+                <div className="col-md-6 col-lg-4 d-flex align-items-start gap-2">
+                  <span className="gl-equipo px-2 py-1 d-inline-flex align-items-center gap-1 flex-shrink-0 border">
+                    <i className="bi bi-universal-access d-inline" style={{ fontSize: ".85rem" }} />Puesto accesible
+                  </span>
+                  <span className="text-secondary">Puesto adaptado: se ofrece primero a quien lo necesita (R8).</span>
+                </div>
+              </div>
             </div>
           </div>
         </>
