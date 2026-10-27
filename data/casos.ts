@@ -24,3 +24,88 @@ export const casos: Record<string, Hechos> = {
   "E-011": { ...base, entrada_registrada: false }, // R12: cierre sin registro
   "E-012": { ...base, necesidad_accesibilidad: true }, // R8: necesita puesto accesible
 };
+
+// Descripción de cada caso para la demostración (vista Puerta) y para el informe (Tabla 24).
+export type DescripcionCaso = {
+  titulo: string;
+  detalle: string;
+  prueba: string;
+  esperado: string;
+  evento?: "ingreso" | "cierre";
+};
+
+export const descripciones: Record<string, DescripcionCaso> = {
+  "E-001": {
+    titulo: "Estudiante con todo en regla",
+    detalle: "Carné vigente, inducción de seguridad vigente, reserva válida hecha por un rol autorizado, aprobación escrita, aforo 10/25, pide PC-01 y llega a las 08:05.",
+    prueba: "P-01 · caso normal",
+    esperado: "Permitir (R10), sugiere PC-01, asistencia presente (R11)",
+  },
+  "E-002": {
+    titulo: "Estudiante con la inducción de seguridad vencida",
+    detalle: "Todo lo demás está en regla; solo la inducción está vencida.",
+    prueba: "P-02 · normal negativo",
+    esperado: "Negar el uso de equipos y remitir a inducción (R1)",
+  },
+  "E-003": {
+    titulo: "Estudiante que toma el último cupo",
+    detalle: "La sala tiene 24 de 25 puestos ocupados; todo lo demás está en regla.",
+    prueba: "P-03a · límite",
+    esperado: "Permitir (R10): todavía hay un cupo",
+  },
+  "E-004": {
+    titulo: "Estudiante con la sala llena",
+    detalle: "La sala tiene 25 de 25 puestos ocupados.",
+    prueba: "P-03b · límite",
+    esperado: "Negar el ingreso y ofrecer lista de espera (R7)",
+  },
+  "E-005": {
+    titulo: "Estudiante sin registro de inducción",
+    detalle: "No se sabe si tiene la inducción de seguridad: el dato no está cargado. Un dato que falta no es un dato falso.",
+    prueba: "P-04 · dato desconocido",
+    esperado: "Escalar al monitor indicando qué dato falta (R2)",
+  },
+  "E-006": {
+    titulo: "Sin registro de inducción y con un equipo en conflicto",
+    detalle: "Falta el dato de la inducción y, además, pide PC-07, que está disponible según inventario y en diagnóstico según mantenimiento.",
+    prueba: "P-09 · combinado",
+    esperado: "Escalar sin concluir (R13); no sugiere PC-07 y notifica a mantenimiento",
+  },
+  "E-007": {
+    titulo: "Estudiante con el carné vencido",
+    detalle: "Todo lo demás está en regla; solo el carné no está vigente.",
+    prueba: "P-10 · normal negativo",
+    esperado: "Negar el ingreso y remitir a registro (R4)",
+  },
+  "E-008": {
+    titulo: "Estudiante que pide un equipo en conflicto",
+    detalle: "Pide PC-07: el inventario dice disponible y mantenimiento dice diagnóstico. La persona está en regla; el problema es el equipo.",
+    prueba: "P-05 · contradicción",
+    esperado: "Escalar (R3), excluir PC-07 (R9), sugerir otro equipo y notificar a mantenimiento",
+  },
+  "E-009": {
+    titulo: "Estudiante con aprobación solo verbal",
+    detalle: "Dice que coordinación lo autorizó de palabra; no hay aprobación escrita.",
+    prueba: "P-07 · adversarial",
+    esperado: "Escalar a coordinación (R6): la aprobación verbal no se acepta",
+  },
+  "E-010": {
+    titulo: "Estudiante que llega 12 minutos tarde",
+    detalle: "Llega a las 08:12 a una franja que empieza a las 08:00; todo lo demás está en regla.",
+    prueba: "P-08 · regresión",
+    esperado: "Permitir, asistencia presente con tolerancia de 15 min (sería tardía con 10 min)",
+  },
+  "E-011": {
+    titulo: "Estudiante sin entrada al cierre de la franja",
+    detalle: "Al cerrar la franja no hay registro de su entrada. Se evalúa con el evento Cierre de franja.",
+    prueba: "R12 · asistencia",
+    esperado: "Sin registro (no ausente definitivo) y se escala para corregir (R12)",
+    evento: "cierre",
+  },
+  "E-012": {
+    titulo: "Estudiante que necesita un puesto accesible",
+    detalle: "Necesita un puesto accesible; en la sala 1 están libres PC-03 y PC-05.",
+    prueba: "P-11a · accesibilidad",
+    esperado: "Permitir y sugerir un puesto accesible, PC-03 (R8)",
+  },
+};

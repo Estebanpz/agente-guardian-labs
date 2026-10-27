@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import TarjetaDecision from "../components/TarjetaDecision.jsx";
+import CasoInfo from "../components/CasoInfo.jsx";
 import { Cargando, ErrorApi, Vacio } from "../components/Estado.jsx";
 import { ilus } from "../assets/ilustraciones/index.js";
 
-// Ids sintéticos de data/casos.ts (no corresponden a personas reales).
-const CASOS = Array.from({ length: 11 }, (_, i) => `E-${String(i + 1).padStart(3, "0")}`);
+// Ids sintéticos de respaldo si la API no responde (los reales vienen de GET /casos).
+const CASOS = Array.from({ length: 12 }, (_, i) => `E-${String(i + 1).padStart(3, "0")}`);
 
 // Casos que exige la demostración del taller (el de "fuera de alcance" está en el Chat).
 const DEMOS = [
@@ -19,6 +20,7 @@ const INICIAL = { id_sintetico: "E-001", laboratorio: "sala-1", franja: "08:00�
 
 export default function Monitor() {
   const [salas, setSalas] = useState([]);
+  const [casos, setCasos] = useState([]);
   const [form, setForm] = useState(INICIAL);
   const [resultado, setResultado] = useState(null);
   const [cargando, setCargando] = useState(false);
@@ -26,12 +28,17 @@ export default function Monitor() {
 
   useEffect(() => {
     api.salas().then(setSalas).catch(() => {});
+    api.casos().then(setCasos).catch(() => {});
   }, []);
+
+  const casoDe = (id) => casos.find((c) => c.id === id);
 
   const cambiar = (campo) => (e) => {
     const valor = e.target.value;
     setForm((f) => {
       const nuevo = { ...f, [campo]: valor };
+      // Algunos casos se prueban con otro evento (E-011: cierre de franja).
+      if (campo === "id_sintetico") nuevo.tipo_evento = casoDe(valor)?.evento ?? "ingreso";
       if (campo === "laboratorio") {
         const sala = salas.find((s) => s.id === valor);
         if (sala?.franja) nuevo.franja = sala.franja;
@@ -59,7 +66,7 @@ export default function Monitor() {
   };
 
   const probarDemo = (id) => {
-    const entrada = { ...INICIAL, id_sintetico: id };
+    const entrada = { ...INICIAL, id_sintetico: id, tipo_evento: casoDe(id)?.evento ?? "ingreso" };
     setForm(entrada);
     evaluar(entrada);
   };
@@ -82,10 +89,12 @@ export default function Monitor() {
             <div className="card-body">
               <h5 className="mb-3"><i className="bi bi-person-badge me-2" />Solicitud</h5>
               <form onSubmit={enviar} className="row g-3">
-                <div className="col-6">
-                  <label className="form-label" htmlFor="id">Identificador</label>
+                <div className="col-12">
+                  <label className="form-label" htmlFor="id">Identificador (caso sintético)</label>
                   <select id="id" className="form-select" value={form.id_sintetico} onChange={cambiar("id_sintetico")}>
-                    {CASOS.map((c) => <option key={c}>{c}</option>)}
+                    {(casos.length ? casos.map((c) => c.id) : CASOS).map((c) => (
+                      <option key={c} value={c}>{c}{casoDe(c) ? ` · ${casoDe(c).titulo}` : ""}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="col-6">
@@ -100,7 +109,7 @@ export default function Monitor() {
                   <label className="form-label" htmlFor="franja">Franja</label>
                   <input id="franja" className="form-control" value={form.franja} onChange={cambiar("franja")} placeholder="08:00–10:00" />
                 </div>
-                <div className="col-6">
+                <div className="col-12">
                   <label className="form-label" htmlFor="evento">Evento</label>
                   <select id="evento" className="form-select" value={form.tipo_evento} onChange={cambiar("tipo_evento")}>
                     <option value="ingreso">Ingreso</option>
@@ -117,6 +126,8 @@ export default function Monitor() {
               </form>
             </div>
           </div>
+
+          <CasoInfo caso={casoDe(form.id_sintetico)} base={casoDe("E-001")} />
 
           <div className="card">
             <div className="card-body">

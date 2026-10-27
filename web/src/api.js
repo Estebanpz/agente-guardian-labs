@@ -12,6 +12,7 @@ async function pedir(ruta, opciones = {}) {
 export const api = {
   salud: () => pedir("/salud"),
   salas: () => pedir("/salas"),
+  casos: () => pedir("/casos"),
   evaluar: (entrada) => pedir("/evaluar", { method: "POST", body: JSON.stringify(entrada) }),
   mensaje: (texto, laboratorio) =>
     pedir("/mensaje", { method: "POST", body: JSON.stringify({ texto, laboratorio }) }),

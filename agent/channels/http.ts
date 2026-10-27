@@ -4,6 +4,7 @@ import { EntradaEvaluar } from "../tools/esquemas.js";
 import { mensaje, solicitar } from "../orquestador.js";
 import { proveedorActivo } from "../llm/proveedor.js";
 import { resumenSalas } from "../tools/salas.js";
+import { casos, descripciones } from "../../data/casos.js";
 
 const app = express();
 app.use(express.json({ limit: "10kb" }));
@@ -42,6 +43,11 @@ app.post("/mensaje", async (req, res) => {
     console.error("[http]", (e as Error).message);
     res.status(500).json({ error: "Error interno" });
   }
+});
+
+// Casos sintéticos con su descripción, para la demostración (solo lectura).
+app.get("/casos", (_req, res) => {
+  res.json(Object.keys(casos).map((id) => ({ id, ...descripciones[id], hechos: casos[id] })));
 });
 
 // Estado de salas y equipos (solo lectura).
