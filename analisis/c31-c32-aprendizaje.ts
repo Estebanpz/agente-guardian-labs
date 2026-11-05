@@ -95,8 +95,9 @@ export async function c31c32(conModelo = false): Promise<Seccion> {
     for (const p of pred) {
       const r = await interpretar(p.texto);
       p.llm = r.fallo ? "(sin modelo)" : r.intencion;
-      // Como el agente real: la capa determinista primero; si no reconoce nada, decide el modelo.
-      p.agente = p.base !== "fuera_de_alcance" ? p.base : p.llm;
+      // Mismo orden que agent/orquestador.ts: guardia → rutas rápidas → modelo.
+      // (Los temas de ayuda y el id E-000 se usan después, no antes del modelo.)
+      p.agente = esIntentoDeElusion(p.texto) ? "intento_eludir_reglas" : (rutaRapida(p.texto) ?? p.llm);
     }
   }
   const exact = (k: "base" | "nb" | "llm" | "agente") => pred.filter((p) => p[k] === p.intencion).length / pred.length;
@@ -121,7 +122,7 @@ export async function c31c32(conModelo = false): Promise<Seccion> {
       ["Naive Bayes (entrenado con las 40 de ajuste)", `${pred.filter((p) => p.nb === p.intencion).length}/${pred.length}`, pct(exact("nb"))],
       ...(conModelo ? [
         ["llama3.2:3b con la guardia (Ollama)", `${pred.filter((p) => p.llm === p.intencion).length}/${pred.length}`, pct(exact("llm"))],
-        ["Como el agente: reglas primero y, si no reconocen nada, el modelo", `${pred.filter((p) => p.agente === p.intencion).length}/${pred.length}`, pct(exact("agente"))],
+        ["Como el agente: guardia y rutas rápidas primero; si no coinciden, el modelo", `${pred.filter((p) => p.agente === p.intencion).length}/${pred.length}`, pct(exact("agente"))],
       ] : []),
     ]),
     "",
