@@ -699,6 +699,27 @@ Prueba también los extractores en `evals/extraer.ts` (agrégalo a `npm run prue
 
 ## 7. Fase 4: conversación, orquestador y API
 
+### 7.0 Cambio a `registrarEscalada` (decidido al aceptar la Fase 2)
+
+Las reservas escaladas también llevan código, del **mismo contador** `RS-NNNN`. Así cada
+notificación apunta a una reserva concreta y la traza queda completa. Cambia la firma en
+`repositorio.ts`, `memoria.ts` y `mongo.ts`:
+
+```ts
+// Asigna el siguiente RS-NNNN, guarda la reserva con estado "escalada" y su notificación, y
+// devuelve el código. En Mongo: contador + insert de reserva + insert de notificación en UNA
+// transacción (withSession/withTransaction, cada operación con { session }).
+registrarEscalada(
+  construir: (codigo: string) => ReservaDoc,          // estado: "escalada"
+  aviso: (codigo: string) => NotificacionDoc,         // reserva_codigo = codigo
+): Promise<string>;
+```
+
+- Las reservas `escalada` **no** bloquean el horario: `reservasDelDia` sigue devolviendo solo las
+  `programada`.
+- Actualiza `evals/mongo.ts` para cubrir la nueva firma: la escalada recibe código y su
+  notificación lo referencia.
+
 ### 7.1 Privacidad (`agent/tools/privacidad.ts`)
 
 Antes de aplicar los patrones, **quita** del texto los carnés `\b[CD]-\d{8}\b` (si no, el patrón
@@ -825,8 +846,10 @@ mensaje en español; nunca devuelvas el `stack` ni la URI.
 
 ### 7.6 Pruebas de conversación: `evals/conversacion.ts` (en `npm run pruebas`)
 
-Repositorio en memoria, reloj fijo, `interpretar` reemplazado por un clasificador fijo (rutas rápidas).
-Misma `sesion` en cada guion. Comprueba `flujo.pendiente` y la decisión final:
+Cada guion usa un repositorio en memoria **nuevo** (recién sembrado, contador en 3), reloj fijo,
+`interpretar` reemplazado por un clasificador fijo (rutas rápidas) y la misma `sesion` en todos los
+mensajes del guion. Comprueba `flujo.pendiente` y la decisión final. En C-02, la escalada queda
+como `RS-0004` con su notificación R20:
 
 | ID | Mensajes en orden | Esperado |
 |---|---|---|
@@ -844,7 +867,7 @@ Misma `sesion` en cada guion. Comprueba `flujo.pendiente` y la decisión final:
    ejemplo `11111111-1111-4111-8111-111111111111` y `22222222-2222-4222-8222-222222222222`).
 2. Verifica con el MCP:
    - `count` reservas `{ estado: "programada" }` = 4 (C-01 creó RS-0004);
-   - `count` reservas `{ estado: "escalada" }` = 1 (C-02);
+   - `count` reservas `{ estado: "escalada" }` = 1 (C-02, con código `RS-0005` porque C-01 usó `RS-0004`);
    - `count` notificaciones `{ estado: "pendiente", regla: "R20" }` = 1;
    - `find` notificaciones (limit 5): el motivo muestra `C-****0002` y **no** el carné completo;
    - `count` conversaciones = 0 tras terminar los dos guiones.
