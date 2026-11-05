@@ -1,6 +1,13 @@
 {
-  "version": "1.0.0",
-  "parametros": { "tolerancia_asistencia_min": 15 },
+  "version": "2.0.0",
+  "parametros": {
+    "tolerancia_asistencia_min": 15,
+    "horario_abre": "07:00",
+    "horario_cierra": "22:00",
+    "duracion_min_min": 30,
+    "duracion_max_min": 240,
+    "dias_adelante_max": 30
+  },
   "reglas": [
     {
       "id": "R1",
@@ -8,7 +15,9 @@
       "especificidad": 1,
       "tipo": "bloqueante",
       "efecto": "negar_equipos",
-      "descripcion": "Inducción de seguridad vencida: negar uso de equipos y remitir a inducción."
+      "descripcion": "Inducción de seguridad vencida: negar uso de equipos y remitir a inducción.",
+      "fuente": "Situación 2 del taller (UniEspinal, 2026)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R13",
@@ -16,7 +25,9 @@
       "especificidad": 3,
       "tipo": "bloqueante",
       "efecto": "escalar",
-      "descripcion": "Dato crítico desconocido y fuentes en conflicto a la vez (R2+R3): no concluir, registrar ambos y escalar."
+      "descripcion": "Dato crítico desconocido y fuentes en conflicto a la vez (R2+R3): no concluir, registrar ambos y escalar.",
+      "fuente": "Situación 2 del taller (UniEspinal, 2026)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R2",
@@ -24,7 +35,9 @@
       "especificidad": 1,
       "tipo": "bloqueante",
       "efecto": "escalar",
-      "descripcion": "Algún hecho crítico desconocido: no concluir, indicar qué dato falta y escalar al monitor."
+      "descripcion": "Algún hecho crítico desconocido: no concluir, indicar qué dato falta y escalar al monitor.",
+      "fuente": "Situación 2 del taller (UniEspinal, 2026)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R3",
@@ -32,7 +45,9 @@
       "especificidad": 1,
       "tipo": "bloqueante",
       "efecto": "escalar",
-      "descripcion": "Dos fuentes con estados incompatibles: registrar contradicción, bloquear la sugerencia y escalar."
+      "descripcion": "Dos fuentes con estados incompatibles: registrar contradicción, bloquear la sugerencia y escalar.",
+      "fuente": "Situación 2 del taller (UniEspinal, 2026)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R4",
@@ -40,7 +55,9 @@
       "especificidad": 1,
       "tipo": "bloqueante",
       "efecto": "negar_ingreso",
-      "descripcion": "Carné no vigente: negar ingreso y remitir a registro."
+      "descripcion": "Carné no vigente: negar ingreso y remitir a registro.",
+      "fuente": "Entrevista al monitor, 27-10-2026, pregunta 8",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R5",
@@ -48,7 +65,9 @@
       "especificidad": 1,
       "tipo": "bloqueante",
       "efecto": "escalar_coordinacion",
-      "descripcion": "Reserva creada por rol no autorizado: reserva no válida, escalar a coordinación."
+      "descripcion": "Reserva creada por rol no autorizado: reserva no válida, escalar a coordinación.",
+      "fuente": "Situación 2 del taller (UniEspinal, 2026)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R6",
@@ -56,7 +75,9 @@
       "especificidad": 1,
       "tipo": "bloqueante",
       "efecto": "escalar_coordinacion",
-      "descripcion": "Aprobación verbal: no se acepta, registrar y escalar a coordinación."
+      "descripcion": "Aprobación verbal: no se acepta, registrar y escalar a coordinación.",
+      "fuente": "Situación 2 del taller (UniEspinal, 2026)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R7",
@@ -64,7 +85,9 @@
       "especificidad": 1,
       "tipo": "bloqueante",
       "efecto": "negar_ingreso",
-      "descripcion": "Aforo completo: negar ingreso nuevo y ofrecer lista de espera."
+      "descripcion": "Aforo completo: negar ingreso nuevo y ofrecer lista de espera.",
+      "fuente": "Situación 2 del taller (UniEspinal, 2026)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R8",
@@ -72,7 +95,9 @@
       "especificidad": 1,
       "tipo": "informativa",
       "efecto": "puesto_accesible",
-      "descripcion": "Necesidad de accesibilidad: asignar primero puesto accesible; si no hay, escalar."
+      "descripcion": "Necesidad de accesibilidad: asignar primero puesto accesible; si no hay, escalar.",
+      "fuente": "Situación 2 del taller (UniEspinal, 2026)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R9",
@@ -80,7 +105,9 @@
       "especificidad": 1,
       "tipo": "informativa",
       "efecto": "excluir_equipo",
-      "descripcion": "Equipo no disponible: excluirlo de las sugerencias."
+      "descripcion": "Equipo no disponible: excluirlo de las sugerencias.",
+      "fuente": "Situación 2 del taller (UniEspinal, 2026)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R10",
@@ -88,7 +115,9 @@
       "especificidad": 1,
       "tipo": "recomendacion",
       "efecto": "recomendar_ingreso",
-      "descripcion": "Ninguna regla bloquea y la reserva es válida: recomendar ingreso y sugerir equipo."
+      "descripcion": "Ninguna regla bloquea y la reserva es válida: recomendar ingreso y sugerir equipo.",
+      "fuente": "Diseño del equipo, Fase 1 (supuesto)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R11",
@@ -96,7 +125,9 @@
       "especificidad": 1,
       "tipo": "asistencia",
       "efecto": "asistencia_presente",
-      "descripcion": "Llegada dentro de la tolerancia configurada después del inicio: presente; si es posterior, tardía."
+      "descripcion": "Llegada dentro de la tolerancia configurada después del inicio: presente; si es posterior, tardía.",
+      "fuente": "Diseño del equipo, Fase 1 (supuesto)",
+      "vigente_desde": "2026-10-26"
     },
     {
       "id": "R12",
@@ -104,7 +135,139 @@
       "especificidad": 1,
       "tipo": "asistencia",
       "efecto": "asistencia_sin_registro",
-      "descripcion": "Sin entrada al cierre de la franja: sin registro (no ausente definitivo)."
+      "descripcion": "Sin entrada al cierre de la franja: sin registro (no ausente definitivo).",
+      "fuente": "Diseño del equipo, Fase 1 (supuesto)",
+      "vigente_desde": "2026-10-26"
+    },
+    {
+      "id": "R14",
+      "prioridad": 10,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "pedir_datos",
+      "descripcion": "Falta un dato obligatorio de la solicitud de reserva: pedirlo, no concluir.",
+      "fuente": "Diseño del equipo (supuesto)",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R15",
+      "prioridad": 11,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "negar",
+      "descripcion": "Fecha u horario fuera de lo permitido (07:00–22:00, 30 min a 4 h, hasta 30 días): negar y pedir otro horario.",
+      "fuente": "Entrevista al monitor, 27-10-2026, pregunta 2b; duración y plazo: supuesto del equipo",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R16",
+      "prioridad": 12,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "negar",
+      "descripcion": "Carné no vigente en carnetización: negar la reserva y remitir a carnetización.",
+      "fuente": "Entrevista al monitor, 27-10-2026, preguntas 8 y 11",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R17",
+      "prioridad": 12,
+      "especificidad": 2,
+      "tipo": "bloqueante",
+      "efecto": "escalar_monitor",
+      "descripcion": "Carné que no aparece en carnetización o con vigencia desconocida: no concluir y escalar al monitor.",
+      "fuente": "Situación 2 del taller; política de desconocidos (R2)",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R18",
+      "prioridad": 13,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "negar",
+      "descripcion": "La sala pedida no alcanza para las personas o los equipos requeridos: negar esa sala y sugerir otras.",
+      "fuente": "Entrevista al monitor, pregunta 4 (aforo)",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R19",
+      "prioridad": 13,
+      "especificidad": 2,
+      "tipo": "bloqueante",
+      "efecto": "escalar_monitor",
+      "descripcion": "Los equipos operativos solo alcanzan si se cuentan equipos con estado desconocido o en conflicto: no concluir y escalar.",
+      "fuente": "Situación 2 del taller; R2 y R3",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R20",
+      "prioridad": 14,
+      "especificidad": 2,
+      "tipo": "bloqueante",
+      "efecto": "escalar_monitor",
+      "descripcion": "Un docente pide una sala ya separada por estudiantes en ese horario: informar quién la tiene, escalar al monitor para que acuerden y sugerir salas libres.",
+      "fuente": "Requisito del docente del curso (4-11-2026)",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R21",
+      "prioridad": 14,
+      "especificidad": 2,
+      "tipo": "bloqueante",
+      "efecto": "escalar_coordinacion",
+      "descripcion": "Un docente pide una sala ya separada por otro docente en ese horario: escalar a coordinación y sugerir salas libres.",
+      "fuente": "Situación 2 del taller (conflicto de autoridad)",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R22",
+      "prioridad": 14,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "negar",
+      "descripcion": "Un estudiante pide una sala ya separada en ese horario: negar esa sala y sugerir salas libres.",
+      "fuente": "Requisito del docente del curso (4-11-2026)",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R23",
+      "prioridad": 15,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "negar",
+      "descripcion": "Se necesita alto cómputo y la sala pedida no lo es: negar esa sala y sugerir salas de alto cómputo.",
+      "fuente": "Requisito del docente del curso (4-11-2026)",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R24",
+      "prioridad": 16,
+      "especificidad": 1,
+      "tipo": "bloqueante",
+      "efecto": "negar",
+      "descripcion": "Ninguna sala cumple las condiciones en ese horario: negar y pedir otro horario o menos personas.",
+      "fuente": "Diseño del equipo (supuesto)",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R25",
+      "prioridad": 17,
+      "especificidad": 1,
+      "tipo": "recomendacion",
+      "efecto": "programar",
+      "descripcion": "Ninguna regla bloquea: separar la sala en la base de demostración tras la confirmación.",
+      "fuente": "Requisito del docente del curso (4-11-2026)",
+      "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R26",
+      "prioridad": 17,
+      "especificidad": 1,
+      "tipo": "recomendacion",
+      "efecto": "registrar_usuario",
+      "descripcion": "Carné vigente en carnetización y aún no registrado: registrar al usuario sin pedir más datos personales.",
+      "fuente": "Requisito del docente del curso (4-11-2026)",
+      "vigente_desde": "2026-11-04"
     }
   ]
 }
