@@ -720,6 +720,39 @@ registrarEscalada(
 - Actualiza `evals/mongo.ts` para cubrir la nueva firma: la escalada recibe código y su
   notificación lo referencia.
 
+### 7.0.1 Ajustes decididos al revisar la Fase 4
+
+1. **El carné se evalúa apenas llega**, no al final. Apenas la conversación tiene el carné:
+   - vencido → R16: niega y cierra el flujo;
+   - no existe o vigencia desconocida → R17: escala y cierra el flujo;
+   - vigente sin registro → pregunta "¿Te registro ahora?";
+   - vigente y registrado → sigue preguntando la fecha.
+
+   Así no se le piden fecha, horario y personas a alguien que igual no puede reservar.
+2. **R17 no crea reserva**, porque el problema es la identidad y no la sala. Solo crea una
+   notificación con `reserva_codigo: null` mediante un método nuevo del repositorio:
+   `notificar(n: NotificacionDoc): Promise<void>`. El motivo dice el carné enmascarado y, si ya
+   se conocen, la fecha y el horario pedidos. La respuesta sí dice "Avisé al monitor".
+3. **`registrarEscalada` acepta varias notificaciones:**
+   `aviso: (codigo) => NotificacionDoc[]`.
+   - R19 crea dos: una para `monitor` y otra para `mantenimiento`.
+   - R20 crea una para `monitor`.
+   - R21 crea una para `coordinacion`.
+
+   Todo va en la misma transacción.
+4. **Ruta rápida de reserva:** se agrega `/\bnecesit\w*\b.{0,25}\bsalas?\b/` →
+   `solicitud_reserva`. C-02 debe pasar con la ruta rápida real, sin fijar su primera frase en el
+   clasificador de prueba.
+5. **Pruebas nuevas en `evals/conversacion.ts`:**
+   - C-07: "Quiero reservar" → "C-99999999". Esperado: escala R17 en ese mismo mensaje, 1
+     notificación `monitor` con `reserva_codigo: null` y 0 reservas nuevas.
+   - C-08: "Quiero reservar" → "C-10000011". Esperado: niega R16 en ese mismo mensaje y cierra el
+     flujo.
+   - C-09: el caso RS-05 por chat. Esperado: 2 notificaciones (`monitor` y `mantenimiento`) con el
+     mismo `reserva_codigo`.
+
+   La matriz de la Fase 6 suma C-07, C-08 y C-09.
+
 ### 7.1 Privacidad (`agent/tools/privacidad.ts`)
 
 Antes de aplicar los patrones, **quita** del texto los carnés `\b[CD]-\d{8}\b` (si no, el patrón
@@ -996,7 +1029,7 @@ Guárdalas en `docs/capturas/` como `reserva-escalada.png`, `reserva-confirmada.
 
 ## 9. Fase 6: matriz, documentación y cierre
 
-1. `evals/matriz.ts`: agrega las filas RS-01…RS-20 (21 filas, RS-04 tiene a y b) y C-01…C-06,
+1. `evals/matriz.ts`: agrega las filas RS-01…RS-20 (21 filas, RS-04 tiene a y b) y C-01…C-09,
    sin quitar las 16 actuales.
    Regenera `docs/matriz-pruebas.md` y `.csv`. Todas deben pasar.
 2. `README.md`:
@@ -1049,7 +1082,7 @@ Al final, dale a Esteban un resumen de 5 líneas como máximo:
 ## 11. Definición de terminado
 
 - [ ] `npm run pruebas` pasa: las anteriores, más `reservas`, `extraer`, `conversacion`.
-- [ ] `npm run matriz`: 16 anteriores + 27 nuevas (21 RS + 6 C) en verde.
+- [ ] `npm run matriz`: 16 anteriores + 30 nuevas (21 RS + 9 C) en verde.
 - [ ] `npm run seed` deja 16 salas, 306 equipos (21 de las salas 1–3 + 285 generados), 17
       carnés, 7 usuarios y 3 reservas en Atlas.
 - [ ] `npm run prueba:mongo` pasa y borra su base de pruebas (confirmado con el MCP).
