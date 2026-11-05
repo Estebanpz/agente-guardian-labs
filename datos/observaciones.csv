@@ -3,6 +3,6 @@ id,observacion,hecho_o_regla_candidata,fuente,fecha,estado
 "O2","La reserva o autorización previa es el horario en Excel","Regla candidata: reserva válida = aparece en el horario vigente","entrevista_monitor_P3","2026-10-27","dudoso"
 "O3","Registrar a una persona toma cerca de 1 minuto por sala","Medida de desempeño: tiempo de registro","entrevista_monitor_P6","2026-10-27","confirmado"
 "O4","Sin carné puede haber inconvenientes por daños y por falta de datos","Regla candidata: carné obligatorio (R4, R16)","entrevista_monitor_P8","2026-10-27","confirmado"
-"O5","Los casos dudosos los decide la Vicerrectoría académica","Ruta de escalamiento distinta a la del diseño (monitor y coordinación)","entrevista_monitor_P9","2026-10-27","contradictorio"
+"O5","Los casos dudosos los decide la Vicerrectoría académica","Ruta de escalamiento: el agente escala al monitor (primera instancia) y la Vicerrectoría es la última instancia","entrevista_monitor_P9","2026-10-27","confirmado"
 "O6","Al ingresar se registran nombres completos y celular","Dato personal: el agente no lo recibe ni lo guarda","entrevista_monitor_P10","2026-10-27","confirmado"
 "O7","La entrevista no menciona la inducción de seguridad","Dato sin fuente institucional: R1 y R2 quedan como supuestos","entrevista_monitor","2026-10-27","desconocido"

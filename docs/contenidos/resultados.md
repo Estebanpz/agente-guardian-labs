@@ -115,7 +115,7 @@ Un archivo JSON no certifica por sí mismo una regla institucional: por eso cada
 | O2 | La reserva o autorización previa es el horario en Excel | Regla candidata: reserva válida = aparece en el horario vigente | entrevista_monitor_P3 | dudoso |
 | O3 | Registrar a una persona toma cerca de 1 minuto por sala | Medida de desempeño: tiempo de registro | entrevista_monitor_P6 | confirmado |
 | O4 | Sin carné puede haber inconvenientes por daños y por falta de datos | Regla candidata: carné obligatorio (R4, R16) | entrevista_monitor_P8 | confirmado |
-| O5 | Los casos dudosos los decide la Vicerrectoría académica | Ruta de escalamiento distinta a la del diseño (monitor y coordinación) | entrevista_monitor_P9 | contradictorio |
+| O5 | Los casos dudosos los decide la Vicerrectoría académica | Ruta de escalamiento: el agente escala al monitor (primera instancia) y la Vicerrectoría es la última instancia | entrevista_monitor_P9 | confirmado |
 | O6 | Al ingresar se registran nombres completos y celular | Dato personal: el agente no lo recibe ni lo guarda | entrevista_monitor_P10 | confirmado |
 | O7 | La entrevista no menciona la inducción de seguridad | Dato sin fuente institucional: R1 y R2 quedan como supuestos | entrevista_monitor | desconocido |
 
@@ -123,13 +123,12 @@ Un archivo JSON no certifica por sí mismo una regla institucional: por eso cada
 
 | Id | Sujeto | Valor | Estado | Nota |
 |---|---|---|---|---|
-| H04 | casos dudosos | decide la Vicerrectoría académica | contradictorio | El diseño escala al monitor y a coordinación; la entrevista nombra a la Vicerrectoría. Discrepancia registrada para validar con el responsable. |
 | H06 | PC-07 | inventario=disponible; mantenimiento=diagnostico | contradictorio |  |
 | H07 | S3-05 | mantenimiento sin dato | desconocido |  |
 | H09 | C-10000012 | vigencia sin dato | desconocido |  |
 | H10 | inducción de seguridad | no se mencionó en la entrevista | desconocido | Las reglas R1 y R2 se basan en la situación 2 del taller. |
 
-La discrepancia H04 (quién decide los casos dudosos) se registró y no se resolvió con una suposición: queda para validar con el responsable de los laboratorios.
+**Discrepancia resuelta (H04 y O5).** La entrevista dice que los casos dudosos los decide la Vicerrectoría académica, y el diseño escalaba al monitor. El equipo lo resolvió sin cambiar el límite del agente: el monitor es la primera instancia humana, recibe todos los escalamientos y decide la acción o remite a coordinación y, en última instancia, a la Vicerrectoría. El agente nunca decide un caso dudoso ni escala directo a la Vicerrectoría.
 
 ## 2.4 Incertidumbre
 

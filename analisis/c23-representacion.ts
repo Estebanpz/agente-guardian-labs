@@ -15,7 +15,7 @@ const HECHOS: Hecho[] = [
   { id: "H01", tipo: "infraestructura", sujeto: "salas", valor: "16 salas de cómputo", fuente: "entrevista_monitor_P4", fecha: "2026-10-27", verificacion: "verificado", estado: "confirmado" },
   { id: "H02", tipo: "horario", sujeto: "salas", valor: "07:00 a 22:00", fuente: "entrevista_monitor_P2b", fecha: "2026-10-27", verificacion: "verificado", estado: "confirmado" },
   { id: "H03", tipo: "proceso", sujeto: "reservas", valor: "la programación se lleva en un horario en Excel", fuente: "entrevista_monitor_P3", fecha: "2026-10-27", verificacion: "pendiente", estado: "confirmado", nota: "No se sabe quién actualiza el Excel ni con qué frecuencia." },
-  { id: "H04", tipo: "autoridad", sujeto: "casos dudosos", valor: "decide la Vicerrectoría académica", fuente: "entrevista_monitor_P9", fecha: "2026-10-27", verificacion: "pendiente", estado: "contradictorio", nota: "El diseño escala al monitor y a coordinación; la entrevista nombra a la Vicerrectoría. Discrepancia registrada para validar con el responsable." },
+  { id: "H04", tipo: "autoridad", sujeto: "casos dudosos", valor: "decide la Vicerrectoría académica", fuente: "entrevista_monitor_P9", fecha: "2026-10-27", verificacion: "pendiente", estado: "confirmado", nota: "Resuelto por el equipo (4-11-2026): el monitor es la primera instancia; el agente le escala y él decide la acción o remite a coordinación y, en última instancia, a la Vicerrectoría académica. El agente nunca escala directo a la Vicerrectoría." },
   { id: "H05", tipo: "datos", sujeto: "registro de ingreso", valor: "se anotan nombres completos y celular", fuente: "entrevista_monitor_P10", fecha: "2026-10-27", verificacion: "verificado", estado: "confirmado", nota: "El agente NO usa estos datos: solo identificadores sintéticos." },
   { id: "H06", tipo: "equipo", sujeto: "PC-07", valor: "inventario=disponible; mantenimiento=diagnostico", fuente: "ejemplo_sintetico", fecha: "2026-11-04", verificacion: "no_aplica", estado: "contradictorio" },
   { id: "H07", tipo: "equipo", sujeto: "S3-05", valor: "mantenimiento sin dato", fuente: "ejemplo_sintetico", fecha: "2026-11-04", verificacion: "no_aplica", estado: "desconocido" },
@@ -30,7 +30,7 @@ const OBSERVACIONES = [
   ["O2", "La reserva o autorización previa es el horario en Excel", "Regla candidata: reserva válida = aparece en el horario vigente", "entrevista_monitor_P3", "2026-10-27", "dudoso"],
   ["O3", "Registrar a una persona toma cerca de 1 minuto por sala", "Medida de desempeño: tiempo de registro", "entrevista_monitor_P6", "2026-10-27", "confirmado"],
   ["O4", "Sin carné puede haber inconvenientes por daños y por falta de datos", "Regla candidata: carné obligatorio (R4, R16)", "entrevista_monitor_P8", "2026-10-27", "confirmado"],
-  ["O5", "Los casos dudosos los decide la Vicerrectoría académica", "Ruta de escalamiento distinta a la del diseño (monitor y coordinación)", "entrevista_monitor_P9", "2026-10-27", "contradictorio"],
+  ["O5", "Los casos dudosos los decide la Vicerrectoría académica", "Ruta de escalamiento: el agente escala al monitor (primera instancia) y la Vicerrectoría es la última instancia", "entrevista_monitor_P9", "2026-10-27", "confirmado"],
   ["O6", "Al ingresar se registran nombres completos y celular", "Dato personal: el agente no lo recibe ni lo guarda", "entrevista_monitor_P10", "2026-10-27", "confirmado"],
   ["O7", "La entrevista no menciona la inducción de seguridad", "Dato sin fuente institucional: R1 y R2 quedan como supuestos", "entrevista_monitor", "2026-10-27", "desconocido"],
 ];
@@ -96,7 +96,7 @@ export async function c23(): Promise<Seccion> {
     "",
     tabla(["Id", "Sujeto", "Valor", "Estado", "Nota"], inciertos.map((h) => [h.id, h.sujeto, h.valor, h.estado, h.nota ?? ""])),
     "",
-    "La discrepancia H04 (quién decide los casos dudosos) se registró y no se resolvió con una suposición: queda para validar con el responsable de los laboratorios.",
+    "**Discrepancia resuelta (H04 y O5).** La entrevista dice que los casos dudosos los decide la Vicerrectoría académica, y el diseño escalaba al monitor. El equipo lo resolvió sin cambiar el límite del agente: el monitor es la primera instancia humana, recibe todos los escalamientos y decide la acción o remite a coordinación y, en última instancia, a la Vicerrectoría. El agente nunca decide un caso dudoso ni escala directo a la Vicerrectoría.",
   ].join("\n");
 
   return {
