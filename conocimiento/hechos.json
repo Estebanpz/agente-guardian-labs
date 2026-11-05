@@ -1,0 +1,111 @@
+{
+  "version": "1.0.0",
+  "generado_por": "analisis/c23-representacion.ts",
+  "hechos": [
+    {
+      "id": "H01",
+      "tipo": "infraestructura",
+      "sujeto": "salas",
+      "valor": "16 salas de cómputo",
+      "fuente": "entrevista_monitor_P4",
+      "fecha": "2026-10-27",
+      "verificacion": "verificado",
+      "estado": "confirmado"
+    },
+    {
+      "id": "H02",
+      "tipo": "horario",
+      "sujeto": "salas",
+      "valor": "07:00 a 22:00",
+      "fuente": "entrevista_monitor_P2b",
+      "fecha": "2026-10-27",
+      "verificacion": "verificado",
+      "estado": "confirmado"
+    },
+    {
+      "id": "H03",
+      "tipo": "proceso",
+      "sujeto": "reservas",
+      "valor": "la programación se lleva en un horario en Excel",
+      "fuente": "entrevista_monitor_P3",
+      "fecha": "2026-10-27",
+      "verificacion": "pendiente",
+      "estado": "confirmado",
+      "nota": "No se sabe quién actualiza el Excel ni con qué frecuencia."
+    },
+    {
+      "id": "H04",
+      "tipo": "autoridad",
+      "sujeto": "casos dudosos",
+      "valor": "decide la Vicerrectoría académica",
+      "fuente": "entrevista_monitor_P9",
+      "fecha": "2026-10-27",
+      "verificacion": "pendiente",
+      "estado": "contradictorio",
+      "nota": "El diseño escala al monitor y a coordinación; la entrevista nombra a la Vicerrectoría. Discrepancia registrada para validar con el responsable."
+    },
+    {
+      "id": "H05",
+      "tipo": "datos",
+      "sujeto": "registro de ingreso",
+      "valor": "se anotan nombres completos y celular",
+      "fuente": "entrevista_monitor_P10",
+      "fecha": "2026-10-27",
+      "verificacion": "verificado",
+      "estado": "confirmado",
+      "nota": "El agente NO usa estos datos: solo identificadores sintéticos."
+    },
+    {
+      "id": "H06",
+      "tipo": "equipo",
+      "sujeto": "PC-07",
+      "valor": "inventario=disponible; mantenimiento=diagnostico",
+      "fuente": "ejemplo_sintetico",
+      "fecha": "2026-11-04",
+      "verificacion": "no_aplica",
+      "estado": "contradictorio"
+    },
+    {
+      "id": "H07",
+      "tipo": "equipo",
+      "sujeto": "S3-05",
+      "valor": "mantenimiento sin dato",
+      "fuente": "ejemplo_sintetico",
+      "fecha": "2026-11-04",
+      "verificacion": "no_aplica",
+      "estado": "desconocido"
+    },
+    {
+      "id": "H08",
+      "tipo": "carne",
+      "sujeto": "C-10000011",
+      "valor": "vencido",
+      "fuente": "carnetizacion_simulada",
+      "fecha": "2026-11-04",
+      "verificacion": "no_aplica",
+      "estado": "falso",
+      "nota": "falso = el carné no está vigente."
+    },
+    {
+      "id": "H09",
+      "tipo": "carne",
+      "sujeto": "C-10000012",
+      "valor": "vigencia sin dato",
+      "fuente": "carnetizacion_simulada",
+      "fecha": "2026-11-04",
+      "verificacion": "no_aplica",
+      "estado": "desconocido"
+    },
+    {
+      "id": "H10",
+      "tipo": "induccion",
+      "sujeto": "inducción de seguridad",
+      "valor": "no se mencionó en la entrevista",
+      "fuente": "entrevista_monitor",
+      "fecha": "2026-10-27",
+      "verificacion": "pendiente",
+      "estado": "desconocido",
+      "nota": "Las reglas R1 y R2 se basan en la situación 2 del taller."
+    }
+  ]
+}

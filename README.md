@@ -230,6 +230,22 @@ Las reglas R1–R13 se describen aquí; las reglas R14–R26 de las reservas por
 
 La tolerancia de asistencia es un parámetro de `agent/rules/reglas.json` (`tolerancia_asistencia_min`).
 
+## Contenidos de la guía (sección 5)
+
+`npm run contenidos` genera `docs/contenidos/resultados.md` con los nueve contenidos de la Fase 2: qué
+se usa en el agente (reglas, lógica de primer orden, representación del conocimiento e
+incertidumbre) y qué se implementó solo como ejemplo con datos simulados, con su justificación
+(probabilidad, modelo temporal, aprendizaje estadístico y refuerzo). Incluye el ejemplo en Python de
+la sección 6 (`analisis/ejemplo_guia.py`). Con Ollama encendido, `npm run contenidos -- --llm`
+agrega la comparación con el modelo local.
+
+| Archivo | Contenido |
+|---|---|
+| `conocimiento/hechos.json` | Hechos con fuente, fecha y estado (generado) |
+| `datos/observaciones.csv` | Observaciones de la entrevista al monitor (generado) |
+| `datos/consultas_etiquetadas.csv` | 64 frases etiquetadas por intención (40 de ajuste y 24 de prueba) |
+| `analisis/` | Un módulo por contenido y el generador |
+
 ## Pruebas
 
 | Prueba | Caso | Resultado esperado |

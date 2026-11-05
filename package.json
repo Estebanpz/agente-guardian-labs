@@ -11,7 +11,8 @@
     "app": "concurrently --kill-others --names api,web -c blue,magenta \"npm run serve\" \"npm --prefix web run dev\"",
     "matriz": "tsx evals/matriz.ts",
     "seed": "tsx scripts/seed.ts",
-    "prueba:mongo": "tsx evals/mongo.ts"
+    "prueba:mongo": "tsx evals/mongo.ts",
+    "contenidos": "tsx analisis/contenidos.ts"
   },
   "keywords": [],
   "author": "Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel",
