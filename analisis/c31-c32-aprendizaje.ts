@@ -89,14 +89,17 @@ export async function c31c32(conModelo = false): Promise<Seccion> {
     base: lineaBase(d.texto),
     nb: nb.predecir(d.texto),
     llm: undefined as string | undefined,
+    agente: undefined as string | undefined,
   }));
   if (conModelo) {
     for (const p of pred) {
       const r = await interpretar(p.texto);
       p.llm = r.fallo ? "(sin modelo)" : r.intencion;
+      // Como el agente real: la capa determinista primero; si no reconoce nada, decide el modelo.
+      p.agente = p.base !== "fuera_de_alcance" ? p.base : p.llm;
     }
   }
-  const exact = (k: "base" | "nb" | "llm") => pred.filter((p) => p[k] === p.intencion).length / pred.length;
+  const exact = (k: "base" | "nb" | "llm" | "agente") => pred.filter((p) => p[k] === p.intencion).length / pred.length;
   const recall = (k: "base" | "nb", c: string) => {
     const de = pred.filter((p) => p.intencion === c);
     return `${de.filter((p) => p[k] === c).length}/${de.length}`;
@@ -104,7 +107,7 @@ export async function c31c32(conModelo = false): Promise<Seccion> {
   // Matriz de confusión del clasificador (filas = real, columnas = predicho).
   const corto = (c: string) => c.replace("consulta_", "c_").replace("solicitud_", "s_").replace("intento_eludir_reglas", "eludir").replace("fuera_de_alcance", "fuera").replace("registro_usuario", "registro");
   const confusion = clases.map((r) => [corto(r), ...clases.map((p) => pred.filter((x) => x.intencion === r && x.nb === p).length)]);
-  const errores = pred.filter((p) => p.base !== p.intencion || p.nb !== p.intencion);
+  const errores = pred.filter((p) => p.base !== p.intencion || p.nb !== p.intencion || (conModelo && p.llm !== p.intencion));
 
   const md = [
     "**Comprenda (3.1).** Aprender de observaciones es usar ejemplos etiquetados para reconocer patrones y evaluar con ejemplos nuevos. Guardar registros no es aprender.",
@@ -116,7 +119,10 @@ export async function c31c32(conModelo = false): Promise<Seccion> {
     tabla(["Método", "Aciertos en prueba", "Exactitud"], [
       ["Línea base por reglas (palabras clave, sin modelo)", `${pred.filter((p) => p.base === p.intencion).length}/${pred.length}`, pct(exact("base"))],
       ["Naive Bayes (entrenado con las 40 de ajuste)", `${pred.filter((p) => p.nb === p.intencion).length}/${pred.length}`, pct(exact("nb"))],
-      ...(conModelo ? [["llama3.2:3b con la guardia (Ollama)", `${pred.filter((p) => p.llm === p.intencion).length}/${pred.length}`, pct(exact("llm"))]] : []),
+      ...(conModelo ? [
+        ["llama3.2:3b con la guardia (Ollama)", `${pred.filter((p) => p.llm === p.intencion).length}/${pred.length}`, pct(exact("llm"))],
+        ["Como el agente: reglas primero y, si no reconocen nada, el modelo", `${pred.filter((p) => p.agente === p.intencion).length}/${pred.length}`, pct(exact("agente"))],
+      ] : []),
     ]),
     "",
     "**Aciertos por intención (sensibilidad)**",
@@ -129,10 +135,12 @@ export async function c31c32(conModelo = false): Promise<Seccion> {
     "",
     "**Análisis de errores en casos nuevos**",
     "",
-    tabla(["Id", "Frase", "Real", "Reglas", "Naive Bayes"], errores.map((p) => [p.id, p.texto, p.intencion, p.base, p.nb])),
+    conModelo
+      ? tabla(["Id", "Frase", "Real", "Reglas", "Naive Bayes", "Modelo", "Agente"], errores.map((p) => [p.id, p.texto, p.intencion, p.base, p.nb, p.llm ?? "", p.agente ?? ""]))
+      : tabla(["Id", "Frase", "Real", "Reglas", "Naive Bayes"], errores.map((p) => [p.id, p.texto, p.intencion, p.base, p.nb])),
     "",
     `**Lectura.** Naive Bayes acierta más (${pct(exact("nb"))} frente a ${pct(exact("base"))}), pero la diferencia importante está en **cómo** falla cada uno. Las reglas solo aciertan cuando aparece una palabra clave y, cuando no la encuentran, devuelven *fuera de alcance*: con sinónimos como \"darme de alta\", \"desocupadas\" o \"espacio con computadores\" se quedan cortas, pero su error es conservador (en el agente real, esas frases pasan al modelo). Naive Bayes reconoce mejor frases parecidas a las de ajuste, pero sus errores **meten al usuario en el flujo equivocado**: \"Necesito el certificado de notas\" la clasifica como reserva por la palabra \"necesito\", y no detecta ningún intento de eludir reglas (0/3), que es el error más peligroso. Con 5 ejemplos por intención confunde las que comparten palabras (\"sala\", \"mañana\"). ` +
-      (conModelo ? "El modelo local se agrega como referencia, porque es el clasificador que hoy usa el agente detrás de las rutas rápidas." : "Con `npm run contenidos -- --llm` (Ollama encendido) se agrega la columna del modelo local, que es el clasificador que hoy usa el agente detrás de las rutas rápidas."),
+      (conModelo ? `El modelo local (${pct(exact("llm"))}) es el que mejor generaliza, porque no depende de palabras exactas; por eso el agente lo usa detrás de las rutas rápidas, y la combinación de los dos da ${pct(exact("agente"))}. Aun así, el modelo solo clasifica la intención: sus errores se contienen porque el orquestador verifica los datos contra el texto y las reglas deciden.` : "Con `npm run contenidos -- --llm` (Ollama encendido) se agrega la columna del modelo local, que es el clasificador que hoy usa el agente detrás de las rutas rápidas."),
     "",
     "**Sesgos y límites.** Las frases las escribió el mismo equipo que diseñó las reglas, así que favorecen su vocabulario; 24 frases de prueba dan una exactitud muy inestable (un acierto cambia 4 puntos). **No se presenta el clasificador como fiable** ni se pone en producción. Lo que sí se aprovecha: las frases que fallaron muestran qué rutas rápidas faltan, y el clasificador podría servir de respaldo si el modelo no responde, después de entrenarlo con consultas reales autorizadas. En cualquier caso, clasificar la intención no decide nada: las reglas siguen decidiendo.",
   ].join("\n");
