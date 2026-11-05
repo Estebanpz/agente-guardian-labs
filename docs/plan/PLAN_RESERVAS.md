@@ -753,6 +753,64 @@ registrarEscalada(
 
    La matriz de la Fase 6 suma C-07, C-08 y C-09.
 
+### 7.0.3 Disponibilidad con criterios y contexto entre consultas (4-11-2026, prueba de Esteban)
+
+**Problema observado:**
+
+1. En la interfaz, Esteban escribió "Dime qué salas tienes disponibles para el viernes de 7PM - 9PM con equipos de
+   poder de cómputo potentes, para 20 estudiantes". El agente respondió con las salas que tienen 2 horas libres en
+   todo el día, salas estándar incluidas.
+2. Después escribió "necesito la sala de pc potente" y el agente empezó una reserva nueva, preguntando otra vez el
+   carné y la fecha.
+
+**Causas:**
+
+1. `disponibilidadTurno` usa la fecha y la sala, pero ignora el horario, las personas, los equipos y el alto cómputo.
+2. Al responder, la conversación se cierra y se borra, así que la reserva siguiente no conoce esos datos.
+
+**Corrección:**
+
+1. **Selección compartida.** En `agent/tools/reservas.ts`, extrae a una función exportada
+   `candidatas(s: SolicitudReserva, c: Contexto): SalaDoc[]` la lógica que hoy elige la sala en `evaluarReserva`:
+   capacidad, equipos operativos, alto cómputo, sin choque y el orden de preferencia. `evaluarReserva` debe usarla y
+   **comportarse igual**: RS-01 a RS-20 siguen pasando sin cambios.
+2. **Disponibilidad con criterios.** En `disponibilidadTurno`, aplica todos los extractores: fecha, horario, personas,
+   equipos y alto cómputo. Si viene un horario, o personas, o alto cómputo, responde **solo con las salas que cumplen**,
+   usando `candidatas`. Si es estudiante, o no hay carné, los equipos son iguales a las personas. Formato exacto:
+   `Para el {fecha larga}{ de HH:MM a HH:MM}{, N personas}{, alto cómputo}, estas salas cumplen:` seguido de una línea
+   por sala: `• Sala 14 · 25 puestos · 25 equipos operativos · alto cómputo`. Muestra un máximo de 6 y usa el chip
+   `Reservar Sala N` en cada una.
+   - Si ninguna cumple:
+     `Ninguna sala cumple esas condiciones el {fecha larga}{ de HH:MM a HH:MM}.`
+   - Si además se pidió alto cómputo y hay salas estándar libres que cumplen el resto, agrega:
+     `Salas estándar que sí cumplen: …`
+   - Sin criterios, la respuesta sigue como hoy.
+3. **Contexto entre consultas.** Después de responder una disponibilidad, **no borres** la conversación. Guárdala con
+   `flujo: "disponibilidad"`, `pendiente: null` y en `datos` lo que se extrajo: fecha, inicio, fin, personas, equipos y
+   computo_alto. El TTL de 30 minutos la limpia sola.
+4. **Reutilizar el contexto.** Cuando en la misma sesión empieza una reserva (`iniciar("reserva", …)`) y existe ese
+   contexto, copia sus datos a la nueva solicitud **solo en los campos que el mensaje nuevo no trae**. El chip
+   `Reservar Sala N` también fija la sala. La primera respuesta empieza con
+   `Tomo lo que me dijiste: {fecha larga}, {HH:MM} a {HH:MM}, {N} personas{, alto cómputo}.` y sigue con la pregunta
+   del primer dato que falte (normalmente el carné). Nunca copies el carné desde el contexto: siempre se pide.
+5. **Datos sueltos dentro de un flujo.** Durante una reserva, un texto libre que no coincide con los chips debe seguir
+   llenando los campos con los extractores, como ya hace `aplicar`. Agrega una prueba que lo demuestre.
+6. **Chip "Cancelar".** Solo debe aparecer si hay un flujo de reserva o de registro abierto, no después de una respuesta
+   de disponibilidad.
+
+**Pruebas nuevas** en `evals/escenarios-conversacion.ts`, con reloj fijo el lunes 2026-11-09 a las 08:00. "El
+viernes" es 2026-11-13, un día sin reservas en la semilla.
+
+| ID | Mensajes | Esperado |
+|---|---|---|
+| C-10 | "Dime qué salas tienes disponibles para el viernes de 7PM - 9PM con equipos de poder de cómputo potentes, para 20 estudiantes" | Lista **solo** Sala 14 y Sala 16 (la Sala 15 tiene 18 equipos operativos); chips `Reservar Sala 14` y `Reservar Sala 16` |
+| C-11 | C-10 → "necesito la sala de pc potente" → "D-20000001" → "20" → "IA" → "sí" | La primera respuesta dice "Tomo lo que me dijiste: viernes 13 de noviembre, 19:00 a 21:00, 20 personas, alto cómputo." y pide el carné. No vuelve a pedir fecha, horario ni personas. Termina con una reserva programada en sala-14 |
+| C-12 | C-10 → "Reservar Sala 16" → "D-20000001" → "20" → "IA" → "sí" | Reserva programada en sala-16 |
+| C-13 | "Quiero reservar" → "C-10000001" → "el viernes de 7 a 9 pm somos 4" | Los tres datos quedan llenos en un solo mensaje; la siguiente respuesta es la propuesta de sala, no otra pregunta |
+
+Agrega a `evals/extraer.ts`: `"de 7PM - 9PM"` → 19:00–21:00 y `"7pm a 9pm"` → 19:00–21:00.
+La matriz suma C-10 a C-13 (16 + 21 + 13 = 50 filas). Actualiza `docs/cambios-reservas.md`.
+
 ### 7.1 Privacidad (`agent/tools/privacidad.ts`)
 
 Antes de aplicar los patrones, **quita** del texto los carnés `\b[CD]-\d{8}\b` (si no, el patrón
