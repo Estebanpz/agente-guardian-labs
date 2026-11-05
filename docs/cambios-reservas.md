@@ -69,3 +69,14 @@ siguiente volvió a preguntar todo.
 | El chip "Reservar Sala N" fija la sala y la respuesta empieza con «Tomo lo que me dijiste: …». | Confirmar lo tomado del contexto antes de seguir preguntando. | `agent/conversacion.ts` | C-11, C-12 |
 | Los datos sueltos dentro de una reserva llenan los campos que faltan en un solo mensaje. | Evitar preguntas repetidas. | `agent/conversacion.ts` | C-13 |
 | El contexto de disponibilidad no es un flujo abierto: el chip "Cancelar" no aparece después de una disponibilidad. | "Cancelar" solo cuando hay una reserva o un registro abierto. | `agent/conversacion.ts`, `web/src/pages/Chat.jsx` (sin cambio: ya usa `flujo.tipo`) | revisión manual de C-11 en la interfaz |
+
+## Ocupación por día y varias fechas (sección 7.0.4, 4-11-2026)
+
+Motivo: "Que salas tienes ocupadas el jueves y viernes?" se respondió con el estado de ahora.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| `fechas(t, hoy)` devuelve todas las fechas del texto, sin repetir, en orden y máximo 7. `fecha()` no cambia. | Poder preguntar por varios días en un mensaje. | `agent/tools/extraer.ts` | 4 casos de `fechas()` en `evals/extraer.ts` |
+| `ocupacionTurno` lista por día las reservas programadas (sala, hora y si es de docente o estudiantes), sin carnés, y cuántas salas quedan libres. | Responder qué está ocupado, no solo los huecos libres. | `agent/conversacion.ts`, `agent/tools/reservas.ts` (`horarioLaboratorio`) | C-14, C-15 |
+| Ruta antes del modelo: un texto con fecha sobre salas va a ocupación (si dice ocupadas/reservadas o trae dos fechas o más) o a disponibilidad (una fecha). Se aplica también si el modelo devuelve `consulta_salas`. | Que la fecha no se pierda aunque el modelo se equivoque o esté apagado. | `agent/orquestador.ts` | C-14, C-15 (sin modelo) |
+| El estado de ahora termina con «Para otro día, pregunta por ejemplo: ¿qué salas están ocupadas el viernes?». | Indicar cómo preguntar por otra fecha. | `agent/conversacion.ts` | C-16 |

@@ -11,7 +11,7 @@ import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import { salas } from "../data/salas.js";
 import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
-import { continuar, estadoSalasDeBase, iniciar, reanudar, type RespuestaChat } from "./conversacion.js";
+import { continuar, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
 
 // Ingreso (vista Laboratorios): las tres salas de la evaluación (las reservas usan sala-1 a sala-16).
 type SalaId = "sala-1" | "sala-2" | "sala-3";
@@ -71,6 +71,15 @@ async function flujoPara(intencion: string, texto: string, sesion: string, repo:
   return null;
 }
 
+// Ocupación o disponibilidad de un día concreto (sección 7.0.4).
+async function porFecha(
+  tipo: "ocupacion" | "disponibilidad" | null, texto: string, sesion: string | undefined, repo: Repositorio,
+): Promise<RespuestaChat | null> {
+  if (tipo === "ocupacion") return ocupacionTurno(texto, sesion, repo);
+  if (tipo === "disponibilidad" && sesion) return iniciar("disponibilidad", texto, sesion, repo);
+  return null;
+}
+
 // Texto libre del monitor o del usuario. `contexto` = sala de la interfaz y sesión del navegador.
 export async function mensaje(
   texto: string,
@@ -110,6 +119,14 @@ export async function mensaje(
 
   // Paso 3: rutas rápidas, antes del modelo.
   const ruta = rutaRapida(texto);
+  // Sección 7.0.4: preguntas con fecha sobre salas (no una reserva ni un registro) se responden sin modelo.
+  if (!eludir && ruta !== "solicitud_reserva" && ruta !== "registro_usuario") {
+    const r = await porFecha(rutaPorFecha(texto), texto, sesion, repo);
+    if (r) {
+      registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+      return r;
+    }
+  }
   // Estado de las salas: siempre desde la base de reservas (las 16 salas), no desde los datos de la Puerta.
   if (ruta === "consulta_salas" && !eludir) {
     const respuesta = await estadoSalasDeBase(repo);
@@ -136,6 +153,12 @@ export async function mensaje(
   }
 
   if (c.intencion === "consulta_salas" && !eludir) {
+    // El modelo dijo "estado de salas" pero el texto trae fecha: no se responde con el estado de ahora.
+    const r = await porFecha(rutaPorFecha(texto, false), texto, sesion, repo);
+    if (r) {
+      registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+      return r;
+    }
     const respuesta = await estadoSalasDeBase(repo);
     registrar({ texto: resumen, intencion: "consulta_salas", respuesta });
     return { intencion: "consulta_salas", respuesta };

@@ -47,7 +47,8 @@ const S = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-2222
   "77777777-7777-4777-8777-777777777777", "88888888-8888-4888-8888-888888888888",
   "99999999-9999-4999-8999-999999999999",
   "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1", "aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
-  "aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3", "aaaaaaa4-aaaa-4aaa-8aaa-aaaaaaaaaaa4"];
+  "aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3", "aaaaaaa4-aaaa-4aaa-8aaa-aaaaaaaaaaa4",
+  "aaaaaaa5-aaaa-4aaa-8aaa-aaaaaaaaaaa5", "aaaaaaa6-aaaa-4aaa-8aaa-aaaaaaaaaaa6", "aaaaaaa7-aaaa-4aaa-8aaa-aaaaaaaaaaa7"];
 
 export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
   fijarReloj("2026-11-09", "08:00");
@@ -236,6 +237,38 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
         "fecha, horario y personas quedan llenos en un solo mensaje; la siguiente respuesta es la propuesta de sala", [
           [pendiente(salidas[1]) === "fecha", "pregunta la fecha"],
           [tercera.flujo?.pendiente === "confirmar" && (tercera.respuesta ?? "").startsWith("La Sala"), "propuesta de sala, sin otra pregunta"],
+        ]));
+    }
+
+    // C-14 a C-16 (sección 7.0.4): ocupación por día y varias fechas, sin modelo.
+    {
+      const { salidas } = await guion(S[13], ["Que salas tienes ocupadas el jueves y viernes?"]);
+      const t = salidas[0].respuesta ?? "";
+      filas.push(fila("C-14", "Ocupación de dos días", "Que salas tienes ocupadas el jueves y viernes?",
+        "dos bloques (jueves 12 y viernes 13), ambos sin reservas; no responde con el estado de ahora", [
+          [t.includes("Jueves 12 de noviembre: sin reservas") && t.includes("Viernes 13 de noviembre: sin reservas"), "un bloque por día, sin reservas"],
+          [!t.includes("Ahora"), "no responde con el estado de ahora"],
+        ]));
+    }
+    {
+      const { salidas } = await guion(S[14], ["¿Qué salas están ocupadas el martes?"]);
+      const t = salidas[0].respuesta ?? "";
+      const i5 = t.indexOf("Sala 5 · 08:00–10:00"), i15 = t.indexOf("Sala 15 · 10:00–12:00"), i6 = t.indexOf("Sala 6 · 13:00–15:00");
+      filas.push(fila("C-15", "Ocupación de un día", "¿Qué salas están ocupadas el martes?",
+        "martes 10 con 3 reservas en orden 08:00, 10:00, 13:00; «Las otras 13 salas están libres todo el día.»; sin carnés", [
+          [t.startsWith("Martes 10 de noviembre (3 reservas):"), "bloque del martes con 3 reservas"],
+          [i5 >= 0 && i5 < i15 && i15 < i6, "ordenadas por hora de inicio"],
+          [t.includes("Las otras 13 salas están libres todo el día."), "resume las salas libres"],
+          [!/C-\d|C-\*/.test(t), "no muestra carnés"],
+        ]));
+    }
+    {
+      const { salidas } = await guion(S[15], ["¿Cuál es el estado de las salas?"]);
+      const t = salidas[0].respuesta ?? "";
+      filas.push(fila("C-16", "Estado de ahora (regresión)", "¿Cuál es el estado de las salas?",
+        "vista «Ahora (…)» con la línea de ayuda para otro día", [
+          [t.startsWith("Ahora ("), "estado de ahora"],
+          [t.endsWith("¿qué salas están ocupadas el viernes?"), "termina con la línea de ayuda"],
         ]));
     }
   } finally {

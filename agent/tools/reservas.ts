@@ -40,6 +40,7 @@ const FUENTES = [
 
 const descripcionDe = (id: string): string => base.reglas.find((r) => r.id === id)?.descripcion ?? id;
 
+export const horarioLaboratorio = (): { abre: string; cierra: string } => ({ abre: P.horario_abre, cierra: P.horario_cierra });
 export const enmascarar = (carne: string): string => `${carne.slice(0, 2)}****${carne.slice(-4)}`;
 
 // Construye la decisión con su traza ("Rxx: descripción").

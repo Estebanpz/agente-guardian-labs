@@ -4,8 +4,8 @@ import type {
   Conversacion, DecisionReserva, NotificacionDoc, ReservaDoc, SalaDoc, SolicitudReserva,
 } from "./tools/esquemas-reservas.js";
 import { ahora, aMin, aHora, sumarDias } from "./tools/reloj.js";
-import { cancelar as esCancelar, extraer, type Extraido } from "./tools/extraer.js";
-import { candidatas, disponibilidad, enmascarar, evaluarRegistro, evaluarReserva, type Contexto } from "./tools/reservas.js";
+import { cancelar as esCancelar, extraer, fechas, type Extraido } from "./tools/extraer.js";
+import { candidatas, disponibilidad, enmascarar, evaluarRegistro, evaluarReserva, horarioLaboratorio, type Contexto } from "./tools/reservas.js";
 import type { Repositorio } from "./store/repositorio.js";
 
 export type RespuestaChat = {
@@ -613,7 +613,49 @@ export async function estadoSalasDeBase(repo: Repositorio): Promise<string> {
     `• Equipos operativos: ${operativos} de ${equipos.length}.`,
     `• Con conflicto entre fuentes: ${lista(conflicto)}.`,
     `• Con dato desconocido: ${lista(desconocido)}.`,
+    "Para otro día, pregunta por ejemplo: ¿qué salas están ocupadas el viernes?",
   ].join("\n");
+}
+
+// Sección 7.0.4: una pregunta con fecha sobre salas no es el estado de "ahora".
+// Ocupación si habla de ocupadas/reservadas o trae dos fechas o más; disponibilidad si trae una sola fecha.
+export function rutaPorFecha(texto: string, exigirSala = true): "ocupacion" | "disponibilidad" | null {
+  const t = texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (exigirSala && !/\b(salas?|laboratorios?)\b/.test(t)) return null;
+  const fs = fechas(texto, ahora().fecha);
+  if (!fs.length) return null;
+  return /\b(ocupad|reservad|tomad)\w*/.test(t) || fs.length >= 2 ? "ocupacion" : "disponibilidad";
+}
+
+// Ocupación por día, leída de la base: qué salas están reservadas y a qué hora. Sin carnés.
+export async function ocupacionTurno(texto: string, sesion: string | undefined, repo: Repositorio): Promise<RespuestaChat> {
+  const h = ahora();
+  const fs = fechas(texto, h.fecha);
+  const dias = fs.length ? fs : [h.fecha];
+  const salas = await repo.salas();
+  const { abre, cierra } = horarioLaboratorio();
+  const bloques: string[] = [];
+  for (const f of dias) {
+    const titulo = fechaLarga(f).replace(/^./, (c) => c.toUpperCase());
+    const rs = (await repo.reservasDelDia(f)).slice().sort((a, b) => a.inicio_min - b.inicio_min);
+    if (!rs.length) {
+      bloques.push(`${titulo}: sin reservas; las ${salas.length} salas están libres de ${abre} a ${cierra}.`);
+      continue;
+    }
+    const usadas = new Set(rs.map((r) => r.sala)).size;
+    bloques.push([
+      `${titulo} (${rs.length} ${rs.length === 1 ? "reserva" : "reservas"}):`,
+      ...rs.map((r) => `• Sala ${r.sala.slice(5)} · ${r.inicio}–${r.fin} · ${r.rol === "docente" ? "docente" : "estudiantes"}`),
+      `Las otras ${salas.length - usadas} salas están libres todo el día.`,
+    ].join("\n"));
+  }
+  if (sesion) {
+    await guardarContextoDisponibilidad(repo, sesion, {
+      carne: null, fecha: dias[0], inicio: null, fin: null, sala: null,
+      personas: null, equipos: null, computo_alto: null, materia: null,
+    });
+  }
+  return cerrado("consulta_disponibilidad", bloques.join("\n\n"), ["Reservar una sala"]);
 }
 
 // Un mensaje dentro de un flujo abierto (o "cancelar" para abortarlo).

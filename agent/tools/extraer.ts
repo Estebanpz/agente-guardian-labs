@@ -58,6 +58,20 @@ export function fecha(t: string, hoy: string): string | null {
   return buscarFecha(t, hoy)?.valor ?? null;
 }
 
+// Todas las fechas del texto ("el jueves y viernes"), sin repetir y en orden cronológico; máximo 7.
+// Cada hallazgo se quita del texto, así "pasado mañana" no cuenta también como "mañana".
+export function fechas(t: string, hoy: string): string[] {
+  let resto = norm(t);
+  const out: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const h = buscarFecha(resto, hoy);
+    if (!h) break;
+    if (!out.includes(h.valor)) out.push(h.valor);
+    resto = resto.replace(h.texto, " ");
+  }
+  return out.sort();
+}
+
 // ── Horario ──────────────────────────────────────────────────────────────
 // Horas sin am/pm: 7–11 mañana, 12 mediodía, 1–6 tarde (+12), 13–22 tal cual.
 // Con am/pm se respeta el sufijo; si la hora de inicio no lo trae, usa el del final.

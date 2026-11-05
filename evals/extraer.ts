@@ -1,5 +1,5 @@
 // Pruebas de los extractores deterministas del chat de reservas (sin modelo).
-import { extraer, type Extraido } from "../agent/tools/extraer.js";
+import { extraer, fechas, type Extraido } from "../agent/tools/extraer.js";
 
 const HOY = "2026-11-09"; // lunes
 
@@ -55,6 +55,19 @@ for (const caso of CASOS) {
   if (fallas.length) fallos++;
   const detalle = fallas.map((k) => `${k}=${JSON.stringify(r[k])}`).join(" ");
   console.log(`${fallas.length ? "❌" : "✅"} "${caso.entrada}"${caso.pendiente ? ` [${caso.pendiente}]` : ""}${fallas.length ? ` · ${detalle}` : ""}`);
+}
+// Varias fechas en un mensaje (sección 7.0.4).
+const FECHAS: [string, string[]][] = [
+  ["el jueves y viernes", ["2026-11-12", "2026-11-13"]],
+  ["mañana y pasado mañana", ["2026-11-10", "2026-11-11"]],
+  ["lunes, martes y miércoles", ["2026-11-09", "2026-11-10", "2026-11-11"]],
+  ["en la mañana", []],
+];
+for (const [texto, esperado] of FECHAS) {
+  const r = fechas(texto, HOY);
+  const ok = JSON.stringify(r) === JSON.stringify(esperado);
+  if (!ok) fallos++;
+  console.log(`${ok ? "✅" : "❌"} fechas("${texto}")${ok ? "" : ` · ${JSON.stringify(r)}`}`);
 }
 console.log(fallos === 0 ? "\nTodas pasaron" : `\n${fallos} fallaron`);
 process.exit(fallos === 0 ? 0 : 1);
