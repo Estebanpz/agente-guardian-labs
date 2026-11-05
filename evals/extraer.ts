@@ -21,6 +21,8 @@ const CASOS: Caso[] = [
   { entrada: "2026-11-20", esperado: { fecha: "2026-11-20" } },
   { entrada: "13:00-15:00", esperado: { inicio: "13:00", fin: "15:00" } },
   { entrada: "2pm a 4pm", esperado: { inicio: "14:00", fin: "16:00" } },
+  { entrada: "de 7PM - 9PM", esperado: { inicio: "19:00", fin: "21:00" } },
+  { entrada: "7pm a 9pm", esperado: { inicio: "19:00", fin: "21:00" } },
   { entrada: "desde las 9 hasta las 11", esperado: { inicio: "09:00", fin: "11:00" } },
   { entrada: "de 12 a 2", esperado: { inicio: "12:00", fin: "14:00" } },
   // Números: el carné y la hora no cuentan como personas.

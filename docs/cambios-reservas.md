@@ -55,3 +55,17 @@ quedan en la base de demostración (datos sintéticos); el prototipo no reserva 
 | cambio | motivo | archivo | prueba |
 |---|---|---|---|
 | R21 ya no escala a coordinación: escala al monitor, que lo remite a coordinación o a la Vicerrectoría académica si hace falta. La versión de las reglas sigue en 2.0.0. | Decisión del equipo del 4-11-2026, registrada en `conocimiento/hechos.json` (H04): el monitor es la primera instancia y el agente nunca escala directo a la Vicerrectoría. | `agent/rules/reglas.json` (efecto, descripción y fuente de R21), `agent/tools/reservas.ts` (notificar `["monitor"]`), `agent/conversacion.ts` (texto del chat: "Avisé al monitor, que lo remitirá a coordinación si hace falta"), `docs/plan/PLAN_RESERVAS.md` (sección 2) | RS-08 en `evals/escenarios-reservas.ts` (y su fila en la matriz) |
+
+## Disponibilidad con criterios y contexto entre consultas (sección 7.0.3, 4-11-2026)
+
+Motivo: en una prueba manual, la disponibilidad ignoró el horario, las personas y el alto cómputo, y la reserva
+siguiente volvió a preguntar todo.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| `candidatas(s, c)` se extrae como función exportada y la usa `evaluarReserva`. Sin cambio de comportamiento. | Una sola regla para elegir sala, usada por la reserva y por la disponibilidad. | `agent/tools/reservas.ts` | RS-01 a RS-20 (sin cambios) |
+| La disponibilidad aplica fecha, horario, personas, equipos y alto cómputo, y responde solo con las salas que cumplen. Muestra máximo 6; si hay más, lo dice. | Que la respuesta corresponda a lo que pidió la persona. | `agent/conversacion.ts` | C-10 y extractor "de 7PM - 9PM" / "7pm a 9pm" |
+| Tras una disponibilidad se guarda el contexto (fecha, horario, personas, equipos, alto cómputo), 30 min, sin carné ni sala. Al empezar una reserva se reutiliza, y el mensaje nuevo gana. | Que la reserva siguiente no pida otra vez lo que ya se dijo. | `agent/conversacion.ts` | C-11, C-12 |
+| El chip "Reservar Sala N" fija la sala y la respuesta empieza con «Tomo lo que me dijiste: …». | Confirmar lo tomado del contexto antes de seguir preguntando. | `agent/conversacion.ts` | C-11, C-12 |
+| Los datos sueltos dentro de una reserva llenan los campos que faltan en un solo mensaje. | Evitar preguntas repetidas. | `agent/conversacion.ts` | C-13 |
+| El contexto de disponibilidad no es un flujo abierto: el chip "Cancelar" no aparece después de una disponibilidad. | "Cancelar" solo cuando hay una reserva o un registro abierto. | `agent/conversacion.ts`, `web/src/pages/Chat.jsx` (sin cambio: ya usa `flujo.tipo`) | revisión manual de C-11 en la interfaz |

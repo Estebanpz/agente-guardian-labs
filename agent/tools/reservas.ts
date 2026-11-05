@@ -85,24 +85,33 @@ const aConflicto = (r: ReservaDoc): Conflicto => ({
 
 type Req = { personas: number; equipos: number; alto: boolean; inicio: number; fin: number; fecha: string; docente: boolean };
 
-// Salas que cumplen el paso 6 (candidatas), en el orden de selección.
-function candidatas(req: Req, c: Contexto): SalaDoc[] {
+// Salas que cumplen los criterios de la solicitud, en el orden de preferencia (paso 6 del plan).
+// Un criterio que falta no filtra: sin personas no hay mínimo de aforo; sin horario no hay choques.
+// Sin carné o para estudiantes, los equipos son las personas. Con la solicitud completa, el resultado es el
+// mismo que antes de extraer esta función (RS-01 a RS-20).
+export function candidatas(s: SolicitudReserva, c: Contexto): SalaDoc[] {
+  const personas = s.personas;
+  const equipos = s.equipos ?? personas ?? 0;
+  const alto = s.computo_alto ?? false;
+  const tieneHorario = s.fecha !== null && s.inicio !== null && s.fin !== null;
+  const inicio = s.inicio ? aMin(s.inicio) : 0;
+  const fin = s.fin ? aMin(s.fin) : 0;
   return c.salas
     .filter((sala) => sala.activa)
-    .filter((sala) => sala.capacidad >= req.personas)
-    .filter((sala) => estadoSala(sala, c.equipos).operativos >= req.equipos)
-    .filter((sala) => !c.reservasDelDia.some((r) =>
-      r.sala === sala._id && r.fecha === req.fecha && solapa(r, req.inicio, req.fin)))
-    .filter((sala) => !req.alto || sala.computo === "alto")
+    .filter((sala) => personas === null || sala.capacidad >= personas)
+    .filter((sala) => estadoSala(sala, c.equipos).operativos >= equipos)
+    .filter((sala) => !tieneHorario || !c.reservasDelDia.some((r) =>
+      r.sala === sala._id && r.fecha === s.fecha && solapa(r, inicio, fin)))
+    .filter((sala) => !alto || sala.computo === "alto")
     .sort((a, b) =>
-      (req.alto ? 0 : (a.computo === "estandar" ? 0 : 1) - (b.computo === "estandar" ? 0 : 1))
+      (alto ? 0 : (a.computo === "estandar" ? 0 : 1) - (b.computo === "estandar" ? 0 : 1))
       || a.capacidad - b.capacidad
       || Number(a._id.slice(5)) - Number(b._id.slice(5)));
 }
 
 // Hasta 3 alternativas de la selección, sin la sala indicada.
-const alternativas = (req: Req, c: Contexto, sin?: string): string[] =>
-  candidatas(req, c).map((s) => s._id).filter((id) => id !== sin).slice(0, 3);
+const alternativas = (s: SolicitudReserva, c: Contexto, sin?: string): string[] =>
+  candidatas(s, c).map((x) => x._id).filter((id) => id !== sin).slice(0, 3);
 
 // Evalúa una solicitud completa, en el orden de la sección 6.3 del plan.
 export function evaluarReserva(s: SolicitudReserva, c: Contexto): DecisionReserva {
@@ -164,10 +173,10 @@ export function evaluarReserva(s: SolicitudReserva, c: Contexto): DecisionReserv
   if (s.sala) {
     const sala = c.salas.find((x) => x._id === s.sala);
     if (!sala) {
-      return decidir({ decision: "negar", estado: "falso", accion: "orientar_proceso", reglas: ["R18"], alternativas: alternativas(req, c) });
+      return decidir({ decision: "negar", estado: "falso", accion: "orientar_proceso", reglas: ["R18"], alternativas: alternativas(s, c) });
     }
     const est = estadoSala(sala, c.equipos);
-    const alts = alternativas(req, c, sala._id);
+    const alts = alternativas(s, c, sala._id);
 
     // R23: alto cómputo pedido en una sala estándar.
     if (req.alto && sala.computo === "estandar") {
@@ -224,7 +233,7 @@ export function evaluarReserva(s: SolicitudReserva, c: Contexto): DecisionReserv
   }
 
   // Sin sala pedida: el motor elige (paso 6).
-  const cand = candidatas(req, c);
+  const cand = candidatas(s, c);
   if (!cand.length) {
     return decidir({ decision: "negar", estado: "falso", accion: "orientar_proceso", reglas: ["R24"] });
   }

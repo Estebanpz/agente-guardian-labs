@@ -45,7 +45,9 @@ const S = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-2222
   "33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444",
   "55555555-5555-4555-8555-555555555555", "66666666-6666-4666-8666-666666666666",
   "77777777-7777-4777-8777-777777777777", "88888888-8888-4888-8888-888888888888",
-  "99999999-9999-4999-8999-999999999999"];
+  "99999999-9999-4999-8999-999999999999",
+  "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1", "aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+  "aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaa3", "aaaaaaa4-aaaa-4aaa-8aaa-aaaaaaaaaaa4"];
 
 export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
   fijarReloj("2026-11-09", "08:00");
@@ -181,6 +183,59 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
           [JSON.stringify(paras) === JSON.stringify(["mantenimiento", "monitor"]), `avisos ${JSON.stringify(paras)}`],
           [avisos.length === 2 && avisos.every((a) => a.reserva_codigo === "RS-0004"), "ambos avisos con el mismo RS-0004"],
           [(await repo.escaladasDelDia("2026-11-10")).length === 1, "una reserva escalada"],
+        ]));
+    }
+    // C-10: disponibilidad con criterios (viernes 7 a 9 pm, 20 estudiantes, alto cómputo). Reloj: lunes 2026-11-09.
+    const PREG_C10 = "Dime qué salas tienes disponibles para el viernes de 7PM - 9PM con equipos de poder de cómputo potentes, para 20 estudiantes";
+    {
+      const { salidas } = await guion(S[9], [PREG_C10]);
+      const r = salidas[0];
+      const texto = r.respuesta ?? "";
+      const chips = r.flujo?.opciones ?? [];
+      filas.push(fila("C-10", "Disponibilidad con criterios", PREG_C10,
+        "solo Sala 14 y Sala 16 (la 15 tiene 18 equipos operativos); chips Reservar Sala 14 y Reservar Sala 16", [
+          [texto.includes("Sala 14") && texto.includes("Sala 16") && !texto.includes("Sala 15") && !texto.includes("Sala 1 "),
+            "lista solo Sala 14 y Sala 16"],
+          [JSON.stringify(chips) === JSON.stringify(["Reservar Sala 14", "Reservar Sala 16"]), "chips Reservar Sala 14 y Reservar Sala 16"],
+        ]));
+    }
+
+    // C-11: contexto entre consultas. La disponibilidad se reutiliza al empezar la reserva; el carné siempre se pide.
+    {
+      const { repo, salidas } = await guion(S[10], [PREG_C10, "necesito la sala de pc potente", "D-20000001", "20", "IA", "sí"]);
+      const primera = salidas[1];
+      const texto = primera.respuesta ?? "";
+      const reservas = await repo.reservasDelDia("2026-11-13", "sala-14");
+      const resto = salidas.slice(2).map((s) => s.respuesta ?? "").join(" ");
+      filas.push(fila("C-11", "Contexto entre consultas", "C-10 → necesito la sala de pc potente → D-20000001 → 20 → IA → sí",
+        "primera respuesta «Tomo lo que me dijiste: viernes 13 de noviembre, 19:00 a 21:00, 20 personas, alto cómputo.» y pide el carné; no vuelve a pedir fecha, horario ni personas; reserva en sala-14", [
+          [texto.includes("Tomo lo que me dijiste: viernes 13 de noviembre, 19:00 a 21:00, 20 personas, alto cómputo."), "«Tomo lo que me dijiste» con fecha, horario, personas y alto cómputo"],
+          [pendiente(primera) === "carne", "pide el carné"],
+          [!resto.includes("¿Para qué día?") && !resto.includes("¿De qué hora") && !resto.includes("¿Cuántas personas") && !resto.includes("¿Cuántos estudiantes"),
+            "no vuelve a pedir fecha, horario ni personas"],
+          [reservas.length === 1, "reserva programada en sala-14 el viernes"],
+        ]));
+    }
+
+    // C-12: el chip "Reservar Sala 16" fija la sala y reutiliza el contexto de la disponibilidad.
+    {
+      const { repo, salidas } = await guion(S[11], [PREG_C10, "Reservar Sala 16", "D-20000001", "20", "IA", "sí"]);
+      const reservas = await repo.reservasDelDia("2026-11-13", "sala-16");
+      filas.push(fila("C-12", "Chip Reservar Sala 16", "C-10 → Reservar Sala 16 → D-20000001 → 20 → IA → sí",
+        "reserva programada en sala-16; la primera respuesta reutiliza el contexto", [
+          [(salidas[1].respuesta ?? "").includes("Tomo lo que me dijiste"), "reutiliza el contexto de la disponibilidad"],
+          [reservas.length === 1, "reserva programada en sala-16"],
+        ]));
+    }
+
+    // C-13: datos sueltos dentro de un flujo. Tres datos en un solo mensaje; la siguiente respuesta es la propuesta.
+    {
+      const { salidas } = await guion(S[12], ["Quiero reservar", "C-10000001", "el viernes de 7 a 9 pm somos 4"]);
+      const tercera = salidas[2];
+      filas.push(fila("C-13", "Datos sueltos dentro de la reserva", "Quiero reservar → C-10000001 → el viernes de 7 a 9 pm somos 4",
+        "fecha, horario y personas quedan llenos en un solo mensaje; la siguiente respuesta es la propuesta de sala", [
+          [pendiente(salidas[1]) === "fecha", "pregunta la fecha"],
+          [tercera.flujo?.pendiente === "confirmar" && (tercera.respuesta ?? "").startsWith("La Sala"), "propuesta de sala, sin otra pregunta"],
         ]));
     }
   } finally {

@@ -5,7 +5,7 @@ import type {
 } from "./tools/esquemas-reservas.js";
 import { ahora, aMin, aHora, sumarDias } from "./tools/reloj.js";
 import { cancelar as esCancelar, extraer, type Extraido } from "./tools/extraer.js";
-import { disponibilidad, enmascarar, evaluarRegistro, evaluarReserva, type Contexto } from "./tools/reservas.js";
+import { candidatas, disponibilidad, enmascarar, evaluarRegistro, evaluarReserva, type Contexto } from "./tools/reservas.js";
 import type { Repositorio } from "./store/repositorio.js";
 
 export type RespuestaChat = {
@@ -482,16 +482,33 @@ async function turnoRegistro(conv: Conversacion, texto: string, repo: Repositori
 }
 
 // Disponibilidad: sin flujo. Con sala, la agenda del día; sin sala, las salas con un hueco de 2 h.
-async function disponibilidadTurno(texto: string, repo: Repositorio): Promise<RespuestaChat> {
+// Contexto de una consulta de disponibilidad: 30 min (TTL de la colección). Sin carné ni sala.
+async function guardarContextoDisponibilidad(repo: Repositorio, sesion: string, datos: SolicitudReserva): Promise<void> {
+  await repo.guardarConversacion({
+    _id: sesion, flujo: "disponibilidad", pendiente: null,
+    datos: {
+      ...VACIA(), fecha: datos.fecha, inicio: datos.inicio, fin: datos.fin,
+      personas: datos.personas, equipos: datos.equipos, computo_alto: datos.computo_alto,
+    },
+    intentos: 0, propuesta: null, actualizado: new Date(),
+  });
+}
+
+// Disponibilidad (sección 7.0.3): responde con los criterios que trae el texto (fecha, horario, personas,
+// equipos, alto cómputo) usando candidatas(); sin criterios, lista las salas con 2 horas libres.
+async function disponibilidadTurno(texto: string, sesion: string, repo: Repositorio): Promise<RespuestaChat> {
   const h = ahora();
   const ext = extraer(texto, { hoy: h.fecha, pendiente: null });
   const fecha = ext.fecha ?? h.fecha;
-  // Sin fecha, la consulta es de hoy; la respuesta ya lo dice, así que no se repite aquí.
-  const aviso = "";
   // Si la fecha es hoy, solo cuenta desde la hora actual (no se ofrecen horas que ya pasaron).
   const desde = fecha === h.fecha ? h.minutos : 0;
   const ctx = await contextoPara(repo, null, fecha);
   const reservas = ctx.reservasDelDia;
+  const criterios: SolicitudReserva = {
+    carne: null, fecha, inicio: ext.inicio, fin: ext.fin, sala: null,
+    personas: ext.personas, equipos: ext.equipos, computo_alto: ext.computo_alto, materia: null,
+  };
+  await guardarContextoDisponibilidad(repo, sesion, criterios);
 
   if (ext.sala) {
     const sala = ctx.salas.find((s) => s._id === ext.sala);
@@ -507,13 +524,37 @@ async function disponibilidadTurno(texto: string, repo: Repositorio): Promise<Re
         ? `Libre${fecha === h.fecha ? ` desde las ${aHora(desde)}` : ""}: ${libresSala.join(", ")}`
         : "Libre: no hay un hueco de 30 minutos o más.",
     ];
-    return cerrado("consulta_disponibilidad", `${aviso}${fechaLarga(fecha)}\n${lineas.join("\n")}`,
+    return cerrado("consulta_disponibilidad", `${fechaLarga(fecha)}\n${lineas.join("\n")}`,
       [`Reservar ${sala.nombre}`], {
         disponibilidad: { sala: sala._id, fecha, ocupadas: d.ocupadas, libres: d.libres, operativos: d.operativos, inciertos: d.inciertos },
       });
   }
 
-  // Sin sala: salas con un hueco libre de 2 horas o más, leídas de la base.
+  const hayCriterios = ext.inicio !== null || ext.personas !== null || ext.computo_alto === true;
+  if (hayCriterios) {
+    const alto = criterios.computo_alto === true;
+    const diaTxt = `${fechaLarga(fecha)}${ext.inicio && ext.fin ? ` de ${ext.inicio} a ${ext.fin}` : ""}`;
+    const cumplen = candidatas(criterios, ctx);
+    if (!cumplen.length) {
+      // Pidió alto cómputo y ninguna sala de alto cumple: se ofrecen las estándar que cumplen el resto.
+      const estandar = alto
+        ? candidatas({ ...criterios, computo_alto: false }, ctx).filter((s) => s.computo === "estandar").slice(0, 6)
+        : [];
+      const extra = estandar.length ? `\nSalas estándar que sí cumplen: ${estandar.map((s) => etiquetaSala(s)).join(", ")}.` : "";
+      return cerrado("consulta_disponibilidad", `Ninguna sala cumple esas condiciones el ${diaTxt}.${extra}`,
+        estandar.map((s) => `Reservar ${etiquetaSala(s)}`));
+    }
+    const mostradas = cumplen.slice(0, 6);
+    const resto = cumplen.length - mostradas.length;
+    const criterioTxt = `${diaTxt}${ext.personas !== null ? `, ${ext.personas} personas` : ""}${alto ? ", alto cómputo" : ""}`;
+    const lineas = mostradas.map((s) =>
+      `• ${etiquetaSala(s)} · ${s.capacidad} puestos · ${disponibilidad(s, fecha, reservas, ctx).operativos} equipos operativos · ${s.computo === "alto" ? "alto cómputo" : "estándar"}`);
+    const mas = resto > 0 ? `\ny ${resto} salas más: acota con un horario o con el número de personas.` : "";
+    return cerrado("consulta_disponibilidad", `Para el ${criterioTxt}, estas salas cumplen:\n${lineas.join("\n")}${mas}`,
+      mostradas.map((s) => `Reservar ${etiquetaSala(s)}`));
+  }
+
+  // Sin criterios: salas con un hueco libre de 2 horas o más, leídas de la base.
   const todas = /\btodas\b/.test(norm(texto));
   const conHueco = ctx.salas
     .slice()
@@ -525,20 +566,23 @@ async function disponibilidadTurno(texto: string, repo: Repositorio): Promise<Re
   const etiquetaDia = fecha === h.fecha ? "hoy" : fecha === sumarDias(h.fecha, 1) ? "mañana" : fecha;
   const mostradas = todas ? conHueco : conHueco.slice(0, 6);
   const resto = conHueco.length - mostradas.length;
-  const cuando = fecha === h.fecha
+  const cuandoLista = fecha === h.fecha
     ? `hoy (${fechaLarga(fecha)}) a partir de las ${aHora(desde)}`
     : `el ${fechaLarga(fecha)}`;
   if (!conHueco.length) {
-    const manana = fecha === h.fecha && !ext.fecha
+    const manana = fecha === h.fecha && ext.fecha === null
       ? ` ¿Quieres que revise mañana (${fechaLarga(sumarDias(h.fecha, 1))})?`
       : "";
-    return cerrado("consulta_disponibilidad", `No hay salas con 2 horas libres ${cuando}.${manana}`);
+    return cerrado("consulta_disponibilidad", `No hay salas con 2 horas libres ${cuandoLista}.${manana}`);
   }
   const lineas = mostradas.map((x) => `• ${x.s.nombre}: ${x.rangos.join(", ")}`);
   const mas = resto > 0 ? `\ny ${resto} salas más.` : "";
-  return cerrado("consulta_disponibilidad", `${aviso}Salas con 2 horas libres ${cuando}:\n${lineas.join("\n")}${mas}`,
+  return cerrado("consulta_disponibilidad", `Salas con 2 horas libres ${cuandoLista}:\n${lineas.join("\n")}${mas}`,
     [...mostradas.map((x) => `Reservar ${x.s.nombre}`), ...(resto > 0 ? [`Ver todas (${etiquetaDia})`] : [])]);
 }
+
+// "Sala N" sin el texto del nombre (el de alto cómputo no va en la lista).
+const etiquetaSala = (s: SalaDoc): string => `Sala ${s._id.slice(5)}`;
 
 // Rangos libres de al menos `minimo` minutos, recortados a partir de `desde` (minuto del día).
 function rangosDesde(libres: { inicio: string; fin: string }[], desde: number, minimo: number): string[] {
@@ -575,7 +619,8 @@ export async function estadoSalasDeBase(repo: Repositorio): Promise<string> {
 // Un mensaje dentro de un flujo abierto (o "cancelar" para abortarlo).
 export async function continuar(texto: string, sesion: string, repo: Repositorio): Promise<RespuestaChat | null> {
   const conv = await repo.leerConversacion(sesion);
-  if (!conv) return null;
+  // El contexto de una disponibilidad no es un flujo abierto: no toma los mensajes siguientes.
+  if (!conv || conv.flujo === "disponibilidad") return null;
   if (esCancelar(texto)) {
     await repo.borrarConversacion(sesion);
     return cerrado("cancelar", "Cancelé la solicitud. No se guardó nada.");
@@ -584,32 +629,54 @@ export async function continuar(texto: string, sesion: string, repo: Repositorio
 }
 
 // Abre un flujo nuevo: "reserva", "registro" o "disponibilidad".
+// Abre un flujo nuevo: "reserva", "registro" o "disponibilidad".
 export async function iniciar(
   flujo: "reserva" | "registro" | "disponibilidad", texto: string, sesion: string, repo: Repositorio,
 ): Promise<RespuestaChat> {
-  if (flujo === "disponibilidad") return disponibilidadTurno(texto, repo);
-  const conv: Conversacion = {
-    _id: sesion,
-    flujo,
-    pendiente: flujo === "registro" ? "carne" : null,
-    datos: VACIA(),
-    intentos: 0,
-    propuesta: null,
-    actualizado: new Date(),
-  };
+  if (flujo === "disponibilidad") return disponibilidadTurno(texto, sesion, repo);
   if (flujo === "registro") {
+    const conv: Conversacion = {
+      _id: sesion, flujo, pendiente: "carne", datos: VACIA(), intentos: 0, propuesta: null, actualizado: new Date(),
+    };
     if (extraer(texto, { hoy: ahora().fecha, pendiente: "carne" }).carne) return turnoRegistro(conv, texto, repo);
     await guardar(repo, conv);
     return abierto(conv, preguntaPara("carne", false).texto, ["Soy nuevo"]);
   }
+  // Reserva: lo que trae el mensaje gana; lo que falta se toma de la disponibilidad reciente de la sesión.
+  // Nunca se copia el carné: siempre se pide.
+  const previo = await repo.leerConversacion(sesion);
+  const usado = previo && previo.flujo === "disponibilidad" ? previo.datos : null;
+  const datos = VACIA();
+  aplicar(datos, extraer(texto, { hoy: ahora().fecha, pendiente: null }));
+  const tomados: string[] = [];
+  if (usado) {
+    for (const k of ["fecha", "personas", "equipos", "computo_alto"] as const) {
+      if (datos[k] === null && usado[k] !== null) { (datos as Record<string, unknown>)[k] = usado[k]; tomados.push(k); }
+    }
+    if (datos.inicio === null && datos.fin === null && usado.inicio && usado.fin) {
+      datos.inicio = usado.inicio; datos.fin = usado.fin; tomados.push("horario");
+    }
+  }
+  const conv: Conversacion = {
+    _id: sesion, flujo, pendiente: null, datos, intentos: 0, propuesta: null, actualizado: new Date(),
+  };
   await guardar(repo, conv);
-  return turnoReserva(conv, texto, repo);
+  const r = await turnoReserva(conv, texto, repo);
+  if (tomados.length === 0) return r;
+  const partes = [
+    datos.fecha ? fechaLarga(datos.fecha) : null,
+    datos.inicio && datos.fin ? `${datos.inicio} a ${datos.fin}` : null,
+    datos.personas !== null ? `${datos.personas} personas` : null,
+    datos.computo_alto ? "alto cómputo" : null,
+  ].filter((x): x is string => x !== null);
+  const tomo = partes.length ? `Tomo lo que me dijiste: ${partes.join(", ")}.` : "";
+  return { ...r, respuesta: `${tomo}\n${r.respuesta}` };
 }
 
 // Tras una elusión, responde la alerta y repite la pregunta pendiente. No cambia ningún dato.
 export async function reanudar(sesion: string, repo: Repositorio, alerta: string): Promise<RespuestaChat | null> {
   const conv = await repo.leerConversacion(sesion);
-  if (!conv) return null;
+  if (!conv || conv.flujo === "disponibilidad") return null;
   const pendiente = conv.pendiente ?? "carne";
   const p = preguntaPara(pendiente, docenteDe(conv.datos));
   return abierto(conv, `${alerta}\n\n${p.texto}`, p.opciones);
