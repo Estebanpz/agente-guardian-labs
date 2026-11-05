@@ -100,6 +100,13 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
       return docs.map((d) => ReservaDoc.parse(d));
     },
 
+    async escaladasDelDia(fecha) {
+      const docs = await db.collection("reservas")
+        .find({ fecha: Fecha.parse(fecha), estado: "escalada" }, { projection: PROY_RESERVA })
+        .toArray();
+      return docs.map((d) => ReservaDoc.parse(d));
+    },
+
     async crearReservaAtomica(fecha, sala, revalidar, construir) {
       Fecha.parse(fecha);
       SalaId.parse(sala);
@@ -127,13 +134,26 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
       return salida.r;
     },
 
-    async registrarEscalada(r, n) {
-      const reserva = ReservaDoc.parse(r);
-      const aviso = NotificacionDoc.parse(n);
+    async registrarEscalada(construirReserva, construirAvisos) {
+      // Contador + reserva + avisos en UNA transacción: o se guardan todos o ninguno.
+      const salida: { codigo?: string } = {};
       await c.withSession((session) => session.withTransaction(async (s) => {
+        const codigo = await siguienteCodigo(db, s);
+        const reserva = ReservaDoc.parse(construirReserva(codigo));
+        const avisos = construirAvisos(codigo).map((a) => NotificacionDoc.parse(a));
+        if (reserva.estado !== "escalada") throw new Error("registrarEscalada exige estado escalada");
         await db.collection("reservas").insertOne({ ...reserva }, { session: s });
-        await db.collection("notificaciones").insertOne({ ...aviso }, { session: s });
+        await db.collection("notificaciones").insertMany(avisos.map((a) => ({ ...a })), { session: s });
+        salida.codigo = codigo;
       }));
+      if (!salida.codigo) throw new Error("La transacción de escalada no devolvió código");
+      return salida.codigo;
+    },
+
+    async notificar(n) {
+      const v = NotificacionDoc.parse(n);
+      if (v.reserva_codigo !== null) throw new Error("notificar sin reserva exige reserva_codigo null");
+      await db.collection("notificaciones").insertOne({ ...v });
     },
 
     async notificaciones(estado) {

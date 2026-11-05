@@ -50,6 +50,10 @@ export function crearMemoria(hoy: string): Repositorio {
         r.fecha === fecha && r.estado === "programada" && (!sala || r.sala === sala));
     },
 
+    async escaladasDelDia(fecha) {
+      return reservas.filter((r) => r.fecha === fecha && r.estado === "escalada");
+    },
+
     async crearReservaAtomica(fecha, sala, revalidar, construir) {
       const actuales = reservas.filter((r) => r.fecha === fecha && r.sala === sala && r.estado === "programada");
       const decision = revalidar(actuales);
@@ -59,8 +63,18 @@ export function crearMemoria(hoy: string): Repositorio {
       return { decision, reserva };
     },
 
-    async registrarEscalada(r, n) {
-      reservas.push(r);
+    async registrarEscalada(construirReserva, construirAvisos) {
+      // Síncrono por dentro: el código, la reserva y los avisos no se intercalan con otra operación.
+      const codigo = siguienteCodigo();
+      const reserva = construirReserva(codigo);
+      if (reserva.estado !== "escalada") throw new Error("registrarEscalada exige estado escalada");
+      reservas.push(reserva);
+      notificaciones.push(...construirAvisos(codigo));
+      return codigo;
+    },
+
+    async notificar(n) {
+      if (n.reserva_codigo !== null) throw new Error("notificar sin reserva exige reserva_codigo null");
       notificaciones.push(n);
     },
 

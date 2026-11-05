@@ -62,8 +62,9 @@ export function estadoSalas(texto = ""): string {
 }
 
 export const TEXTO_RESERVA = [
-  "No agendo, programo ni reservo salas: eso lo gestiona coordinación en el sistema de reservas.",
-  "Yo trabajo en la puerta, con las franjas que ya están programadas: evalúo el ingreso, registro la asistencia e informo el estado de las salas.",
+  "Puedo separar una sala si cumple las reglas y el horario está libre (base de demostración, con datos sintéticos).",
+  "Escriba \"Quiero reservar una sala\" y le pregunto paso a paso: carné, día, horario, personas y, si es docente, equipos, cómputo y materia.",
+  "Para ver la agenda escriba, por ejemplo, \"¿Qué disponibilidad hay en la sala 6 mañana?\". No se guarda nada hasta que confirme.",
 ].join("\n");
 
 export const AYUDA_GENERAL = [

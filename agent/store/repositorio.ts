@@ -13,6 +13,7 @@ export interface Repositorio {
   usuario(id: string): Promise<UsuarioDoc | null>;
   registrarUsuario(u: UsuarioDoc): Promise<"creado" | "existente">;
   reservasDelDia(fecha: string, sala?: string): Promise<ReservaDoc[]>; // solo estado "programada"
+  escaladasDelDia(fecha: string): Promise<ReservaDoc[]>;             // solo estado "escalada" (para la API)
   // Re-evalúa las reglas DENTRO de la operación atómica y solo inserta si sigue siendo "programar".
   // `revalidar` recibe las reservas programadas de esa sala y ese día.
   crearReservaAtomica(
@@ -20,7 +21,14 @@ export interface Repositorio {
     revalidar: (reservasActuales: ReservaDoc[]) => DecisionReserva,
     construir: (codigo: string) => ReservaDoc,
   ): Promise<{ decision: DecisionReserva; reserva: ReservaDoc | null }>;
-  registrarEscalada(r: ReservaDoc, n: NotificacionDoc): Promise<void>; // reserva "escalada" + aviso
+  // Asigna el siguiente RS-NNNN (mismo contador), guarda la reserva "escalada" y sus avisos, y devuelve
+  // el código. Todo en una sola transacción.
+  registrarEscalada(
+    construir: (codigo: string) => ReservaDoc,          // estado: "escalada"
+    avisos: (codigo: string) => NotificacionDoc[],      // reserva_codigo = codigo (R19: monitor y mantenimiento)
+  ): Promise<string>;
+  // Aviso sin reserva (R17: identidad desconocida). reserva_codigo debe ser null.
+  notificar(n: NotificacionDoc): Promise<void>;
   notificaciones(estado?: "pendiente" | "atendida"): Promise<NotificacionDoc[]>;
   leerConversacion(id: string): Promise<Conversacion | null>;
   guardarConversacion(c: Conversacion): Promise<void>;

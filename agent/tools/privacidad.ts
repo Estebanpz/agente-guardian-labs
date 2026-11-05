@@ -6,7 +6,16 @@ const PATRONES: [string, RegExp][] = [
   ["documento", /\b(c[eé]dula|tarjeta de identidad|\bc\.?c\.?\b)\s*[:#]?\s*\d+/i],
 ];
 
+// Los carnés (C-10000001 / D-20000001) son sintéticos y permitidos: se quitan antes de buscar datos
+// prohibidos, para que el patrón de documentos no los confunda con una cédula.
+const CARNE = /\b[CD]-?\d{8}\b/gi;
+
 export function datosProhibidos(texto: string): string[] {
-  const tipos = PATRONES.filter(([, p]) => p.test(texto)).map(([t]) => t);
+  const sinCarnes = texto.replace(CARNE, " ");
+  const tipos = PATRONES.filter(([, p]) => p.test(sinCarnes)).map(([t]) => t);
   return [...new Set(tipos)];
 }
+
+// Enmascara los carnés de un texto antes de escribirlo en logs: C-10000002 → C-****0002.
+export const enmascararCarnes = (texto: string): string =>
+  texto.replace(/\b([CD])-?\d{4}(\d{4})\b/gi, "$1-****$2");

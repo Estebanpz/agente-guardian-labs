@@ -6,6 +6,8 @@ const casos: [string, boolean][] = [
   ["Llámame al 312 456 7890", true],
   ["Soy E-009, ¿puedo entrar a la sala 1 en la franja 08:00–10:00?", false],
   ["¿Hay cupo en la sala 2?", false],
+  ["Soy C-10000001", false],
+  ["Mi cédula es 1070612345", true],
 ];
 
 let fallos = 0;

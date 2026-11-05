@@ -66,14 +66,18 @@ try {
   const dia = await repo.reservasDelDia(FECHA, SALA);
   comprobar(dia.length === 1, `reservasDelDia = ${dia.length} (esperado 1)`);
 
-  // 4) Escalada: reserva "escalada" + aviso pendiente (no aparece en reservasDelDia).
-  const escalada: ReservaDoc = { ...construir("RS-0099"), estado: "escalada", reglas_aplicadas: ["R20"] };
-  await repo.registrarEscalada(escalada, {
-    para: "monitor", motivo: "Conflicto con reserva de estudiantes", regla: "R20",
-    reserva_codigo: "RS-0099", estado: "pendiente", creada: new Date(),
-  });
+  // 4) Escalada: recibe código del mismo contador (RS-0005) y su aviso lo referencia.
+  const codigoEscalada = await repo.registrarEscalada(
+    (codigo) => ({ ...construir(codigo), estado: "escalada", reglas_aplicadas: ["R20"] }),
+    (codigo) => [{
+      para: "monitor" as const, motivo: "Conflicto con reserva de estudiantes", regla: "R20",
+      reserva_codigo: codigo, estado: "pendiente" as const, creada: new Date(),
+    }],
+  );
+  comprobar(codigoEscalada === "RS-0005", `escalada con código ${codigoEscalada} (esperado RS-0005)`);
   const pendientes = await repo.notificaciones("pendiente");
-  comprobar(pendientes.length === 1, `notificaciones pendientes = ${pendientes.length} (esperado 1)`);
+  comprobar(pendientes.length === 1 && pendientes[0].reserva_codigo === codigoEscalada,
+    `notificaciones pendientes = ${pendientes.length}, referencia ${pendientes[0]?.reserva_codigo ?? "—"}`);
   comprobar((await repo.reservasDelDia(FECHA, SALA)).length === 1, "la escalada no cuenta como programada");
 
   await repo.cerrar();
