@@ -22,6 +22,12 @@ definido allí, pregunta a Esteban antes de inventarlo.
   `git diff --cached | grep -nE 'mongodb(\+srv)?://[^ "]*@|AI_GATEWAY_API_KEY=.+' || echo "OK sin secretos"`
 - Sin datos personales reales. Carnés sintéticos `C-1000000X` / `D-2000000X`; los de terceros se
   muestran enmascarados (`C-****0002`).
+- Ciclo por fase: implementar → probar → informe de fase → **esperar la aceptación de Esteban** →
+  commit en `dev`. Sin aceptación no hay commit ni siguiente fase.
+- MCP de MongoDB Atlas: solo para crear la base y las colecciones vacías y para verificar
+  (`count`, `find` con `limit`, índices, esquema). Los datos los carga `npm run seed`. Nunca
+  insertes, edites ni borres documentos de `guardian_labs` a mano. No toques usuarios, IPs,
+  clusters ni el proyecto `api`. `drop-database` solo sobre `guardian_labs_test`.
 - El motor decide; el modelo nunca elige sala, horario ni confirma una reserva.
 - No modifiques `agent/tools/motor.ts` (R1–R13), `data/casos.ts` ni `data/equipos.ts`.
 
