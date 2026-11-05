@@ -88,6 +88,41 @@ Arranca la API (`http://127.0.0.1:3000`) y la interfaz (`http://localhost:5173`)
 | `npm run e2e` | Pruebas de punta a punta P-06 y P-07 con el modelo |
 | `npm run typecheck` | Verificación de tipos (TypeScript estricto) |
 
+## Reservas por chat
+
+El chat también gestiona reservas de salas. Para una reserva, el agente pide los datos paso a paso:
+
+1. carné del solicitante;
+2. fecha y horario;
+3. número de personas;
+4. si la persona es docente: equipos requeridos, si se necesita alto cómputo y la materia.
+
+Con esos datos, el **motor de reglas decide**; el modelo local solo conversa y redacta la respuesta. Si todas
+las reglas se cumplen, la reserva se confirma y queda registrada en la base de demostración. Si una regla niega
+la reserva, el chat lo explica y pide otro horario o sala; los conflictos se escalan a una persona.
+
+| ID | Efecto | Descripción |
+|---|---|---|
+| R14 | `pedir_datos` | Falta un dato obligatorio de la solicitud de reserva: pedirlo, no concluir. |
+| R15 | `negar` | Fecha u horario fuera de lo permitido (07:00–22:00, 30 min a 4 h, hasta 30 días): negar y pedir otro horario. |
+| R16 | `negar` | Carné no vigente en carnetización: negar la reserva y remitir a carnetización. |
+| R17 | `escalar_monitor` | Carné que no aparece en carnetización o con vigencia desconocida: no concluir y escalar al monitor. |
+| R18 | `negar` | La sala pedida no alcanza para las personas o los equipos requeridos: negar esa sala y sugerir otras. |
+| R19 | `escalar_monitor` | Los equipos operativos solo alcanzan si se cuentan equipos con estado desconocido o en conflicto: no concluir y escalar. |
+| R20 | `escalar_monitor` | Un docente pide una sala ya separada por estudiantes en ese horario: informar quién la tiene, escalar al monitor para que acuerden y sugerir salas libres. |
+| R21 | `escalar_coordinacion` | Un docente pide una sala ya separada por otro docente en ese horario: escalar a coordinación y sugerir salas libres. |
+| R22 | `negar` | Un estudiante pide una sala ya separada en ese horario: negar esa sala y sugerir salas libres. |
+| R23 | `negar` | Se necesita alto cómputo y la sala pedida no lo es: negar esa sala y sugerir salas de alto cómputo. |
+| R24 | `negar` | Ninguna sala cumple las condiciones en ese horario: negar y pedir otro horario o menos personas. |
+| R25 | `programar` | Ninguna regla bloquea: separar la sala en la base de demostración tras la confirmación. |
+| R26 | `registrar_usuario` | Carné vigente en carnetización y aún no registrado: registrar al usuario sin pedir más datos personales. |
+
+**Chat con una reserva confirmada:**
+
+![Chat con una reserva confirmada en la base de demostración](docs/capturas/reserva-confirmada.png)
+
+Las reservas son simuladas sobre datos sintéticos; el prototipo no reserva salas reales.
+
 ## Configuración (`.env`)
 
 | Variable | Valor por defecto | Descripción |
@@ -98,6 +133,32 @@ Arranca la API (`http://127.0.0.1:3000`) y la interfaz (`http://localhost:5173`)
 | `MODELO_VERCEL` | vacío | Modelo principal del Gateway (comparación) |
 | `MODELOS_RESPALDO` | vacío | Modelos de respaldo del Gateway, separados por coma |
 | `PORT` | `3000` | Puerto de la API |
+
+## Base de datos
+
+La base de demostración usa **MongoDB Atlas** en el plan **Free**. La cadena de conexión (`MONGODB_URI`) va solo
+en `.env`, que no se sube al repositorio; nunca debe aparecer en el código, en la documentación ni en los commits.
+
+Cargar los datos sintéticos en Atlas:
+
+```sh
+npm run seed
+```
+
+Restaurar la demostración desde cero:
+
+```sh
+npm run seed -- --reset --si
+```
+
+> **Advertencia:** `--reset` borra reservas, notificaciones, conversaciones, bloqueos y contadores. Úsalo solo
+> cuando quieras empezar de nuevo.
+
+Para correr el prototipo sin red y sin Atlas, usa el repositorio en memoria:
+
+```sh
+REPOSITORIO=memoria npm run app
+```
 
 ## API
 
@@ -127,7 +188,7 @@ curl -s -X POST localhost:3000/evaluar -H "Content-Type: application/json" \
     "estado_asistencia": "no_aplica",
     "hechos_desconocidos": [],
     "contradicciones": [],
-    "version_reglas": "1.0.0",
+    "version_reglas": "2.0.0",
     "traza": ["R1: Inducción de seguridad vencida: negar uso de equipos y remitir a inducción."]
   },
   "explicacion": "…redactada por el modelo local…"
@@ -146,7 +207,10 @@ Una entrada que no cumple el esquema devuelve `400` con el detalle de los campos
 6. **Explicación:** el modelo redacta la explicación sin cambiar la decisión.
 7. **Registro:** se guarda en `logs/evaluaciones.jsonl`.
 
-## Reglas (versión 1.0.0)
+## Reglas (versión 2.0.0: R1–R13 más R14–R26)
+
+Las reglas R1–R13 se describen aquí; las reglas R14–R26 de las reservas por chat están en la sección
+[Reservas por chat](#reservas-por-chat).
 
 | ID | Prioridad | Condición | Efecto |
 |---|---|---|---|

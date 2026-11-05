@@ -65,7 +65,9 @@ Usa CodeGraph antes de abrir archivos: la herramienta MCP `codegraph_explore`, o
 | `npm run typecheck` | Verificación de tipos |
 | `npm run pruebas` | Pruebas deterministas (sin red) |
 | `npm run matriz` | Matriz esperado vs. observado (requiere Ollama para algunas filas) |
-| `npm run seed` | Siembra MongoDB Atlas (después de la Fase 2 del plan) |
+| `npm run seed` | Siembra MongoDB Atlas (idempotente; datos sintéticos) |
+| `npm run seed -- --reset --si` | Restaura la base de demostración: borra reservas, notificaciones, conversaciones, bloqueos y contadores |
+| `npm run prueba:mongo` | Prueba de humo con Atlas sobre `MONGODB_DB_PRUEBAS` (no está en `npm run pruebas`) |
 | `npm --prefix web run lint` / `build` | Calidad y compilación de la interfaz |
 
 ## Mapa

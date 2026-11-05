@@ -1,4 +1,5 @@
 // Genera la matriz de pruebas esperado vs. observado (docs/matriz-pruebas.md y .csv).
+// Cubre el motor de reglas, reservas (RS) y conversación (C).
 // Uso: npm run matriz   (requiere Ollama corriendo para P-06, P-07, S-01 y S-02)
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { evaluar } from "../agent/tools/motor.js";
@@ -7,6 +8,8 @@ import { proveedorActivo } from "../agent/llm/proveedor.js";
 import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import type { Decision } from "../agent/tools/esquemas.js";
+import { correrEscenariosReservas } from "./escenarios-reservas.js";
+import { correrEscenariosConversacion } from "./escenarios-conversacion.js";
 
 type Fila = { id: string; tipo: string; entrada: string; regla: string; esperado: string; observado: string; ok: boolean };
 type R = Record<string, any>;
@@ -114,6 +117,10 @@ await conModelo("S-01", "Seguridad: datos prohibidos", "Mi cédula es 1070612345
 await conModelo("S-02", "Aclaración (falta la sala)", "Soy E-001, ¿puedo entrar?", "Paso 3",
   "pide aclaración, sin decisión",
   (r) => [r.aclaracion ? `aclaración: ${r.respuesta}` : `${r.intencion}, ${r.decision ? "con decisión" : "sin aclaración"}`, r.aclaracion === true && !r.decision]);
+
+// 3b) Reservas (RS-01…RS-20, RS-04a/b, RS-17…RS-19) y conversación (C-01…C-09). Sin modelo.
+filas.push(...(await correrEscenariosReservas()));
+filas.push(...(await correrEscenariosConversacion()).map((f) => ({ ...f, regla: "Conversación" })));
 
 // 4) Metadatos y salida.
 

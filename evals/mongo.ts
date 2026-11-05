@@ -1,6 +1,6 @@
 // Prueba de humo con MongoDB Atlas sobre la base de pruebas (MONGODB_DB_PRUEBAS).
 // Uso: npm run prueba:mongo   (no forma parte de npm run pruebas)
-import { MongoClient } from "mongodb";
+import { MongoClient, type Db } from "mongodb";
 import type { DecisionReserva, ReservaDoc } from "../agent/tools/esquemas-reservas.js";
 import { crearRepositorioMongo } from "../agent/store/mongo.js";
 import { sembrar } from "../agent/store/sembrar.js";
@@ -17,6 +17,14 @@ const nombre = process.env.MONGODB_DB_PRUEBAS ?? "guardian_labs_test";
 if (nombre === process.env.MONGODB_DB) {
   console.error("Abortada: MONGODB_DB_PRUEBAS no puede ser la base real.");
   process.exit(1);
+}
+
+// Borra las colecciones una por una (dropCollection). Así funciona con los roles readWrite + dbAdmin de la guía:
+// no se usa dropDatabase, que requiere permisos de cluster.
+async function vaciarBase(db: Db): Promise<void> {
+  for (const { name } of await db.listCollections({}, { nameOnly: true }).toArray()) {
+    await db.dropCollection(name);
+  }
 }
 
 const FECHA = "2026-11-10";
@@ -50,7 +58,7 @@ const comprobar = (ok: boolean, texto: string) => {
 try {
   await cliente.connect();
   const db = cliente.db(nombre);
-  await db.dropDatabase();
+  await vaciarBase(db);
   await sembrar(db, "2026-11-09");
   const repo = await crearRepositorioMongo(uri, nombre);
 
@@ -81,8 +89,8 @@ try {
   comprobar((await repo.reservasDelDia(FECHA, SALA)).length === 1, "la escalada no cuenta como programada");
 
   await repo.cerrar();
-  await db.dropDatabase();
-  console.log(`\nBase de pruebas "${nombre}" borrada.`);
+  await vaciarBase(db);
+  console.log(`\nBase de pruebas "${nombre}" vaciada (colecciones borradas).`);
 } catch (e) {
   fallos++;
   const msg = (e as Error).message.split(uri).join("[uri]").replace(/mongodb(\+srv)?:\/\/\S+/g, "[uri]");
