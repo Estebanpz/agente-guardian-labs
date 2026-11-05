@@ -9,7 +9,7 @@ import { pct, tabla, type Seccion } from "./comun.js";
 
 type Fila = { id: string; texto: string; intencion: string; conjunto: "ajuste" | "prueba" };
 
-function leerCsv(ruta: URL): Fila[] {
+export function leerCsv(ruta: URL): Fila[] {
   const lineas = readFileSync(ruta, "utf-8").trim().split("\n").slice(1);
   return lineas.map((l) => {
     const celdas: string[] = [];

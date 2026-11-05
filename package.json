@@ -12,7 +12,8 @@
     "matriz": "tsx evals/matriz.ts",
     "seed": "tsx scripts/seed.ts",
     "prueba:mongo": "tsx evals/mongo.ts",
-    "contenidos": "tsx analisis/contenidos.ts"
+    "contenidos": "tsx analisis/contenidos.ts",
+    "comparar-modelos": "tsx analisis/comparar-modelos.ts"
   },
   "keywords": [],
   "author": "Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel",
