@@ -238,7 +238,7 @@ que hayas tenido que cambiar `.gitignore`.
 | R18 | 13 | 1 | bloqueante | negar | La sala pedida no alcanza para las personas o los equipos requeridos: negar esa sala y sugerir otras. | Entrevista al monitor, pregunta 4 (aforo) |
 | R19 | 13 | 2 | bloqueante | escalar_monitor | Los equipos operativos solo alcanzan si se cuentan equipos con estado desconocido o en conflicto: no concluir y escalar. | Situación 2 del taller; R2 y R3 |
 | R20 | 14 | 2 | bloqueante | escalar_monitor | Un docente pide una sala ya separada por estudiantes en ese horario: informar quién la tiene, escalar al monitor para que acuerden y sugerir salas libres. | Requisito del docente del curso (4-11-2026) |
-| R21 | 14 | 2 | bloqueante | escalar_coordinacion | Un docente pide una sala ya separada por otro docente en ese horario: escalar a coordinación y sugerir salas libres. | Situación 2 del taller (conflicto de autoridad) |
+| R21 | 14 | 2 | bloqueante | escalar_monitor | Un docente pide una sala ya separada por otro docente en ese horario: escalar al monitor (primera instancia), que remite a coordinación si hace falta, y sugerir salas libres. | Situación 2 del taller (conflicto de autoridad) |
 | R22 | 14 | 1 | bloqueante | negar | Un estudiante pide una sala ya separada en ese horario: negar esa sala y sugerir salas libres. | Requisito del docente del curso (4-11-2026) |
 | R23 | 15 | 1 | bloqueante | negar | Se necesita alto cómputo y la sala pedida no lo es: negar esa sala y sugerir salas de alto cómputo. | Requisito del docente del curso (4-11-2026) |
 | R24 | 16 | 1 | bloqueante | negar | Ninguna sala cumple las condiciones en ese horario: negar y pedir otro horario o menos personas. | Diseño del equipo (supuesto) |
@@ -671,7 +671,7 @@ Agrégalo a `npm run pruebas`. Cada fila compara `decision`, `reglas_aplicadas`,
 | RS-05 Desconocido (equipos) | D-20000001, sala-12, 10:00–12:00, 14 personas, 14 equipos, no alto, materia "Redes" | escalar [R19], notificar [monitor, mantenimiento] |
 | RS-06 Contradicción (equipos) | D-20000001, sala-9, 10:00–12:00, 20, 20, no alto, "Redes" | escalar [R19], estado contradictorio |
 | RS-07 Docente vs. estudiantes | D-20000001, sala-6, 14:00–16:00, 20, 20, no alto, "Bases de datos" | escalar [R20], notificar [monitor], conflicto RS-0001 con `C-****0002`, alternativas [sala-8, sala-10, sala-7] |
-| RS-08 Docente vs. docente | D-20000002, sala-5, 09:00–11:00, 20, 20, no alto, "Redes" | escalar [R21], notificar [coordinacion] |
+| RS-08 Docente vs. docente | D-20000002, sala-5, 09:00–11:00, 20, 20, no alto, "Redes" | escalar [R21], notificar [monitor] |
 | RS-09 Estudiante vs. reserva | C-10000003, sala-6, 14:00–15:00, 3 | negar [R22] |
 | RS-10 Carné vencido | C-10000011, sala-4, 10:00–12:00, 5 | negar [R16] |
 | RS-11 Carné desconocido | C-99999999, sala-4, 10:00–12:00, 5 | escalar [R17], notificar [monitor] |
@@ -737,7 +737,7 @@ registrarEscalada(
    `aviso: (codigo) => NotificacionDoc[]`.
    - R19 crea dos: una para `monitor` y otra para `mantenimiento`.
    - R20 crea una para `monitor`.
-   - R21 crea una para `coordinacion`.
+   - R21 crea una para `monitor` (cambio del 4-11-2026, H04).
 
    Todo va en la misma transacción.
 4. **Ruta rápida de reserva:** se agrega `/\bnecesit\w*\b.{0,25}\bsalas?\b/` →
@@ -820,7 +820,7 @@ Reglas de la conversación:
      (chips `Usar Sala N` por alternativa). El flujo sigue abierto para cambiar el dato.
    - **escalar** → R20: `La {Sala N} ya está separada de {inicio} a {fin} por un grupo de estudiantes
      ({personas} personas, carné {C-****0002}). Avisé al monitor para que ustedes acuerden el uso.
-     Mientras tanto, estas salas están libres: …`. R21: igual, pero con "otro docente" y "coordinación".
+     Mientras tanto, estas salas están libres: …`. R21: igual, pero con "otro docente" y "Avisé al monitor, que lo remitirá a coordinación si hace falta".
      R17 y R19: `No puedo confirmarlo con los datos que hay: {motivo}. Avisé al {monitor}.`
      → `registrarEscalada` (reserva `escalada` + notificación) y se cierra el flujo.
    - **pedir_datos** → la pregunta del primer faltante.
