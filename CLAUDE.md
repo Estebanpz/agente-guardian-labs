@@ -31,6 +31,26 @@ definido allí, pregunta a Esteban antes de inventarlo.
 - El motor decide; el modelo nunca elige sala, horario ni confirma una reserva.
 - No modifiques `agent/tools/motor.ts` (R1–R13), `data/casos.ts` ni `data/equipos.ts`.
 
+## Trabajo con varios agentes (subagentes)
+
+Puedes repartir una fase entre subagentes en paralelo para ir más rápido, con estas reglas:
+
+- **Cada archivo tiene un solo dueño.** Antes de lanzar los subagentes, escribe la lista de
+  "subagente → archivos que puede crear o editar". Dos subagentes nunca tocan el mismo archivo,
+  ni siquiera `package.json` o `README.md`.
+- **Solo el agente principal** puede:
+  - usar git (`add`, `commit`, `push`, `mv`);
+  - correr `npm install`, `npm run seed` y `seed --reset`;
+  - usar las herramientas de escritura del MCP de MongoDB;
+  - levantar o detener `npm run app`;
+  - hacer el informe de fase.
+- Los subagentes solo leen, editan sus archivos y corren pruebas de solo lectura (`typecheck`,
+  `npx tsx evals/<su-archivo>.ts`). No corren la matriz completa ni tocan Atlas.
+- Tareas que dependen de otras (por ejemplo, la verificación final) van **después** de que
+  terminen los subagentes, en el agente principal.
+- Al terminar, el agente principal revisa `git status` y `git diff`, corre todas las pruebas de
+  la fase y recién entonces entrega el informe.
+
 ## Cómo explorar el código
 
 Usa CodeGraph antes de abrir archivos: la herramienta MCP `codegraph_explore`, o en la terminal
