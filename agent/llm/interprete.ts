@@ -82,9 +82,12 @@ export function rutaRapida(texto: string): TipoIntencion | null {
   if (/\b(soy nuevo|primera vez|registrarme|registro)\b/.test(t)) return "registro_usuario";
   if (/\b(reservar|separar|apartar|agendar|programar)\b/.test(t)) return "solicitud_reserva";
   if (/\bnecesit\w*\b.{0,25}\bsalas?\b/.test(t)) return "solicitud_reserva";
-  if (/\b(disponibilidad|disponible|libres?|agenda)\b/.test(t) && /\b(sala|salas|laboratorio)\b/.test(t)) {
+  if (/^ver todas\b/.test(t.trim())) return "consulta_disponibilidad"; // chip "Ver todas (día)" de la lista de salas
+  if (/\b(disponibilidad|disponibles?|libres?|agenda)\b/.test(t) && /\b(sala|salas|laboratorio)\b/.test(t)) {
     return "consulta_disponibilidad";
   }
+  // Estado de las salas (cupo, ocupación, equipos) desde la base de reservas.
+  if (/\bestado de (las )?salas\b/.test(t) || /\bsalas?\b.{0,30}\bcupo\b/.test(t)) return "consulta_salas";
   return null;
 }
 

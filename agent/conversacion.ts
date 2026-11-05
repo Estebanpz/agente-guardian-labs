@@ -3,7 +3,7 @@
 import type {
   Conversacion, DecisionReserva, NotificacionDoc, ReservaDoc, SalaDoc, SolicitudReserva,
 } from "./tools/esquemas-reservas.js";
-import { ahora, aMin, aHora } from "./tools/reloj.js";
+import { ahora, aMin, aHora, sumarDias } from "./tools/reloj.js";
 import { cancelar as esCancelar, extraer, type Extraido } from "./tools/extraer.js";
 import { disponibilidad, enmascarar, evaluarRegistro, evaluarReserva, type Contexto } from "./tools/reservas.js";
 import type { Repositorio } from "./store/repositorio.js";
@@ -486,7 +486,10 @@ async function disponibilidadTurno(texto: string, repo: Repositorio): Promise<Re
   const h = ahora();
   const ext = extraer(texto, { hoy: h.fecha, pendiente: null });
   const fecha = ext.fecha ?? h.fecha;
-  const aviso = ext.fecha ? "" : `Como no indicaste fecha, uso hoy (${fechaLarga(h.fecha)}). `;
+  // Sin fecha, la consulta es de hoy; la respuesta ya lo dice, así que no se repite aquí.
+  const aviso = "";
+  // Si la fecha es hoy, solo cuenta desde la hora actual (no se ofrecen horas que ya pasaron).
+  const desde = fecha === h.fecha ? h.minutos : 0;
   const ctx = await contextoPara(repo, null, fecha);
   const reservas = ctx.reservasDelDia;
 
@@ -494,13 +497,14 @@ async function disponibilidadTurno(texto: string, repo: Repositorio): Promise<Re
     const sala = ctx.salas.find((s) => s._id === ext.sala);
     if (!sala) return cerrado("consulta_disponibilidad", "No encuentro esa sala.");
     const d = disponibilidad(sala, fecha, reservas, ctx);
+    const libresSala = rangosDesde(d.libres, desde, 30);
     const lineas = [
       `${sala.nombre} · ${sala.capacidad} puestos · ${d.operativos} equipos operativos · ${sala.computo === "alto" ? "alto cómputo" : "estándar"}`,
       ...(d.ocupadas.length
         ? d.ocupadas.map((o) => `Ocupada: ${o.inicio}–${o.fin} (${o.tipo}, ${o.personas} personas)`)
         : ["Sin reservas ese día."]),
-      d.libres.length
-        ? `Libre: ${d.libres.map((l) => `${l.inicio}–${l.fin}`).join(", ")}`
+      libresSala.length
+        ? `Libre${fecha === h.fecha ? ` desde las ${aHora(desde)}` : ""}: ${libresSala.join(", ")}`
         : "Libre: no hay un hueco de 30 minutos o más.",
     ];
     return cerrado("consulta_disponibilidad", `${aviso}${fechaLarga(fecha)}\n${lineas.join("\n")}`,
@@ -509,19 +513,63 @@ async function disponibilidadTurno(texto: string, repo: Repositorio): Promise<Re
       });
   }
 
+  // Sin sala: salas con un hueco libre de 2 horas o más, leídas de la base.
+  const todas = /\btodas\b/.test(norm(texto));
   const conHueco = ctx.salas
     .slice()
     .sort((a, b) => Number(a._id.slice(5)) - Number(b._id.slice(5)))
-    .map((s) => ({ s, d: disponibilidad(s, fecha, reservas, ctx) }))
-    .filter((x) => x.d.libres.some((l) => aMin(l.fin) - aMin(l.inicio) >= 120))
-    .slice(0, 6);
+    .map((s) => ({ s, rangos: rangosDesde(disponibilidad(s, fecha, reservas, ctx).libres, desde, 120) }))
+    .filter((x) => x.rangos.length > 0);
+  // Por defecto se muestran 6; el resto se anuncia y se ofrece "Ver todas (día)" (no se corta en silencio).
+  // El chip lleva el día: "Ver todas" sin fecha volvería a preguntar por hoy aunque la lista fuera de mañana.
+  const etiquetaDia = fecha === h.fecha ? "hoy" : fecha === sumarDias(h.fecha, 1) ? "mañana" : fecha;
+  const mostradas = todas ? conHueco : conHueco.slice(0, 6);
+  const resto = conHueco.length - mostradas.length;
+  const cuando = fecha === h.fecha
+    ? `hoy (${fechaLarga(fecha)}) a partir de las ${aHora(desde)}`
+    : `el ${fechaLarga(fecha)}`;
   if (!conHueco.length) {
-    return cerrado("consulta_disponibilidad", `${aviso}${fechaLarga(fecha)}: no hay salas con un hueco de 2 horas o más.`);
+    const manana = fecha === h.fecha && !ext.fecha
+      ? ` ¿Quieres que revise mañana (${fechaLarga(sumarDias(h.fecha, 1))})?`
+      : "";
+    return cerrado("consulta_disponibilidad", `No hay salas con 2 horas libres ${cuando}.${manana}`);
   }
-  const lineas = conHueco.map((x) =>
-    `${x.s.nombre}: libre ${x.d.libres.filter((l) => aMin(l.fin) - aMin(l.inicio) >= 120).map((l) => `${l.inicio}–${l.fin}`).join(", ")}`);
-  return cerrado("consulta_disponibilidad", `${aviso}Salas con un hueco de 2 horas o más el ${fechaLarga(fecha)}:\n${lineas.join("\n")}`,
-    conHueco.map((x) => `Reservar ${x.s.nombre}`));
+  const lineas = mostradas.map((x) => `• ${x.s.nombre}: ${x.rangos.join(", ")}`);
+  const mas = resto > 0 ? `\ny ${resto} salas más.` : "";
+  return cerrado("consulta_disponibilidad", `${aviso}Salas con 2 horas libres ${cuando}:\n${lineas.join("\n")}${mas}`,
+    [...mostradas.map((x) => `Reservar ${x.s.nombre}`), ...(resto > 0 ? [`Ver todas (${etiquetaDia})`] : [])]);
+}
+
+// Rangos libres de al menos `minimo` minutos, recortados a partir de `desde` (minuto del día).
+function rangosDesde(libres: { inicio: string; fin: string }[], desde: number, minimo: number): string[] {
+  return libres
+    .map((l) => ({ inicio: Math.max(aMin(l.inicio), desde), fin: aMin(l.fin) }))
+    .filter((l) => l.fin - l.inicio >= minimo)
+    .map((l) => `${aHora(l.inicio)}–${aHora(l.fin)}`);
+}
+
+// Estado de las salas según la base, para "¿qué salas tienen cupo?" y "estado de las salas".
+export async function estadoSalasDeBase(repo: Repositorio): Promise<string> {
+  const h = ahora();
+  const salas = await repo.salas();
+  const equipos = await repo.equipos();
+  const reservasHoy = await repo.reservasDelDia(h.fecha);
+  const ocupadas = salas.filter((s) =>
+    reservasHoy.some((r) => r.sala === s._id && r.inicio_min <= h.minutos && h.minutos < r.fin_min));
+  const operativos = equipos.filter((q) => q.inventario === "disponible" && q.mantenimiento === "disponible").length;
+  const conflicto = salas.filter((s) => equipos.some((q) =>
+    q.sala === s._id && q.inventario !== "desconocido" && q.mantenimiento !== "desconocido" && q.inventario !== q.mantenimiento));
+  const desconocido = salas.filter((s) => equipos.some((q) =>
+    q.sala === s._id && (q.inventario === "desconocido" || q.mantenimiento === "desconocido")));
+  const lista = (xs: { nombre: string }[]) => (xs.length ? xs.map((s) => s.nombre).join(", ") : "ninguna");
+  return [
+    `Ahora (${aHora(h.minutos)}, ${fechaLarga(h.fecha)}):`,
+    `• Salas ocupadas: ${ocupadas.length} de ${salas.length}${ocupadas.length ? ` (${lista(ocupadas)})` : ""}.`,
+    `• Salas libres ahora: ${salas.length - ocupadas.length}.`,
+    `• Equipos operativos: ${operativos} de ${equipos.length}.`,
+    `• Con conflicto entre fuentes: ${lista(conflicto)}.`,
+    `• Con dato desconocido: ${lista(desconocido)}.`,
+  ].join("\n");
 }
 
 // Un mensaje dentro de un flujo abierto (o "cancelar" para abortarlo).

@@ -98,11 +98,21 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
 
     // C-04: disponibilidad de la sala 6 mañana (la semilla RS-0001 ocupa 13:00–15:00).
     {
-      const { salidas } = await guion(S[3], ["¿Qué disponibilidad hay en la sala 6 mañana?"]);
+      const { salidas } = await guion(S[3], ["¿Qué disponibilidad hay en la sala 6 mañana?", "¿Qué salas hay disponibles mañana?", "¿Qué salas tienen cupo?", "Ver todas (mañana)"]);
       const texto = salidas[0].respuesta ?? "";
-      filas.push(fila("C-04", "Disponibilidad", "¿Qué disponibilidad hay en la sala 6 mañana?",
-        "ocupada 13:00–15:00; libres 07:00–13:00 y 15:00–22:00", [
+      const lista = salidas[1].respuesta ?? "";
+      const estado = salidas[2].respuesta ?? "";
+      const todas = salidas[3].respuesta ?? "";
+      const salasTodas = (todas.match(/• Sala /g) ?? []).length;
+      filas.push(fila("C-04", "Disponibilidad y estado de salas",
+        "¿Qué disponibilidad hay en la sala 6 mañana? → ¿Qué salas hay disponibles mañana? → ¿Qué salas tienen cupo?",
+        "ocupada 13:00–15:00 y libres 07:00–13:00, 15:00–22:00; lista de salas desde la base con «y N salas más»; estado de las 16 salas", [
           [texto.includes("Ocupada: 13:00–15:00") && texto.includes("Libre: 07:00–13:00, 15:00–22:00"), "ocupada y libres como se espera"],
+          [lista.includes("Salas con 2 horas libres") && lista.includes("• Sala") && lista.includes("salas más")
+            && !lista.includes("aforo") && !lista.includes("franja"), "lista de salas desde la base, con «y N salas más»"],
+          [estado.includes("Equipos operativos") && estado.includes("de 16") && estado.includes("Sala 12") && estado.includes("Sala 9")
+            && !estado.includes("aforo") && !estado.includes("franja"), "estado de las salas desde la base (conflictos y datos desconocidos)"],
+          [salasTodas > 6 && !todas.includes("salas más") && todas.includes("Sala 16"), `"Ver todas (mañana)" muestra todas las salas (${salasTodas})`],
         ]));
     }
 

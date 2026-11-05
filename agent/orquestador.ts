@@ -11,7 +11,7 @@ import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import { salas } from "../data/salas.js";
 import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
-import { continuar, iniciar, reanudar, type RespuestaChat } from "./conversacion.js";
+import { continuar, estadoSalasDeBase, iniciar, reanudar, type RespuestaChat } from "./conversacion.js";
 
 // Ingreso (vista Laboratorios): las tres salas de la evaluación (las reservas usan sala-1 a sala-16).
 type SalaId = "sala-1" | "sala-2" | "sala-3";
@@ -110,6 +110,12 @@ export async function mensaje(
 
   // Paso 3: rutas rápidas, antes del modelo.
   const ruta = rutaRapida(texto);
+  // Estado de las salas: siempre desde la base de reservas (las 16 salas), no desde los datos de la Puerta.
+  if (ruta === "consulta_salas" && !eludir) {
+    const respuesta = await estadoSalasDeBase(repo);
+    registrar({ texto: resumen, intencion: "consulta_salas", respuesta });
+    return { intencion: "consulta_salas", respuesta };
+  }
   if (ruta && sesion && !eludir) {
     const r = await flujoPara(ruta, texto, sesion, repo);
     if (r) {
@@ -127,6 +133,12 @@ export async function mensaje(
       "No pude interpretar el mensaje porque el modelo no respondió. Intente de nuevo, o use la vista Laboratorios, que evalúa con las reglas sin depender del modelo.";
     registrar({ texto: resumen, intencion: "error_modelo", respuesta });
     return { intencion: "error_modelo", respuesta };
+  }
+
+  if (c.intencion === "consulta_salas" && !eludir) {
+    const respuesta = await estadoSalasDeBase(repo);
+    registrar({ texto: resumen, intencion: "consulta_salas", respuesta });
+    return { intencion: "consulta_salas", respuesta };
   }
 
   if (sesion && (c.intencion === "solicitud_reserva" || c.intencion === "consulta_disponibilidad" || c.intencion === "registro_usuario")) {
