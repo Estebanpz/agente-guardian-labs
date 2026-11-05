@@ -169,7 +169,7 @@ siempre.
 | Selección de sala | La más pequeña que cumpla; las de alto cómputo solo si se piden o si no hay estándar |
 | Confirmación | Si las reglas permiten, se pregunta "¿Confirmo?" y al "sí" se registra |
 | Docente vs. estudiantes | Escala al monitor, informa quién tiene la sala y sugiere salas libres |
-| Docente vs. docente | Escala a coordinación y sugiere salas libres |
+| Docente vs. docente | Escala al monitor (primera instancia), que lo remite a coordinación si hace falta; sugiere salas libres (H04, 4-11-2026) |
 | Estudiante vs. cualquiera | Niega esa sala y sugiere salas libres |
 | Base | MongoDB Atlas (Free), base `guardian_labs`; respaldo en memoria |
 

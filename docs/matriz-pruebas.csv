@@ -23,7 +23,7 @@
 "RS-05","Desconocido (equipos)","RS-05","R19","escalar [R19] · notificar monitor, mantenimiento · desconocido","escalar [R19] · notificar monitor, mantenimiento · desconocido","pasa"
 "RS-06","Contradicción (equipos)","RS-06","R19","escalar [R19] · contradictorio","escalar [R19] · notificar monitor, mantenimiento · contradictorio","pasa"
 "RS-07","Docente vs. estudiantes","RS-07","R20","escalar [R20] · notificar monitor · alternativas sala-8, sala-10, sala-7","escalar [R20] · notificar monitor · contradictorio","pasa"
-"RS-08","Docente vs. docente","RS-08","R21","escalar [R21] · notificar coordinacion","escalar [R21] · notificar coordinacion · contradictorio","pasa"
+"RS-08","Docente vs. docente","RS-08","R21","escalar [R21] · notificar monitor","escalar [R21] · notificar monitor · contradictorio","pasa"
 "RS-09","Estudiante vs. reserva","RS-09","R22","negar [R22]","negar [R22] · falso","pasa"
 "RS-10","Carné vencido","RS-10","R16","negar [R16]","negar [R16] · falso","pasa"
 "RS-11","Carné desconocido","RS-11","R17","escalar [R17] · notificar monitor","escalar [R17] · notificar monitor · desconocido","pasa"

@@ -203,10 +203,10 @@ export function evaluarReserva(s: SolicitudReserva, c: Contexto): DecisionReserv
         });
       }
       if (docente) {
-        // R21: docente frente a otro docente.
+        // R21: docente frente a otro docente. Primera instancia: el monitor (H04); él remite a coordinación si hace falta.
         return decidir({
           decision: "escalar", estado: "contradictorio", accion: "revision_humana", reglas: ["R21"],
-          conflictos, alternativas: alts, notificar: ["coordinacion"],
+          conflictos, alternativas: alts, notificar: ["monitor"],
         });
       }
       // R22: estudiante frente a una sala ya separada.

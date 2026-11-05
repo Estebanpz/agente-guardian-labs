@@ -237,7 +237,7 @@ function textoEscalar(d: DecisionReserva, sol: SolicitudReserva, salas: SalaDoc[
     return `La ${nombre} ya está separada de ${c.inicio} a ${c.fin} por un grupo de estudiantes (${c.personas} personas, carné ${c.carne_enmascarado}). Avisé al monitor para que ustedes acuerden el uso.${libres}${quedo}`;
   }
   if (regla === "R21" && c) {
-    return `La ${nombre} ya está separada de ${c.inicio} a ${c.fin} por otro docente (carné ${c.carne_enmascarado}). Avisé a coordinación para que acuerden el uso.${libres}${quedo}`;
+    return `La ${nombre} ya está separada de ${c.inicio} a ${c.fin} por otro docente (carné ${c.carne_enmascarado}). Avisé al monitor, que lo remitirá a coordinación si hace falta.${libres}${quedo}`;
   }
   const quien = regla === "R19" ? "Avisé al monitor y a mantenimiento." : "Avisé al monitor.";
   const aviso = codigo ? `${quien}${quedo}` : "Consulte con el monitor.";

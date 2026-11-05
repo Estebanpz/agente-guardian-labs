@@ -214,9 +214,9 @@
       "prioridad": 14,
       "especificidad": 2,
       "tipo": "bloqueante",
-      "efecto": "escalar_coordinacion",
-      "descripcion": "Un docente pide una sala ya separada por otro docente en ese horario: escalar a coordinación y sugerir salas libres.",
-      "fuente": "Situación 2 del taller (conflicto de autoridad)",
+      "efecto": "escalar_monitor",
+      "descripcion": "Un docente pide una sala ya separada por otro docente en ese horario: escalar al monitor, que lo remitirá a coordinación si hace falta, y sugerir salas libres.",
+      "fuente": "Situación 2 del taller (conflicto de autoridad); decisión del equipo del 4-11-2026 (H04): el monitor es la primera instancia",
       "vigente_desde": "2026-11-04"
     },
     {

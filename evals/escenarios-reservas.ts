@@ -58,7 +58,7 @@ export const CASOS: Caso[] = [
   { id: "RS-07", tipo: "Docente vs. estudiantes", regla: "R20", s: sol({ carne: "D-20000001", sala: "sala-6", inicio: "14:00", fin: "16:00", personas: 20, equipos: 20, computo_alto: false, materia: "Bases de datos" }),
     esp: { decision: "escalar", reglas: ["R20"], notificar: ["monitor"], conflicto: { codigo: "RS-0001", carne: "C-****0002" }, alternativas: ["sala-8", "sala-10", "sala-7"] } },
   { id: "RS-08", tipo: "Docente vs. docente", regla: "R21", s: sol({ carne: "D-20000002", sala: "sala-5", inicio: "09:00", fin: "11:00", personas: 20, equipos: 20, computo_alto: false, materia: "Redes" }),
-    esp: { decision: "escalar", reglas: ["R21"], notificar: ["coordinacion"] } },
+    esp: { decision: "escalar", reglas: ["R21"], notificar: ["monitor"] } },
   { id: "RS-09", tipo: "Estudiante vs. reserva", regla: "R22", s: sol({ carne: "C-10000003", sala: "sala-6", inicio: "14:00", fin: "15:00", personas: 3 }),
     esp: { decision: "negar", reglas: ["R22"] } },
   { id: "RS-10", tipo: "Carné vencido", regla: "R16", s: sol({ carne: "C-10000011", sala: "sala-4", inicio: "10:00", fin: "12:00", personas: 5 }),

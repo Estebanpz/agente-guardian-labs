@@ -49,3 +49,9 @@ quedan en la base de demostración (datos sintéticos); el prototipo no reserva 
 - El límite de autoridad cambió: el modelo no decide reservas; el motor decide, y el monitor
   sigue decidiendo el ingreso.
 - Cifras de pruebas: ver el informe de pruebas.
+
+## Cambio de R21: docente contra docente escala al monitor (4-11-2026)
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| R21 ya no escala a coordinación: escala al monitor, que lo remite a coordinación o a la Vicerrectoría académica si hace falta. La versión de las reglas sigue en 2.0.0. | Decisión del equipo del 4-11-2026, registrada en `conocimiento/hechos.json` (H04): el monitor es la primera instancia y el agente nunca escala directo a la Vicerrectoría. | `agent/rules/reglas.json` (efecto, descripción y fuente de R21), `agent/tools/reservas.ts` (notificar `["monitor"]`), `agent/conversacion.ts` (texto del chat: "Avisé al monitor, que lo remitirá a coordinación si hace falta"), `docs/plan/PLAN_RESERVAS.md` (sección 2) | RS-08 en `evals/escenarios-reservas.ts` (y su fila en la matriz) |

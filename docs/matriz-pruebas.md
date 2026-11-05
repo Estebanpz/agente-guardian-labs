@@ -2,7 +2,7 @@
 
 | Dato | Valor |
 |---|---|
-| Fecha de ejecución | 4/11/2026, 9:17:00 p. m. |
+| Fecha de ejecución | 4/11/2026, 9:21:00 p. m. |
 | Versión de las reglas | 2.0.0 |
 | Proveedor y modelo | ollama:llama3.2:3b |
 | Versión de Ollama | 0.34.2 |
@@ -38,7 +38,7 @@ producen la misma decisión. P-06, P-07, S-01 y S-02 pasan por el modelo local.
 | RS-05 | Desconocido (equipos) | RS-05 | R19 | escalar [R19] · notificar monitor, mantenimiento · desconocido | escalar [R19] · notificar monitor, mantenimiento · desconocido | ✅ |
 | RS-06 | Contradicción (equipos) | RS-06 | R19 | escalar [R19] · contradictorio | escalar [R19] · notificar monitor, mantenimiento · contradictorio | ✅ |
 | RS-07 | Docente vs. estudiantes | RS-07 | R20 | escalar [R20] · notificar monitor · alternativas sala-8, sala-10, sala-7 | escalar [R20] · notificar monitor · contradictorio | ✅ |
-| RS-08 | Docente vs. docente | RS-08 | R21 | escalar [R21] · notificar coordinacion | escalar [R21] · notificar coordinacion · contradictorio | ✅ |
+| RS-08 | Docente vs. docente | RS-08 | R21 | escalar [R21] · notificar monitor | escalar [R21] · notificar monitor · contradictorio | ✅ |
 | RS-09 | Estudiante vs. reserva | RS-09 | R22 | negar [R22] | negar [R22] · falso | ✅ |
 | RS-10 | Carné vencido | RS-10 | R16 | negar [R16] | negar [R16] · falso | ✅ |
 | RS-11 | Carné desconocido | RS-11 | R17 | escalar [R17] · notificar monitor | escalar [R17] · notificar monitor · desconocido | ✅ |
