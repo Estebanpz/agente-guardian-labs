@@ -2,6 +2,7 @@ import type {
   CarneDoc, Conversacion, DecisionReserva, EquipoDoc, NotificacionDoc, ReservaDoc, SalaDoc, UsuarioDoc,
 } from "../tools/esquemas-reservas.js";
 import { crearMemoria } from "./memoria.js";
+import { hoyBogota } from "../tools/reloj.js";
 import { crearRepositorioMongo } from "./mongo.js";
 
 export interface Repositorio {
@@ -25,13 +26,6 @@ export interface Repositorio {
   guardarConversacion(c: Conversacion): Promise<void>;
   borrarConversacion(id: string): Promise<void>;
   cerrar(): Promise<void>;
-}
-
-// Fecha de hoy en Bogotá (aaaa-mm-dd).
-export function hoyBogota(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
 }
 
 // Quita la cadena de conexión de cualquier mensaje antes de imprimirlo.

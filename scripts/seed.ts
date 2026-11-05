@@ -2,7 +2,7 @@
 // Uso: npm run seed                 (idempotente)
 //      npm run seed -- --reset --si (borra reservas, notificaciones, conversaciones, bloqueos y contadores)
 import { MongoClient } from "mongodb";
-import { hoyBogota } from "../agent/store/repositorio.js";
+import { hoyBogota } from "../agent/tools/reloj.js";
 import { resetear, sembrar } from "../agent/store/sembrar.js";
 
 try { process.loadEnvFile(); } catch { /* sin .env: se exige en las variables del entorno */ }
