@@ -2,12 +2,12 @@
 
 | Dato | Valor |
 |---|---|
-| Fecha de ejecución | 4/11/2026, 10:47:10 p. m. |
+| Fecha de ejecución | 4/11/2026, 11:36:29 p. m. |
 | Versión de las reglas | 2.0.0 |
 | Proveedor y modelo | ollama:llama3.2:3b |
 | Versión de Ollama | 0.34.2 |
 | Node.js | v24.22.1 |
-| Resultado | **50 de 50 pruebas pasaron** |
+| Resultado | **53 de 53 pruebas pasaron** |
 
 Generado con `npm run matriz`. Las pruebas del motor son deterministas: la misma entrada y versión de reglas
 producen la misma decisión. P-06, P-07, S-01 y S-02 pasan por el modelo local.
@@ -64,6 +64,9 @@ producen la misma decisión. P-06, P-07, S-01 y S-02 pasan por el modelo local.
 | C-11 | Contexto entre consultas | C-10 → necesito la sala de pc potente → D-20000001 → 20 → IA → sí | Conversación | primera respuesta «Tomo lo que me dijiste: viernes 13 de noviembre, 19:00 a 21:00, 20 personas, alto cómputo.» y pide el carné; no vuelve a pedir fecha, horario ni personas; reserva en sala-14 | «Tomo lo que me dijiste» con fecha, horario, personas y alto cómputo; pide el carné; no vuelve a pedir fecha, horario ni personas; reserva programada en sala-14 el viernes | ✅ |
 | C-12 | Chip Reservar Sala 16 | C-10 → Reservar Sala 16 → D-20000001 → 20 → IA → sí | Conversación | reserva programada en sala-16; la primera respuesta reutiliza el contexto | reutiliza el contexto de la disponibilidad; reserva programada en sala-16 | ✅ |
 | C-13 | Datos sueltos dentro de la reserva | Quiero reservar → C-10000001 → el viernes de 7 a 9 pm somos 4 | Conversación | fecha, horario y personas quedan llenos en un solo mensaje; la siguiente respuesta es la propuesta de sala | pregunta la fecha; propuesta de sala, sin otra pregunta | ✅ |
+| C-14 | Ocupación de dos días | Que salas tienes ocupadas el jueves y viernes? | Conversación | dos bloques (jueves 12 y viernes 13), ambos sin reservas; no responde con el estado de ahora | un bloque por día, sin reservas; no responde con el estado de ahora | ✅ |
+| C-15 | Ocupación de un día | ¿Qué salas están ocupadas el martes? | Conversación | martes 10 con 3 reservas en orden 08:00, 10:00, 13:00; «Las otras 13 salas están libres todo el día.»; sin carnés | bloque del martes con 3 reservas; ordenadas por hora de inicio; resume las salas libres; no muestra carnés | ✅ |
+| C-16 | Estado de ahora (regresión) | ¿Cuál es el estado de las salas? | Conversación | vista «Ahora (…)» con la línea de ayuda para otro día | estado de ahora; termina con la línea de ayuda | ✅ |
 
 ## Fallos encontrados durante el desarrollo y correcciones
 

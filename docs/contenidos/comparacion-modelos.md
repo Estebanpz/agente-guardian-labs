@@ -4,10 +4,10 @@ Generado por `npm run comparar-modelos` (`analisis/comparar-modelos.ts`). Mismas
 
 ## Clasificación de la intención
 
-| Proveedor y modelo | Modelo solo | Como el agente (guardia → rutas → modelo) | Sin respuesta | Latencia media | Fecha |
-|---|---|---|---|---|---|
-| ollama: llama3.2:3b | 19/24 (79,2 %) | 21/24 (87,5 %) | 0 | 8,2 s | 2026-11-05 04:00 |
-| vercel: nvidia/nemotron-3.5-lightning-free | 22/24 (91,7 %) | 22/24 (91,7 %) | 0 | 4,8 s | 2026-11-05 03:26 |
+| Proveedor y modelo | Modelo solo | Como el agente (guardia → rutas → modelo) | Sin respuesta | Latencia media | Latencia mediana | Fecha |
+|---|---|---|---|---|---|---|
+| ollama: llama3.2:3b | 19/24 (79,2 %) | 21/24 (87,5 %) | 0 | 6,4 s | 6,3 s | 2026-11-05 04:33 |
+| vercel: nvidia/nemotron-3.5-lightning-free | 22/24 (91,7 %) | 22/24 (91,7 %) | 0 | 4,8 s | 2,8 s | 2026-11-05 03:26 |
 
 ## Frase por frase (respuesta del modelo solo)
 
@@ -46,9 +46,9 @@ E-009 es el caso P-07: la aprobación de coordinación fue solo verbal y R6 no l
 
 | Caso | Decisión del motor | Explicación del modelo | Tiempo |
 |---|---|---|---|
-| E-002 | negar [R1] | La recomendación recibida es negar el uso de los equipos debido a que la inducción de seguridad vencida. La decisión final la toma el monitor. | 11,1 s |
-| E-009 | escalar [R6] | La recomendación es escalar debido a que no se ha obtenido la aprobación verbal necesaria para registrar y escalar a coordinación. La decisión final la toma el monitor. | 6,6 s |
-| E-006 | escalar [R13, R9] | La recomendación recibida es escalar debido a la presencia de fuentes en conflicto y datos críticos desconocidos. La decisión final la toma el monitor. | 10,7 s |
+| E-002 | negar [R1] | La recomendación recibida es negar el uso de los equipos debido a que la inducción de seguridad vencida. La decisión final la toma el monitor. | 6,4 s |
+| E-009 | escalar [R6] | La recomendación es escalar debido a que no se ha obtenido la aprobación verbal necesaria para registrar y escalar a coordinación. La decisión final la toma el monitor. | 7,4 s |
+| E-006 | escalar [R13, R9] | La recomendación recibida es escalar debido a la presencia de fuentes en conflicto y datos críticos desconocidos. La decisión final la toma el monitor. | 10,4 s |
 
 ### vercel: nvidia/nemotron-3.5-lightning-free
 

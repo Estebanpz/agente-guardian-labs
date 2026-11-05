@@ -1,11 +1,11 @@
 {
   "proveedor": "ollama:llama3.2:3b",
-  "fecha": "2026-11-05T04:00:46.107Z",
+  "fecha": "2026-11-05T04:33:41.915Z",
   "total": 24,
   "aciertos": 19,
   "aciertos_agente": 21,
   "sin_respuesta": 0,
-  "latencia_media_ms": 8188,
+  "latencia_media_ms": 6378,
   "predicciones": [
     {
       "id": "Q06",
@@ -13,7 +13,7 @@
       "real": "consulta_ingreso",
       "modelo": "consulta_salas",
       "agente": "consulta_salas",
-      "ms": 52582
+      "ms": 6723
     },
     {
       "id": "Q07",
@@ -21,7 +21,7 @@
       "real": "consulta_ingreso",
       "modelo": "consulta_ingreso",
       "agente": "consulta_ingreso",
-      "ms": 6214
+      "ms": 6226
     },
     {
       "id": "Q08",
@@ -29,7 +29,7 @@
       "real": "consulta_ingreso",
       "modelo": "consulta_ingreso",
       "agente": "consulta_ingreso",
-      "ms": 6778
+      "ms": 6892
     },
     {
       "id": "Q14",
@@ -45,7 +45,7 @@
       "real": "consulta_salas",
       "modelo": "fuera_de_alcance",
       "agente": "fuera_de_alcance",
-      "ms": 5868
+      "ms": 6709
     },
     {
       "id": "Q16",
@@ -53,7 +53,7 @@
       "real": "consulta_salas",
       "modelo": "consulta_salas",
       "agente": "consulta_salas",
-      "ms": 5517
+      "ms": 5786
     },
     {
       "id": "Q22",
@@ -61,7 +61,7 @@
       "real": "consulta_disponibilidad",
       "modelo": "consulta_disponibilidad",
       "agente": "consulta_disponibilidad",
-      "ms": 6841
+      "ms": 7335
     },
     {
       "id": "Q23",
@@ -69,7 +69,7 @@
       "real": "consulta_disponibilidad",
       "modelo": "consulta_disponibilidad",
       "agente": "consulta_disponibilidad",
-      "ms": 6336
+      "ms": 6211
     },
     {
       "id": "Q24",
@@ -77,7 +77,7 @@
       "real": "consulta_disponibilidad",
       "modelo": "consulta_disponibilidad",
       "agente": "consulta_disponibilidad",
-      "ms": 6585
+      "ms": 7079
     },
     {
       "id": "Q30",
@@ -85,7 +85,7 @@
       "real": "solicitud_reserva",
       "modelo": "consulta_disponibilidad",
       "agente": "solicitud_reserva",
-      "ms": 6296
+      "ms": 6091
     },
     {
       "id": "Q31",
@@ -93,7 +93,7 @@
       "real": "solicitud_reserva",
       "modelo": "solicitud_reserva",
       "agente": "solicitud_reserva",
-      "ms": 13140
+      "ms": 6132
     },
     {
       "id": "Q32",
@@ -101,7 +101,7 @@
       "real": "solicitud_reserva",
       "modelo": "consulta_disponibilidad",
       "agente": "consulta_disponibilidad",
-      "ms": 6185
+      "ms": 6162
     },
     {
       "id": "Q38",
@@ -109,7 +109,7 @@
       "real": "registro_usuario",
       "modelo": "registro_usuario",
       "agente": "registro_usuario",
-      "ms": 5642
+      "ms": 5678
     },
     {
       "id": "Q39",
@@ -117,7 +117,7 @@
       "real": "registro_usuario",
       "modelo": "registro_usuario",
       "agente": "registro_usuario",
-      "ms": 5636
+      "ms": 5617
     },
     {
       "id": "Q40",
@@ -125,7 +125,7 @@
       "real": "registro_usuario",
       "modelo": "consulta_ingreso",
       "agente": "registro_usuario",
-      "ms": 7323
+      "ms": 6705
     },
     {
       "id": "Q46",
@@ -133,7 +133,7 @@
       "real": "ayuda",
       "modelo": "ayuda",
       "agente": "ayuda",
-      "ms": 6130
+      "ms": 5624
     },
     {
       "id": "Q47",
@@ -141,7 +141,7 @@
       "real": "ayuda",
       "modelo": "ayuda",
       "agente": "ayuda",
-      "ms": 5597
+      "ms": 6141
     },
     {
       "id": "Q48",
@@ -149,7 +149,7 @@
       "real": "ayuda",
       "modelo": "ayuda",
       "agente": "ayuda",
-      "ms": 5387
+      "ms": 5325
     },
     {
       "id": "Q54",
@@ -157,7 +157,7 @@
       "real": "fuera_de_alcance",
       "modelo": "fuera_de_alcance",
       "agente": "fuera_de_alcance",
-      "ms": 6424
+      "ms": 7537
     },
     {
       "id": "Q55",
@@ -165,7 +165,7 @@
       "real": "fuera_de_alcance",
       "modelo": "fuera_de_alcance",
       "agente": "fuera_de_alcance",
-      "ms": 6237
+      "ms": 6295
     },
     {
       "id": "Q56",
@@ -173,7 +173,7 @@
       "real": "fuera_de_alcance",
       "modelo": "fuera_de_alcance",
       "agente": "fuera_de_alcance",
-      "ms": 6125
+      "ms": 6298
     },
     {
       "id": "Q62",
@@ -189,7 +189,7 @@
       "real": "intento_eludir_reglas",
       "modelo": "intento_eludir_reglas",
       "agente": "intento_eludir_reglas",
-      "ms": 6650
+      "ms": 7041
     },
     {
       "id": "Q64",
@@ -197,7 +197,7 @@
       "real": "intento_eludir_reglas",
       "modelo": "intento_eludir_reglas",
       "agente": "intento_eludir_reglas",
-      "ms": 6703
+      "ms": 6779
     }
   ],
   "explicaciones": [
@@ -206,21 +206,21 @@
       "decision": "negar",
       "reglas": "R1",
       "texto": "La recomendación recibida es negar el uso de los equipos debido a que la inducción de seguridad vencida. La decisión final la toma el monitor.",
-      "ms": 11084
+      "ms": 6416
     },
     {
       "caso": "E-009",
       "decision": "escalar",
       "reglas": "R6",
       "texto": "La recomendación es escalar debido a que no se ha obtenido la aprobación verbal necesaria para registrar y escalar a coordinación. La decisión final la toma el monitor.",
-      "ms": 6578
+      "ms": 7358
     },
     {
       "caso": "E-006",
       "decision": "escalar",
       "reglas": "R13, R9",
       "texto": "La recomendación recibida es escalar debido a la presencia de fuentes en conflicto y datos críticos desconocidos. La decisión final la toma el monitor.",
-      "ms": 10655
+      "ms": 10362
     }
   ]
 }
