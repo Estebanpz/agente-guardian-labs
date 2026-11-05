@@ -25,7 +25,7 @@ export const casos: Record<string, Hechos> = {
   "E-012": { ...base, necesidad_accesibilidad: true }, // R8: necesita puesto accesible
 };
 
-// Descripción de cada caso para la demostración (vista Puerta) y para el informe (Tabla 24).
+// Descripción de cada caso para la demostración (vista Laboratorios) y para el informe (Tabla 24).
 export type DescripcionCaso = {
   titulo: string;
   detalle: string;

@@ -8,6 +8,9 @@
   --gl-permitir: #16a34a;
   --gl-negar: #dc2626;
   --gl-escalar: #d97706;
+  --gl-estudiantes: #8b85ff;
+  --gl-clase: var(--gl-primario);
+  --gl-alto: #0e7490;
 }
 
 body {
@@ -70,6 +73,9 @@ body {
 .gl-escribiendo span:nth-child(2) { animation-delay: .15s; }
 .gl-escribiendo span:nth-child(3) { animation-delay: .3s; }
 @keyframes gl-parpadeo { 0%, 80%, 100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .gl-escribiendo span { animation: none; opacity: .6; }
+}
 .gl-sugerencia { border-radius: 999px; font-size: .8rem; }
 
 /* Salas */
@@ -85,6 +91,21 @@ body {
 .gl-eq-conflicto { background: #fde8e8; color: #b91c1c; border-color: #f8b4b4; }
 .gl-eq-desconocido { background: #eef0fb; color: var(--gl-primario); border: 1px dashed #c7c9ef; }
 .gl-stat { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+
+/* Línea de tiempo de reservas (07:00–22:00) */
+.gl-linea { position: relative; height: 1.7rem; background: #f1f2f8; border-radius: .5rem; overflow: hidden; }
+.gl-bloque { position: absolute; top: 0; bottom: 0; border-radius: .35rem; }
+.gl-bloque-estudiantes { background: var(--gl-estudiantes); }
+.gl-bloque-clase { background: var(--gl-clase); }
+.gl-bloque-leyenda { display: inline-block; width: 1.2rem; height: .8rem; border-radius: .3rem; margin-top: .25rem; }
+.gl-marcas { position: relative; height: 1rem; margin-top: .25rem; }
+.gl-marcas span { position: absolute; transform: translateX(-50%); font-size: .7rem; }
+.gl-insignia-alto { background: var(--gl-alto); color: #fff; font-weight: 600; }
+.gl-pendientes-wrap { top: 90px; }
+.gl-pendientes .gl-chip { font-size: .72rem; }
+
+/* Tarjeta de reserva: el borde y el texto cambian con la decisión; nunca solo el color */
+.gl-decision dl dd { font-weight: 600; }
 
 
 footer { color: var(--gl-suave); font-size: .8rem; }

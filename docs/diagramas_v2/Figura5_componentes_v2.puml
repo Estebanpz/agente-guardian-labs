@@ -11,7 +11,7 @@ skinparam dpi 200
 title Diagrama de componentes implementado\nVersión 2.0 · Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel · Octubre 2026
 
 package "Interfaz (web/)" {
-  component "Vistas Puerta, Chat y Salas\n(React + Bootstrap)" as UI
+  component "Vistas Laboratorios, Chat y Salas\n(React + Bootstrap)" as UI
 }
 package "Agente (agent/)" {
   component "Canal HTTP\nchannels/http.ts (Express)" as HTTP

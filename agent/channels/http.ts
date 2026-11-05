@@ -146,8 +146,8 @@ app.get("/salas", async (_req, res) => {
   }
 });
 
-// Estado de salas y equipos de la Puerta (solo lectura).
-app.get("/salas/puerta", (_req, res) => {
+// Estado de salas y equipos de la vista Laboratorios (solo lectura).
+app.get("/salas/laboratorios", (_req, res) => {
   res.json(resumenSalas());
 });
 

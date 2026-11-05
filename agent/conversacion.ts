@@ -11,7 +11,7 @@ import type { Repositorio } from "./store/repositorio.js";
 export type RespuestaChat = {
   intencion: string; respuesta: string;
   flujo: { tipo: string; pendiente: string | null; opciones: string[] } | null;
-  reserva?: DecisionReserva; disponibilidad?: object;
+  reserva?: DecisionReserva; solicitud?: object; disponibilidad?: object;
 };
 
 const norm = (t: string): string => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -150,6 +150,18 @@ function aplicar(d: SolicitudReserva, e: Extraido): boolean {
 
 const solicitudDe = (datos: SolicitudReserva): SolicitudReserva => ({ ...datos });
 
+// Resumen de la solicitud para la tarjeta de la interfaz (carné enmascarado).
+function resumenDe(sol: SolicitudReserva, salas: SalaDoc[], salaId: string | null) {
+  return {
+    sala: salaId,
+    sala_nombre: salaId ? nombreSala(salas, salaId) : null,
+    fecha: sol.fecha, inicio: sol.inicio, fin: sol.fin,
+    personas: sol.personas, equipos: sol.equipos ?? sol.personas,
+    computo_alto: sol.computo_alto ?? false, materia: sol.materia,
+    docente: docenteDe(sol), carne_enmascarado: sol.carne ? enmascarar(sol.carne) : null,
+  };
+}
+
 function propuestaTexto(sol: SolicitudReserva, sala: string, salas: SalaDoc[]): string {
   return `La ${nombreSala(salas, sala)} está libre el ${fechaLarga(sol.fecha!)} de ${sol.inicio} a ${sol.fin} para ${sol.personas} personas. ¿Confirmo la reserva?`;
 }
@@ -243,7 +255,8 @@ async function responder(
     await guardar(repo, conv);
     const texto = prefijo + propuestaTexto(sol, d.sala_asignada!, ctx.salas);
     return { intencion: "solicitud_reserva", respuesta: texto,
-      flujo: { tipo: "reserva", pendiente: "confirmar", opciones: ["Sí, confirmar", "No"] }, reserva: d };
+      flujo: { tipo: "reserva", pendiente: "confirmar", opciones: ["Sí, confirmar", "No"] },
+      reserva: d, solicitud: resumenDe(sol, ctx.salas, d.sala_asignada) };
   }
   if (d.decision === "escalar") {
     let codigo: string | null = null;
@@ -254,7 +267,8 @@ async function responder(
       );
     }
     await repo.borrarConversacion(conv._id);
-    return cerrado("solicitud_reserva", prefijo + textoEscalar(d, sol, ctx.salas, codigo), [], { reserva: d });
+    return cerrado("solicitud_reserva", prefijo + textoEscalar(d, sol, ctx.salas, codigo), [],
+      { reserva: d, solicitud: resumenDe(sol, ctx.salas, sol.sala) });
   }
   if (d.decision === "negar") {
     if (d.reglas_aplicadas.includes("R16")) {
@@ -272,7 +286,8 @@ async function responder(
     conv.intentos = 0;
     await guardar(repo, conv);
     const opciones = d.alternativas.map((a) => `Usar Sala ${a.slice(5)}`);
-    return { ...abierto(conv, prefijo + textoNegar(d, sol, ctx.salas), opciones), reserva: d };
+    return { ...abierto(conv, prefijo + textoNegar(d, sol, ctx.salas), opciones), reserva: d,
+      solicitud: resumenDe(sol, ctx.salas, sol.sala) };
   }
   // pedir_datos: no debería llegar aquí (faltante lo resuelve antes), pero se pide el primer faltante.
   const f = d.faltantes[0] ?? "horario";
@@ -299,7 +314,7 @@ async function confirmar(conv: Conversacion, repo: Repositorio): Promise<Respues
   if (res.reserva) {
     await repo.borrarConversacion(conv._id);
     const texto = `Listo. Reserva ${res.reserva.codigo} confirmada: ${nombreSala(ctx.salas, sala)}, ${fechaLarga(sol.fecha!)}, ${sol.inicio} a ${sol.fin}. Queda registrada en la base de demostración (datos sintéticos).`;
-    return cerrado("solicitud_reserva", texto, [], { reserva: res.decision });
+    return cerrado("solicitud_reserva", texto, [], { reserva: res.decision, solicitud: resumenDe(sol, ctx.salas, sala) });
   }
   conv.propuesta = null;
   return responder(conv, res.decision, sol, ctx, repo, "Los datos cambiaron mientras confirmaba. ");

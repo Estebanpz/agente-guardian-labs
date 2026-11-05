@@ -13,9 +13,9 @@ import { salas } from "../data/salas.js";
 import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
 import { continuar, iniciar, reanudar, type RespuestaChat } from "./conversacion.js";
 
-// Puerta: ingreso en las tres salas de la evaluación (las reservas usan sala-1 a sala-16).
+// Ingreso (vista Laboratorios): las tres salas de la evaluación (las reservas usan sala-1 a sala-16).
 type SalaId = "sala-1" | "sala-2" | "sala-3";
-const SALAS_PUERTA: string[] = ["sala-1", "sala-2", "sala-3"];
+const SALAS_INGRESO: string[] = ["sala-1", "sala-2", "sala-3"];
 
 const LOG = new URL("../logs/evaluaciones.jsonl", import.meta.url);
 // Los carnés se enmascaran antes de escribir: nunca quedan completos en logs/.
@@ -124,7 +124,7 @@ export async function mensaje(
   // El modelo no respondió (apagado, sin red o límite de uso): se informa, no se supone nada.
   if (c.fallo && !temasDe(texto).length) {
     const respuesta =
-      "No pude interpretar el mensaje porque el modelo no respondió. Intente de nuevo, o use la vista Puerta, que evalúa con las reglas sin depender del modelo.";
+      "No pude interpretar el mensaje porque el modelo no respondió. Intente de nuevo, o use la vista Laboratorios, que evalúa con las reglas sin depender del modelo.";
     registrar({ texto: resumen, intencion: "error_modelo", respuesta });
     return { intencion: "error_modelo", respuesta };
   }
@@ -192,7 +192,7 @@ export async function mensaje(
       : "Necesito el identificador de la persona (por ejemplo E-001) para evaluar la solicitud.");
   }
   if (!laboratorio) return aclarar("¿En qué sala? Indique sala-1, sala-2 o sala-3.");
-  if (!SALAS_PUERTA.includes(laboratorio)) {
+  if (!SALAS_INGRESO.includes(laboratorio)) {
     return aclarar("La evaluación de ingreso aplica a sala-1, sala-2 o sala-3. Para reservas use el chat de reservas.");
   }
   const sala = laboratorio as SalaId;

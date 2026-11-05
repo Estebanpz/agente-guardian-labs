@@ -27,7 +27,7 @@ export default function Monitor() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.salas().then(setSalas).catch(() => {});
+    api.laboratorios().then(setSalas).catch(() => {});
     api.casos().then(setCasos).catch(() => {});
   }, []);
 
@@ -75,7 +75,7 @@ export default function Monitor() {
     <>
       <section className="gl-hero p-4 mb-4 d-flex align-items-center justify-content-between">
         <div>
-          <h3 className="fw-bold mb-1">Control en la puerta</h3>
+          <h3 className="fw-bold mb-1">Control de ingreso a los laboratorios</h3>
           <p className="mb-0 opacity-75">
             Evalúa el ingreso con las reglas R1–R13. El agente recomienda; usted decide.
           </p>

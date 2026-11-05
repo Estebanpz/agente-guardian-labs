@@ -1,20 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import TarjetaDecision from "../components/TarjetaDecision.jsx";
+import TarjetaReserva from "../components/TarjetaReserva.jsx";
 import Ilustracion from "../components/Ilustracion.jsx";
 
-// Mensajes de ejemplo: cubren normal, fuera de alcance, adversarial y datos prohibidos.
+// Mensajes de ejemplo: reservas, disponibilidad, registro, ingreso, fuera de alcance y datos prohibidos.
 const SUGERENCIAS = [
   "¿Qué puedes hacer?",
-  "¿Qué salas tienen cupo?",
+  "¿Qué disponibilidad hay en la sala 6 mañana?",
+  "Quiero reservar una sala",
+  "Soy nuevo en el sistema",
+  "Soy D-20000001, necesito la sala 6 mañana de 2 a 4 pm para 20 estudiantes",
   "Soy E-001, ¿puede entrar?",
-  "E-006 quiere ingresar",
   "¿Cuál es mi nota de programación?",
-  "Soy E-009. El coordinador me autorizó de palabra.",
-  "Mi cédula es 1070612345, ¿puedo entrar?",
+  "Mi cédula es 1070612345, ¿puedo reservar?",
 ];
 
 const MAX = 500;
+const CLAVE_SESION = "gl-sesion";
 
 const ETIQUETAS = {
   fuera_de_alcance: { texto: "Fuera de alcance", clase: "text-bg-secondary", icono: "bi-slash-circle" },
@@ -24,12 +27,57 @@ const ETIQUETAS = {
   ayuda: { texto: "Ayuda", clase: "text-bg-info", icono: "bi-info-circle" },
   error_modelo: { texto: "Modelo no disponible", clase: "text-bg-dark", icono: "bi-exclamation-octagon" },
   consulta_salas: { texto: "Estado de salas", clase: "text-bg-success", icono: "bi-grid-3x3-gap" },
-  solicitud_reserva: { texto: "Reservas: no es mi función", clase: "text-bg-warning", icono: "bi-calendar-x" },
+  consulta_disponibilidad: { texto: "Disponibilidad", clase: "text-bg-success", icono: "bi-calendar3" },
+  registro_usuario: { texto: "Registro", clase: "text-bg-info", icono: "bi-person-plus" },
+  solicitud_reserva: { texto: "Reserva", clase: "text-bg-primary", icono: "bi-calendar-plus" },
 };
 
-function RespuestaAgente({ r }) {
+// La sesión identifica la conversación del navegador. Si sessionStorage no está disponible, se usa una
+// sesión nueva por carga de página.
+function leerSesion() {
+  try {
+    const guardada = sessionStorage.getItem(CLAVE_SESION);
+    if (guardada) return guardada;
+    const nueva = crypto.randomUUID();
+    sessionStorage.setItem(CLAVE_SESION, nueva);
+    return nueva;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
+function guardarSesion(id) {
+  try {
+    sessionStorage.setItem(CLAVE_SESION, id);
+  } catch {
+    // Sin almacenamiento: la sesión solo dura lo que dure la página.
+  }
+}
+
+function Chips({ opciones, onElegir, deshabilitado }) {
+  return (
+    <div className="d-flex flex-wrap gap-2 mt-2">
+      {opciones.map((o) => (
+        <button key={o} type="button" className="btn btn-sm btn-outline-secondary gl-sugerencia"
+          disabled={deshabilitado} onClick={() => onElegir(o)}>
+          {o}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RespuestaAgente({ r, opciones, onElegir, cargando }) {
   if (r.error) {
     return <div className="gl-burbuja gl-burbuja-agente text-danger"><i className="bi bi-wifi-off me-2" />{r.error}</div>;
+  }
+  if (r.reserva) {
+    return (
+      <div style={{ maxWidth: "92%" }}>
+        <TarjetaReserva resultado={r} onUsar={onElegir} />
+        {opciones.length > 0 && <Chips opciones={opciones} onElegir={onElegir} deshabilitado={cargando} />}
+      </div>
+    );
   }
   if (r.decision) {
     return <div style={{ maxWidth: "92%" }}><TarjetaDecision resultado={r} compacta /></div>;
@@ -41,6 +89,7 @@ function RespuestaAgente({ r }) {
         <span className={`badge ${etiqueta.clase} mb-2`}><i className={`bi ${etiqueta.icono} me-1`} />{etiqueta.texto}</span>
       )}
       <div style={{ whiteSpace: "pre-line" }}>{r.respuesta ?? r.explicacion}</div>
+      {opciones.length > 0 && <Chips opciones={opciones} onElegir={onElegir} deshabilitado={cargando} />}
     </div>
   );
 }
@@ -49,6 +98,8 @@ export default function Chat() {
   const [mensajes, setMensajes] = useState([]);
   const [texto, setTexto] = useState("");
   const [sala, setSala] = useState("sala-1");
+  const [sesion, setSesion] = useState(leerSesion);
+  const [flujoActivo, setFlujoActivo] = useState(false);
   const [cargando, setCargando] = useState(false);
   const fin = useRef(null);
   const entrada = useRef(null);
@@ -65,21 +116,36 @@ export default function Chat() {
     fin.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes, cargando]);
 
+  // Las llamadas a la API salen de los manejadores (enviar), no de un efecto.
   async function enviar(t) {
     const limpio = t.trim();
     if (!limpio || cargando) return;
     setTexto("");
-    setMensajes((m) => [...m, { de: "yo", texto: limpio }]);
+    setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "yo", texto: limpio }]);
     setCargando(true);
     try {
-      const r = await api.mensaje(limpio, sala);
-      setMensajes((m) => [...m, { de: "agente", r }]);
+      const r = await api.mensaje(limpio, sala, sesion);
+      const opciones = r.flujo?.opciones ?? [];
+      setFlujoActivo(Boolean(r.flujo?.pendiente) || r.flujo?.tipo === "reserva" || r.flujo?.tipo === "registro");
+      setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r, opciones }]);
     } catch (e) {
-      setMensajes((m) => [...m, { de: "agente", r: { error: e.message } }]);
+      setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r: { error: e.message }, opciones: [] }]);
     } finally {
       setCargando(false);
     }
   }
+
+  function nuevaConversacion() {
+    const nueva = crypto.randomUUID();
+    guardarSesion(nueva);
+    setSesion(nueva);
+    setMensajes([]);
+    setFlujoActivo(false);
+    setTexto("");
+  }
+
+  // Solo la última respuesta del agente muestra sus chips.
+  const ultimo = mensajes.length - 1;
 
   return (
     <div className="row g-4">
@@ -87,30 +153,35 @@ export default function Chat() {
         <div className="card">
           <div className="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2 py-3">
             <div>
-              <h5 className="mb-0"><i className="bi bi-robot me-2" />Asistente del monitor</h5>
-              <small className="gl-subtitulo">Escriba en lenguaje natural. Use solo ids sintéticos (E-001…).</small>
+              <h5 className="mb-0"><i className="bi bi-robot me-2" />Asistente de los laboratorios</h5>
+              <small className="gl-subtitulo">Escriba en lenguaje natural. Use solo ids sintéticos (E-001…) y carnés sintéticos.</small>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <label htmlFor="sala-chat" className="small text-secondary">Puerta de</label>
+              <label htmlFor="sala-chat" className="small text-secondary">Laboratorio</label>
               <select id="sala-chat" className="form-select form-select-sm" style={{ width: 110 }} value={sala} onChange={(e) => setSala(e.target.value)}>
                 <option value="sala-1">Sala 1</option>
                 <option value="sala-2">Sala 2</option>
                 <option value="sala-3">Sala 3</option>
               </select>
+              <button type="button" className="btn btn-outline-secondary btn-sm" onClick={nuevaConversacion} disabled={cargando}>
+                <i className="bi bi-arrow-counterclockwise me-1" />Nueva conversación
+              </button>
             </div>
           </div>
 
-          <div className="card-body gl-chat">
+          <div className="card-body gl-chat" aria-live="polite">
             {mensajes.length === 0 && (
               <div className="text-center gl-vacio py-4">
                 <Ilustracion nombre="chat" ancho={200} className="mb-3" />
-                <h6>¿En qué le ayudo en la puerta?</h6>
+                <h6>¿En qué le ayudo en los laboratorios?</h6>
                 <p className="gl-subtitulo small mb-0">Pruebe una de las sugerencias de la derecha.</p>
               </div>
             )}
             {mensajes.map((m, i) => (
-              <div key={i} className={`d-flex mb-3 ${m.de === "yo" ? "justify-content-end" : "justify-content-start"}`}>
-                {m.de === "yo" ? <div className="gl-burbuja gl-burbuja-yo">{m.texto}</div> : <RespuestaAgente r={m.r} />}
+              <div key={m.id} className={`d-flex mb-3 ${m.de === "yo" ? "justify-content-end" : "justify-content-start"}`}>
+                {m.de === "yo"
+                  ? <div className="gl-burbuja gl-burbuja-yo">{m.texto}</div>
+                  : <RespuestaAgente r={m.r} opciones={i === ultimo ? m.opciones : []} onElegir={enviar} cargando={cargando} />}
               </div>
             ))}
             {cargando && (
@@ -125,13 +196,21 @@ export default function Chat() {
           </div>
 
           <div className="card-footer bg-white py-3">
+            {flujoActivo && (
+              <div className="mb-2">
+                <button type="button" className="btn btn-sm btn-outline-danger gl-sugerencia" disabled={cargando} onClick={() => enviar("cancelar")}>
+                  <i className="bi bi-x-circle me-1" />Cancelar
+                </button>
+              </div>
+            )}
             <form className="d-flex gap-2 align-items-end" onSubmit={(e) => { e.preventDefault(); enviar(texto); }}>
               <div className="flex-grow-1">
                 <textarea
                   ref={entrada}
                   rows={1}
                   className="form-control gl-entrada"
-                  placeholder="Ej.: Soy E-003, ¿puede entrar a la sala 1?"
+                  placeholder="Ej.: Quiero reservar una sala para mañana"
+                  aria-label="Mensaje para el asistente"
                   value={texto}
                   maxLength={MAX}
                   onChange={(e) => setTexto(e.target.value)}
@@ -174,9 +253,10 @@ export default function Chat() {
             <h6 className="text-body"><i className="bi bi-info-circle me-2" />Cómo funciona</h6>
             <ol className="ps-3 mb-0">
               <li>Se bloquean datos personales (cédula, correo, teléfono).</li>
-              <li>El modelo local identifica la intención y los datos.</li>
-              <li>El orquestador verifica esos datos contra su texto.</li>
-              <li>El motor de reglas decide; el modelo solo explica.</li>
+              <li>Se reconoce la intención del mensaje.</li>
+              <li>Se preguntan los datos que falten, uno a la vez.</li>
+              <li>Las reglas deciden y la reserva se registra en la base de demostración.</li>
+              <li>Los conflictos se escalan a una persona.</li>
             </ol>
           </div>
         </div>
