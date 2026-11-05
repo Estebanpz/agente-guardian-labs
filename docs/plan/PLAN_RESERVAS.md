@@ -811,6 +811,68 @@ viernes" es 2026-11-13, un día sin reservas en la semilla.
 Agrega a `evals/extraer.ts`: `"de 7PM - 9PM"` → 19:00–21:00 y `"7pm a 9pm"` → 19:00–21:00.
 La matriz suma C-10 a C-13 (16 + 21 + 13 = 50 filas). Actualiza `docs/cambios-reservas.md`.
 
+### 7.0.4 Ocupación por día y varias fechas (4-11-2026, prueba de Esteban)
+
+**Problema observado:** Esteban escribió "Que salas tienes ocupadas el jueves y viernes?". El agente respondió con el
+estado de **ahora** ("Ahora (22:58, miércoles 4 de noviembre): Salas ocupadas: 0 de 16…") e ignoró los dos días.
+
+**Causas:**
+
+1. El modelo la clasificó como `consulta_salas`, y `estadoSalasDeBase(repo)` no recibe el texto: siempre responde
+   con la hora actual.
+2. `extraer.fecha()` devuelve una sola fecha (la primera que encuentra); no hay forma de pedir dos días.
+3. Ninguna respuesta lista **qué** reservas hay un día: la disponibilidad muestra huecos libres, no ocupación.
+
+**Corrección** (determinista: debe funcionar igual con el modelo apagado):
+
+1. **Varias fechas.** En `agent/tools/extraer.ts` agrega `fechas(t: string, hoy: string): string[]`: todas las fechas
+   del texto en el orden en que aparecen, sin repetir, máximo 7. Reutiliza `buscarFecha` quitando del texto lo ya
+   encontrado, para que "pasado mañana" no cuente también como "mañana". `fecha()` no cambia.
+2. **Ocupación por día.** En `agent/conversacion.ts` agrega `ocupacionTurno(texto, sesion, repo)`. Por cada fecha, lee
+   `repo.reservasDelDia(fecha)` (solo estado `programada`), ordena por hora de inicio y responde un bloque por día.
+   Formato exacto:
+   ```
+   Martes 10 de noviembre (3 reservas):
+   • Sala 5 · 08:00–10:00 · docente
+   • Sala 15 · 10:00–12:00 · docente
+   • Sala 6 · 13:00–15:00 · estudiantes
+   Las otras 13 salas están libres todo el día.
+   ```
+   - Día sin reservas: `{Fecha larga}: sin reservas; las 16 salas están libres de 07:00 a 22:00.`
+   - Bloques separados por una línea en blanco. **No muestres carnés** (ni enmascarados): la ocupación no dice quién.
+   - Intención: `consulta_disponibilidad` (no agregues intenciones nuevas al clasificador).
+   - Chips: `Reservar una sala`. Guarda el contexto de disponibilidad (7.0.3) con la **primera** fecha.
+3. **Ruta rápida antes del modelo.** En `agent/orquestador.ts`, antes de llamar al modelo y antes de la ruta
+   `consulta_salas`, si el texto menciona sala(s) y trae al menos una fecha, decide así:
+   - Si dice ocupada(s), reservada(s) o tomada(s), **o** trae dos fechas o más → `ocupacionTurno`.
+   - Si trae una sola fecha y no habla de ocupación → `disponibilidadTurno` (la de 7.0.3, sin cambios).
+   - "Hoy" cuenta como fecha: "¿qué salas están ocupadas hoy?" va a `ocupacionTurno`.
+4. **El estado de "ahora" se queda** para mensajes sin fecha ("estado de las salas", "¿qué salas tienen cupo?").
+   Agrega al final la línea: `Para otro día, pregunta por ejemplo: ¿qué salas están ocupadas el viernes?`
+5. Si el modelo devuelve `consulta_salas` para un texto con fecha (por si la ruta rápida no lo atrapó), aplica la
+   misma decisión del punto 3 en lugar de `estadoSalasDeBase`.
+
+**Pruebas nuevas.** En `evals/extraer.ts`, con hoy = lunes 2026-11-09:
+
+| Texto | `fechas()` |
+|---|---|
+| "el jueves y viernes" | 2026-11-12, 2026-11-13 |
+| "mañana y pasado mañana" | 2026-11-10, 2026-11-11 |
+| "lunes, martes y miércoles" | 2026-11-09, 2026-11-10, 2026-11-11 |
+| "en la mañana" | (vacío) |
+
+En `evals/escenarios-conversacion.ts`, mismo reloj (lunes 2026-11-09 08:00; la semilla tiene 3 reservas el martes
+2026-11-10):
+
+| ID | Mensaje | Esperado |
+|---|---|---|
+| C-14 | "Que salas tienes ocupadas el jueves y viernes?" | Dos bloques: jueves 12 y viernes 13 de noviembre, ambos "sin reservas". No aparece "Ahora" |
+| C-15 | "¿Qué salas están ocupadas el martes?" | Bloque del martes 10 con 3 reservas en orden 08:00, 10:00, 13:00 y "Las otras 13 salas están libres todo el día." Ningún texto con "C-" |
+| C-16 | "¿Cuál es el estado de las salas?" | Sigue la vista "Ahora (…)" y termina con la línea de ayuda del punto 4 |
+
+C-14 y C-15 deben pasar **sin llamar al modelo** (ruta rápida). La matriz pasa a 53 filas (16 + 21 + 16).
+Actualiza `docs/cambios-reservas.md`.
+
 ### 7.1 Privacidad (`agent/tools/privacidad.ts`)
 
 Antes de aplicar los patrones, **quita** del texto los carnés `\b[CD]-\d{8}\b` (si no, el patrón

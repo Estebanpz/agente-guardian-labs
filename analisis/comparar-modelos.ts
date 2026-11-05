@@ -85,7 +85,8 @@ async function correr(): Promise<Corrida | null> {
   }
 
   const sinRespuesta = predicciones.filter((p) => p.modelo === "(sin respuesta)").length;
-  const conTiempo = predicciones.filter((p) => p.modelo !== "(sin respuesta)");
+  // Sin las respuestas que no llamaron al modelo (0 ms: la guardia interna de interpretar) ni las fallidas.
+  const conTiempo = predicciones.filter((p) => p.modelo !== "(sin respuesta)" && p.ms > 0);
   return {
     proveedor: proveedorActivo(), fecha: new Date().toISOString(), total: prueba.length,
     aciertos: predicciones.filter((p) => p.modelo === p.real).length,
@@ -94,6 +95,14 @@ async function correr(): Promise<Corrida | null> {
     latencia_media_ms: conTiempo.length ? Math.round(conTiempo.reduce((a, p) => a + p.ms, 0) / conTiempo.length) : 0,
     predicciones, explicaciones,
   };
+}
+
+// Mediana: no la mueve la primera llamada, que en Ollama incluye cargar el modelo en memoria.
+function mediana(c: Corrida): number {
+  const xs = c.predicciones.filter((p) => p.modelo !== "(sin respuesta)" && p.ms > 0).map((p) => p.ms).sort((a, b) => a - b);
+  if (!xs.length) return 0;
+  const m = Math.floor(xs.length / 2);
+  return xs.length % 2 ? xs[m] : Math.round((xs[m - 1] + xs[m]) / 2);
 }
 
 function informe(corridas: Corrida[]): string {
@@ -108,10 +117,10 @@ function informe(corridas: Corrida[]): string {
     "",
     "## Clasificación de la intención",
     "",
-    tabla(["Proveedor y modelo", "Modelo solo", "Como el agente (guardia → rutas → modelo)", "Sin respuesta", "Latencia media", "Fecha"],
+    tabla(["Proveedor y modelo", "Modelo solo", "Como el agente (guardia → rutas → modelo)", "Sin respuesta", "Latencia media", "Latencia mediana", "Fecha"],
       corridas.map((c) => [nombre(c), `${c.aciertos}/${c.total} (${pct(c.aciertos / c.total)})`,
         `${c.aciertos_agente}/${c.total} (${pct(c.aciertos_agente / c.total)})`, c.sin_respuesta,
-        `${num(c.latencia_media_ms / 1000, 1)} s`, c.fecha.slice(0, 16).replace("T", " ")])),
+        `${num(c.latencia_media_ms / 1000, 1)} s`, `${num(mediana(c) / 1000, 1)} s`, c.fecha.slice(0, 16).replace("T", " ")])),
     "",
     "## Frase por frase (respuesta del modelo solo)",
     "",
