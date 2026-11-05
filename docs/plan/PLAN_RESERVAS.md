@@ -115,7 +115,7 @@ Reglas del MCP:
 
 Guardian Labs es un agente lógico académico (curso de IA, UniEspinal). Hoy tiene:
 
-- **Puerta**: el monitor evalúa si una persona entra (reglas R1–R13). **No se toca** en este plan,
+- **Laboratorios** (antes "Puerta"; ver 8.0): el monitor evalúa si una persona entra (reglas R1–R13). **No se toca** en este plan,
   salvo lo indicado en la Fase 4.
 - **Chat**: texto libre; las reservas responden "no es mi función".
 - **Salas**: tres salas sintéticas con equipos.
@@ -146,7 +146,7 @@ siempre.
 
 - Cancelar o modificar reservas ya programadas (solo se puede abandonar una conversación).
 - Login o autenticación (la API sigue en `127.0.0.1`).
-- Que la Puerta lea las reservas de Mongo (queda como trabajo futuro).
+- Que la vista Laboratorios lea las reservas de Mongo (queda como trabajo futuro).
 - Nombres de personas, correos o teléfonos.
 - Despliegue en la nube (Render u otro).
 - Cambios a R1–R13 o a los casos E-001…E-012.
@@ -245,7 +245,7 @@ que hayas tenido que cambiar `.gitignore`.
 | R25 | 17 | 1 | recomendacion | programar | Ninguna regla bloquea: separar la sala en la base de demostración tras la confirmación. | Requisito del docente del curso (4-11-2026) |
 | R26 | 17 | 1 | recomendacion | registrar_usuario | Carné vigente en carnetización y aún no registrado: registrar al usuario sin pedir más datos personales. | Requisito del docente del curso (4-11-2026) |
 
-> El motor de la Puerta (`motor.ts`) filtra por id; las reglas nuevas no le afectan porque su
+> El motor de ingreso (`motor.ts`) filtra por id; las reglas nuevas no le afectan porque su
 > tabla `aplica` solo tiene R1–R13. **Verifícalo** con `npm run pruebas` después del cambio.
 > Si `evals/matriz.ts` o `evals/correr-pruebas.ts` comparan la versión `1.0.0`, actualiza el
 > valor esperado a `2.0.0` (es un cambio intencional).
@@ -913,6 +913,32 @@ como `RS-0004` con su notificación R20:
 ---
 
 ## 8. Fase 5: interfaz (mantener el diseño actual)
+
+### 8.0 La vista "Puerta" pasa a llamarse "Laboratorios" (pedido del docente, 4-11-2026)
+
+"Puerta" sonaba a parqueadero. Cambia **todos los textos visibles y los nombres públicos**; la
+lógica no cambia. Haz esto primero en la Fase 5:
+
+| Dónde | Antes | Después |
+|---|---|---|
+| `web/src/App.jsx` (pestaña) | `bi-door-open` + "Puerta" | `bi-pc-display` + "Laboratorios" (la ruta sigue siendo `/`) |
+| `web/src/pages/Monitor.jsx` (título) | "Control en la puerta" | "Control de ingreso a los laboratorios" |
+| `web/src/pages/Chat.jsx` (selector) | "Puerta de" | "Laboratorio" |
+| `web/src/pages/Chat.jsx` (vacío) | "¿En qué le ayudo en la puerta?" | "¿En qué le ayudo en los laboratorios?" |
+| API | `GET /salas/puerta` | `GET /salas/laboratorios` (actualiza `web/src/api.js`) |
+| `agent/orquestador.ts` | `SALAS_PUERTA`; "use la vista Puerta" | `SALAS_INGRESO`; "use la vista Laboratorios" |
+| Comentarios | `http.ts`, `orquestador.ts`, `data/casos.ts` ("vista Puerta") | "vista Laboratorios" (en `casos.ts` solo el comentario; los datos no se tocan) |
+| `README.md` | tabla de vistas y capturas | "Laboratorios"; renombra la captura con `git mv docs/capturas/interfaz-puerta.png docs/capturas/interfaz-laboratorios.png` |
+| `docs/diagramas_v2/Figura5_componentes_v2.puml` | "Vistas Puerta, Chat y Salas" | "Vistas Laboratorios, Chat y Salas" (si no tienes PlantUML para regenerar el PNG, anótalo en `docs/cambios-reservas.md`) |
+
+No cambies:
+- "única puerta al modelo" en `proveedor.ts` y `guia-ollama.md` (es una metáfora, no la vista);
+- el historial de `evals/matriz.ts` (es el registro de lo que pasó).
+
+Verifica con `grep -rniI "puerta" --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude-dir=logs .`:
+solo deben quedar esas excepciones y este plan. Anota el cambio de nombre en
+`docs/cambios-reservas.md`, para que Esteban actualice el informe (Figura 11 y textos que dicen
+"vista Puerta") y el guion de la demo.
 
 ### 8.1 Sistema visual (no lo cambies)
 

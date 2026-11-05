@@ -41,7 +41,7 @@ Usa CodeGraph antes de abrir archivos: la herramienta MCP `codegraph_explore`, o
 
 | Comando | Qué hace |
 |---|---|
-| `npm run app` | API en 127.0.0.1:3000 + interfaz en localhost:5173 |
+| `npm run app` | API en 127.0.0.1:3000 + interfaz en localhost:5173 (vistas Laboratorios, Chat y Salas) |
 | `npm run typecheck` | Verificación de tipos |
 | `npm run pruebas` | Pruebas deterministas (sin red) |
 | `npm run matriz` | Matriz esperado vs. observado (requiere Ollama para algunas filas) |
