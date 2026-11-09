@@ -2,7 +2,7 @@
 
 | Dato | Valor |
 |---|---|
-| Fecha de ejecución | 8/11/2026, 10:48:16 p. m. |
+| Fecha de ejecución | 8/11/2026, 10:52:45 p. m. |
 | Versión de las reglas | 2.0.0 |
 | Proveedor y modelo | ollama:llama3.2:3b |
 | Versión de Ollama | 0.34.2 |
