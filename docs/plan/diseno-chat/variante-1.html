@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Guardian Labs - Asistente UniEspinal</title>
+<!-- Plus Jakarta Sans Font -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-container-low": "#f2f3ff",
+            "surface-container": "#eaedff",
+            "tertiary-container": "#006b2c",
+            "on-primary-fixed": "#001551",
+            "surface-container-lowest": "#ffffff",
+            "on-primary-fixed-variant": "#0039b5",
+            "on-secondary-fixed": "#091649",
+            "outline-variant": "#c4c5d7",
+            "inverse-primary": "#b7c4ff",
+            "error-container": "#ffdad6",
+            "on-tertiary": "#ffffff",
+            "primary-fixed": "#dce1ff",
+            "surface-bright": "#faf8ff",
+            "secondary-container": "#b8c3ff",
+            "inverse-surface": "#283044",
+            "surface-container-highest": "#dae2fd",
+            "tertiary": "#00501f",
+            "on-primary": "#ffffff",
+            "outline": "#747686",
+            "surface-container-high": "#e2e7ff",
+            "background": "#faf8ff",
+            "on-tertiary-fixed": "#002109",
+            "on-surface": "#131b2e",
+            "primary-container": "#1d4ed8",
+            "on-tertiary-container": "#71ee8a",
+            "on-primary-container": "#cad3ff",
+            "on-surface-variant": "#434655",
+            "surface-dim": "#d2d9f4",
+            "on-secondary-container": "#444f83",
+            "on-secondary-fixed-variant": "#384377",
+            "inverse-on-surface": "#eef0ff",
+            "secondary-fixed-dim": "#b8c3ff",
+            "on-background": "#131b2e",
+            "tertiary-fixed": "#7ffc97",
+            "surface-variant": "#dae2fd",
+            "surface": "#faf8ff",
+            "tertiary-fixed-dim": "#62df7d",
+            "surface-tint": "#2151da",
+            "secondary-fixed": "#dde1ff",
+            "primary": "#0037b0",
+            "on-secondary": "#ffffff",
+            "error": "#ba1a1a",
+            "primary-fixed-dim": "#b7c4ff",
+            "on-error": "#ffffff",
+            "secondary": "#505b90",
+            "on-error-container": "#93000a",
+            "on-tertiary-fixed-variant": "#005320"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2rem",
+            "space-lg": "1.5rem",
+            "gutter": "1.5rem",
+            "space-md": "1rem",
+            "space-sm": "0.5rem",
+            "margin": "2rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "headline-md": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "display-hero": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "headline-md": ["1.25rem", { lineHeight: "1.75rem", letterSpacing: "-0.015em", fontWeight: "700" }],
+            "body-md": ["0.875rem", { lineHeight: "1.375rem", letterSpacing: "0em", fontWeight: "400" }],
+            "label-md": ["0.75rem", { lineHeight: "1rem", letterSpacing: "0.02em", fontWeight: "600" }],
+            "body-sm": ["0.75rem", { lineHeight: "1.125rem", letterSpacing: "0.01em", fontWeight: "400" }],
+            "label-lg": ["0.875rem", { lineHeight: "1.25rem", letterSpacing: "0.01em", fontWeight: "600" }],
+            "headline-lg": ["1.75rem", { lineHeight: "2.25rem", letterSpacing: "-0.02em", fontWeight: "700" }],
+            "label-sm": ["0.6875rem", { lineHeight: "0.875rem", letterSpacing: "0.04em", fontWeight: "700" }],
+            "body-lg": ["1rem", { lineHeight: "1.5rem", letterSpacing: "0em", fontWeight: "400" }],
+            "headline-sm": ["1.125rem", { lineHeight: "1.5rem", letterSpacing: "-0.01em", fontWeight: "600" }],
+            "display-hero": ["2.25rem", { lineHeight: "2.75rem", letterSpacing: "-0.025em", fontWeight: "800" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .material-symbols-outlined.fill-icon {
+      font-variation-settings: 'FILL' 1;
+    }
+    @keyframes dotFlashing {
+      0% { opacity: 0.2; transform: translateY(0); }
+      50% { opacity: 1; transform: translateY(-3px); }
+      100% { opacity: 0.2; transform: translateY(0); }
+    }
+    .typing-dot {
+      animation: dotFlashing 1.2s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .typing-dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+  </style>
+</head>
+<body class="h-full bg-[#F4F6FB] text-on-surface antialiased font-body-md text-body-md flex overflow-hidden">
+<!-- 1. BARRA LATERAL IZQUIERDA FIJA (224px, #0E1B4D) -->
+<aside class="w-[224px] h-screen bg-[#0E1B4D] flex-shrink-0 flex flex-col justify-between border-r border-[#1e293b] select-none z-20">
+<!-- Cabecera y Navegación -->
+<div class="p-4 flex flex-col gap-6">
+<!-- Marca Institucional -->
+<div class="flex items-center gap-3 px-1 pt-1">
+<div class="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary shadow-sm flex-shrink-0">
+<span class="material-symbols-outlined text-[24px]" data-icon="shield">shield</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm font-bold text-surface-container-lowest tracking-tight leading-tight">Guardian Labs</span>
+<span class="font-label-sm text-label-sm font-semibold text-[#94A3B8]">UniEspinal</span>
+</div>
+</div>
+<!-- Navegación Vertical -->
+<nav aria-label="Navegación principal" class="flex flex-col gap-1.5">
+<!-- Laboratorios (Inactivo) -->
+<a class="min-h-[44px] flex items-center gap-3 text-[#94A3B8] hover:text-surface-container-lowest hover:bg-[#1E293B] font-label-md text-label-md rounded-lg px-3 py-2.5 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-container" href="#laboratorios">
+<span class="material-symbols-outlined text-[20px]" data-icon="science">science</span>
+<span>Laboratorios</span>
+</a>
+<!-- Chat (ACTIVO) -->
+<a aria-current="page" class="min-h-[44px] flex items-center gap-3 bg-[#1F3A8A] text-surface-container-lowest font-label-md text-label-md rounded-lg px-3 py-2.5 border-l-4 border-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-primary-container transition-all" href="#chat">
+<span class="material-symbols-outlined text-[20px]" data-icon="forum">forum</span>
+<span>Chat</span>
+</a>
+<!-- Salas (Inactivo) -->
+<a class="min-h-[44px] flex items-center gap-3 text-[#94A3B8] hover:text-surface-container-lowest hover:bg-[#1E293B] font-label-md text-label-md rounded-lg px-3 py-2.5 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-container" href="#salas">
+<span class="material-symbols-outlined text-[20px]" data-icon="meeting_room">meeting_room</span>
+<span>Salas</span>
+</a>
+</nav>
+</div>
+<!-- Zona Inferior: MongoDB local / Estado sintético -->
+<div class="p-4 border-t border-[#1e293b]/70 bg-[#091233]/50">
+<div class="flex items-center gap-2 mb-1">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22C55E] opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-[#22C55E]"></span>
+</span>
+<span class="font-label-sm text-label-sm text-surface-container-lowest font-medium flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-[#94A3B8]" data-icon="database">database</span>
+          MongoDB local
+        </span>
+</div>
+<p class="font-body-sm text-body-sm text-[#94A3B8] text-[11px] leading-tight">Datos sintéticos de demostración</p>
+</div>
+</aside>
+<!-- 2. PANEL DE HISTORIAL DEL DÍA (288px, Fondo Blanco, Borde Derecho #E2E7F2) -->
+<aside class="w-72 h-screen bg-surface-container-lowest border-r border-[#E2E7F2] flex-shrink-0 flex flex-col justify-between z-10">
+<!-- Cabecera y Acción Principal -->
+<div class="p-4 flex flex-col gap-4 border-b border-[#E2E7F2]/60">
+<button class="w-full min-h-[44px] bg-primary-container hover:bg-primary text-on-primary font-label-lg text-label-lg rounded-full px-4 flex items-center justify-center gap-2 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-container shadow-none active:scale-[0.99]" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="add">add</span>
+<span>Nueva conversación</span>
+</button>
+<div class="flex items-center justify-between px-1">
+<h2 class="font-label-md text-label-md font-bold uppercase tracking-wider text-[#64748B]">Hoy</h2>
+<span class="font-label-sm text-label-sm text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-full">3 chats</span>
+</div>
+</div>
+<!-- Lista de Conversaciones Recientes -->
+<div class="flex-1 overflow-y-auto p-3 space-y-1.5 focus:outline-none" tabindex="0">
+<!-- Chat 1 (Seleccionado / Reciente) -->
+<button class="w-full text-left p-3 rounded-lg bg-[#EFF6FF] border border-[#BFDBFE] hover:border-primary-container transition-all group focus:outline-none focus:ring-2 focus:ring-primary-container" type="button">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm font-semibold text-primary-container">10:15 AM</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+</div>
+<p class="font-label-md text-label-md text-[#0F172A] font-bold truncate group-hover:text-primary-container">Consulta Sala 4</p>
+<p class="font-body-sm text-body-sm text-[#64748B] truncate mt-0.5">Revisé la Sala 6 para el martes...</p>
+</button>
+<!-- Chat 2 -->
+<button class="w-full text-left p-3 rounded-lg bg-surface-container-lowest border border-transparent hover:border-[#D5DBEA] hover:bg-[#F8FAFC] transition-all group focus:outline-none focus:ring-2 focus:ring-primary-container" type="button">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm font-medium text-[#64748B]">09:30 AM</span>
+</div>
+<p class="font-label-md text-label-md text-[#0F172A] font-semibold truncate group-hover:text-primary-container">Reserva Sala 2</p>
+<p class="font-body-sm text-body-sm text-[#64748B] truncate mt-0.5">Reserva confirmada con éxito.</p>
+</button>
+<!-- Chat 3 -->
+<button class="w-full text-left p-3 rounded-lg bg-surface-container-lowest border border-transparent hover:border-[#D5DBEA] hover:bg-[#F8FAFC] transition-all group focus:outline-none focus:ring-2 focus:ring-primary-container" type="button">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm font-medium text-[#64748B]">08:10 AM</span>
+</div>
+<p class="font-label-md text-label-md text-[#0F172A] font-semibold truncate group-hover:text-primary-container">Disponibilidad proyectores</p>
+<p class="font-body-sm text-body-sm text-[#64748B] truncate mt-0.5">3 proyectores libres en bloque A.</p>
+</button>
+</div>
+<!-- Pie del Panel Historial -->
+<div class="p-3 border-t border-[#E2E7F2] bg-[#F8FAFC] flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-[#64748B]">Semestre 2025-1</span>
+<span class="font-label-sm text-label-sm font-semibold text-primary-container">UniEspinal Labs</span>
+</div>
+</aside>
+<!-- 3. ÁREA PRINCIPAL DE CONTENIDO (Fondo #F4F6FB, Resto de los 1440px) -->
+<main class="flex-1 h-screen flex flex-col overflow-hidden bg-[#F4F6FB] relative">
+<!-- Contenedor centralizado para lectura óptima (840px centrado) -->
+<div class="flex-1 overflow-y-auto px-6 py-6 flex flex-col items-center">
+<div class="w-full max-w-[840px] flex flex-col gap-6">
+<!-- Encabezado / Saludo Superior -->
+<section class="bg-surface-container-lowest border border-[#E2E7F2] rounded-[14px] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div class="flex flex-col">
+<h1 class="font-display-hero text-[28px] leading-tight font-extrabold text-[#0F172A] tracking-tight">
+              Hola, Laura Gómez. ¿Qué necesitas hoy?
+            </h1>
+<div class="flex items-center gap-2 mt-2">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label-sm font-semibold bg-[#EFF6FF] text-primary-container border border-[#BFDBFE]">
+<span class="material-symbols-outlined text-[14px]" data-icon="badge">badge</span>
+                Carné C-1234••••
+              </span>
+<span class="font-label-md text-label-md text-[#64748B] font-medium">·</span>
+<span class="font-label-md text-label-md text-[#475569] font-medium">Ingeniería de Sistemas</span>
+</div>
+</div>
+<div class="flex items-center gap-2 self-start md:self-auto">
+<span class="inline-flex items-center gap-1 text-label-sm font-semibold text-[#16A34A] bg-[#DCFCE7] px-2.5 py-1 rounded-full border border-[#86EFAC]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></span>
+              Usuario Activo
+            </span>
+</div>
+</section>
+<!-- Cuatro Tarjetas de Acceso Rápido en Fila Horizontal -->
+<section aria-label="Acciones rápidas" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+<!-- Tarjeta 1: Reservar sala -->
+<button class="min-h-[44px] bg-surface-container-lowest border border-[#E2E7F2] hover:border-primary-container hover:bg-[#F8FAFC] rounded-[14px] p-3.5 flex items-center gap-3 text-left transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-container group" type="button">
+<div class="w-9 h-9 rounded-lg bg-[#EFF6FF] flex items-center justify-center text-primary-container flex-shrink-0 group-hover:bg-primary-container group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="calendar_today">calendar_today</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-[#0F172A]">Reservar sala</span>
+<span class="font-body-sm text-body-sm text-[#64748B] text-[11px]">Crear solicitud</span>
+</div>
+</button>
+<!-- Tarjeta 2: Ver disponibilidad -->
+<button class="min-h-[44px] bg-surface-container-lowest border border-[#E2E7F2] hover:border-primary-container hover:bg-[#F8FAFC] rounded-[14px] p-3.5 flex items-center gap-3 text-left transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-container group" type="button">
+<div class="w-9 h-9 rounded-lg bg-[#EFF6FF] flex items-center justify-center text-primary-container flex-shrink-0 group-hover:bg-primary-container group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="event_available">event_available</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-[#0F172A]">Ver disponibilidad</span>
+<span class="font-body-sm text-body-sm text-[#64748B] text-[11px]">Horarios libres</span>
+</div>
+</button>
+<!-- Tarjeta 3: Estado de salas -->
+<button class="min-h-[44px] bg-surface-container-lowest border border-[#E2E7F2] hover:border-primary-container hover:bg-[#F8FAFC] rounded-[14px] p-3.5 flex items-center gap-3 text-left transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-container group" type="button">
+<div class="w-9 h-9 rounded-lg bg-[#EFF6FF] flex items-center justify-center text-primary-container flex-shrink-0 group-hover:bg-primary-container group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="desktop_windows">desktop_windows</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-[#0F172A]">Estado de salas</span>
+<span class="font-body-sm text-body-sm text-[#64748B] text-[11px]">Equipos y cupos</span>
+</div>
+</button>
+<!-- Tarjeta 4: Mis reservas -->
+<button class="min-h-[44px] bg-surface-container-lowest border border-[#E2E7F2] hover:border-primary-container hover:bg-[#F8FAFC] rounded-[14px] p-3.5 flex items-center gap-3 text-left transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-container group" type="button">
+<div class="w-9 h-9 rounded-lg bg-[#EFF6FF] flex items-center justify-center text-primary-container flex-shrink-0 group-hover:bg-primary-container group-hover:text-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="bookmark">bookmark</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-bold text-[#0F172A]">Mis reservas</span>
+<span class="font-body-sm text-body-sm text-[#64748B] text-[11px]">Historial activo</span>
+</div>
+</button>
+</section>
+<!-- Divisor de Contexto Temporal -->
+<div class="flex items-center gap-4 my-1">
+<div class="flex-1 h-px bg-[#E2E7F2]"></div>
+<span class="font-label-sm text-label-sm text-[#64748B] font-medium bg-[#E2E7F2]/50 px-3 py-0.5 rounded-full">Hoy, 10:14 AM</span>
+<div class="flex-1 h-px bg-[#E2E7F2]"></div>
+</div>
+<!-- Hilo de Conversación -->
+<div class="flex flex-col gap-5">
+<!-- Mensaje del Usuario (Alineado a la derecha) -->
+<div class="flex flex-col items-end self-end max-w-[80%]">
+<div class="bg-primary-container text-on-primary rounded-[14px] rounded-br-[4px] px-5 py-3.5 shadow-none">
+<p class="font-body-md text-body-md text-white font-medium leading-relaxed">
+                Quiero la sala 6 mañana de 2 a 4 pm
+              </p>
+</div>
+<span class="font-label-sm text-label-sm text-[#64748B] mt-1 mr-1">10:14 AM · Entregado</span>
+</div>
+<!-- Respuesta del Agente (Alineada a la izquierda) -->
+<div class="flex flex-col items-start self-start max-w-[90%] md:max-w-[85%]">
+<div class="bg-surface-container-lowest border border-[#E2E7F2] rounded-[14px] rounded-bl-[4px] p-5 shadow-none w-full flex flex-col gap-3.5">
+<!-- Insignia de Intención "Reserva" -->
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-label-sm font-semibold bg-[#EFF6FF] text-primary-container border border-[#BFDBFE]">
+<span class="material-symbols-outlined text-[15px]" data-icon="event">event</span>
+                  Intención: Reserva
+                </span>
+<span class="font-label-sm text-label-sm text-[#64748B]">Guardian Labs Asistente</span>
+</div>
+<!-- Texto de Respuesta -->
+<p class="font-body-md text-body-md text-[#0F172A] leading-relaxed">
+                Revisé la Sala 6 para el martes 10 de noviembre de 14:00 a 16:00 y está libre. Ahora, ¿cuántas personas son?
+              </p>
+<!-- Tarjeta de Decisión (Borde izquierdo verde 6px) -->
+<div class="border-l-[6px] border-[#16A34A] bg-[#F0FDF4] border-t border-r border-b border-[#DCFCE7] rounded-r-[10px] p-3.5 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-[#DCFCE7] flex items-center justify-center text-[#16A34A] flex-shrink-0">
+<span class="material-symbols-outlined text-[20px] font-bold" data-icon="check_circle">check_circle</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-bold text-[#14532D]">Permitir</span>
+<span class="font-label-sm text-label-sm text-[#16A34A] font-semibold bg-white px-2 py-0.2 rounded border border-[#BBF7D0]">Horario disponible</span>
+</div>
+<span class="font-body-sm text-body-sm text-[#166534] font-medium mt-0.5">Sala 6 · 14:00–16:00 (Capacidad máx: 25 personas)</span>
+</div>
+</div>
+<div class="hidden sm:flex items-center gap-1 text-label-sm font-bold text-[#16A34A]">
+<span class="material-symbols-outlined text-[18px]" data-icon="verified_user">verified_user</span>
+<span>Validado</span>
+</div>
+</div>
+<!-- Fila de Chips de Acción Interactivos (44px min-height) -->
+<div aria-label="Sugerencias de respuesta" class="pt-1 flex flex-wrap items-center gap-2">
+<button class="min-h-[44px] px-4 py-2 bg-surface-container-lowest hover:bg-[#F1F5F9] border border-[#D5DBEA] hover:border-primary-container text-[#0F172A] font-label-md text-label-md font-semibold rounded-full flex items-center gap-2 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-container active:scale-[0.98]" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary-container" data-icon="swap_horiz">swap_horiz</span>
+<span>Usar Sala 8</span>
+</button>
+<button class="min-h-[44px] px-4 py-2 bg-surface-container-lowest hover:bg-[#F1F5F9] border border-[#D5DBEA] hover:border-primary-container text-[#0F172A] font-label-md text-label-md font-semibold rounded-full flex items-center gap-2 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-container active:scale-[0.98]" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary-container" data-icon="list">list</span>
+<span>Ver otras salas</span>
+</button>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-[#64748B] mt-1 ml-1">10:15 AM · Respuesta automática</span>
+</div>
+<!-- Indicador de "Escribiendo..." (Typing indicator) -->
+<div class="flex items-center gap-2 self-start">
+<div class="bg-surface-container-lowest border border-[#E2E7F2] rounded-full px-4 py-2.5 flex items-center gap-1.5 shadow-none">
+<span class="typing-dot w-2 h-2 rounded-full bg-primary-container inline-block"></span>
+<span class="typing-dot w-2 h-2 rounded-full bg-primary-container inline-block"></span>
+<span class="typing-dot w-2 h-2 rounded-full bg-primary-container inline-block"></span>
+</div>
+<span class="font-label-sm text-label-sm text-[#64748B]">Guardian Labs está escribiendo…</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Zona de Entrada Inferior Fija / Anclada -->
+<footer class="w-full bg-surface-container-lowest border-t border-[#E2E7F2] py-4 px-6 flex justify-center z-10">
+<div class="w-full max-w-[840px] flex flex-col gap-2">
+<form class="relative flex items-center w-full" onsubmit="event.preventDefault();">
+<!-- Campo de Texto Píldora -->
+<div class="relative w-full flex items-center">
+<input aria-label="Mensaje para el asistente" class="w-full h-12 pl-5 pr-28 bg-surface-container-lowest border border-[#D5DBEA] rounded-full text-body-md font-body-md text-[#0F172A] placeholder-[#64748B] focus:border-primary-container focus:ring-2 focus:ring-primary-container focus:outline-none transition-all shadow-none" placeholder="Escribe tu mensaje…" type="text" value=""/>
+<!-- Contador de Caracteres -->
+<span class="absolute right-14 font-label-sm text-label-sm text-[#94A3B8] pointer-events-none">
+              0/500
+            </span>
+<!-- Botón Redondo de 44px Enviar -->
+<button aria-label="Enviar" class="absolute right-1.5 w-11 h-11 bg-primary-container hover:bg-primary text-on-primary rounded-full flex items-center justify-center transition-transform duration-100 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-container shadow-none" type="submit">
+<span class="material-symbols-outlined text-[20px]" data-icon="send">send</span>
+</button>
+</div>
+</form>
+<!-- Texto de Ayuda / Accesibilidad -->
+<div class="flex items-center justify-between px-3">
+<p class="font-body-sm text-body-sm text-[#64748B] text-[11px]">
+            Presiona <kbd class="px-1.5 py-0.5 bg-[#F1F5F9] border border-[#CBD5E1] rounded text-[10px] text-[#334155] font-semibold">Enter</kbd> para enviar · <kbd class="px-1.5 py-0.5 bg-[#F1F5F9] border border-[#CBD5E1] rounded text-[10px] text-[#334155] font-semibold">Shift + Enter</kbd> para nueva línea
+          </p>
+<div class="flex items-center gap-1.5 text-[11px] text-[#64748B]">
+<span class="material-symbols-outlined text-[14px] text-[#16A34A]" data-icon="lock">lock</span>
+<span>UniEspinal · Reserva Segura</span>
+</div>
+</div>
+</div>
+</footer>
+</main>
+</body></html>

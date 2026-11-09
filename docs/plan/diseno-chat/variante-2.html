@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guardian Labs · Chat de Reservas (Variante Oscura)</title>
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor / Lucide Icons via inline SVG or Font -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              bg: '#0E1B4D',
+              surface: '#13235F',
+              border: '#1F3A8A',
+              accent: '#2563EB',
+              textPrimary: '#FFFFFF',
+              textSecondary: '#C9D3F2',
+              muted: '#94A3B8',
+              success: '#16A34A',
+              pillBlue: '#1E3A8A'
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif']
+          },
+          borderRadius: {
+            card: '14px',
+            pill: '999px'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0E1B4D;
+      color: #FFFFFF;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    .focus-ring:focus-visible {
+      outline: 3px solid #2563EB;
+      outline-offset: 2px;
+    }
+    /* Typing indicator animation */
+    @keyframes typingBounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+      40% { transform: translateY(-5px); opacity: 1; }
+    }
+    .dot-1 { animation: typingBounce 1.4s infinite ease-in-out; }
+    .dot-2 { animation: typingBounce 1.4s infinite ease-in-out 0.2s; }
+    .dot-3 { animation: typingBounce 1.4s infinite ease-in-out 0.4s; }
+  </style>
+</head>
+<body class="h-full flex overflow-hidden bg-[#0E1B4D] text-white">
+
+  <!-- BARRA LATERAL IZQUIERDA (224px fija) -->
+  <aside class="w-[224px] flex-shrink-0 bg-[#0E1B4D] border-r border-[#1F3A8A] flex flex-col justify-between h-screen p-4 select-none" aria-label="Navegación principal">
+    <!-- Contenido Superior -->
+    <div class="flex flex-col gap-6">
+      <!-- Marca Guardian Labs con icono de escudo -->
+      <div class="flex items-center gap-3 px-1 pt-1">
+        <div class="w-10 h-10 rounded-xl bg-[#13235F] border border-[#1F3A8A] flex items-center justify-center text-[#2563EB] shadow-none flex-shrink-0">
+          <span class="material-symbols-outlined text-2xl text-[#2563EB]">shield</span>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-base font-extrabold tracking-tight text-white leading-tight">Guardian Labs</span>
+          <span class="text-xs text-[#C9D3F2] font-medium leading-tight">UniEspinal</span>
+        </div>
+      </div>
+
+      <!-- Navegación Compartida -->
+      <nav class="flex flex-col gap-1.5" aria-label="Secciones del laboratorio">
+        <!-- Laboratorios -->
+        <a href="#laboratorios" class="focus-ring flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-[#C9D3F2] hover:bg-[#13235F] hover:text-white transition-colors duration-150 min-h-[44px]">
+          <span class="material-symbols-outlined text-xl text-[#C9D3F2]">science</span>
+          <span>Laboratorios</span>
+        </a>
+
+        <!-- Chat (Activo: fondo #1F3A8A, texto blanco) -->
+        <a href="#chat" class="focus-ring flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold bg-[#1F3A8A] text-white border border-[#2563EB]/40 min-h-[44px]" aria-current="page">
+          <span class="material-symbols-outlined text-xl text-white">forum</span>
+          <span class="flex-1">Chat</span>
+          <span class="w-2 h-2 rounded-full bg-[#2563EB]"></span>
+        </a>
+
+        <!-- Salas -->
+        <a href="#salas" class="focus-ring flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-[#C9D3F2] hover:bg-[#13235F] hover:text-white transition-colors duration-150 min-h-[44px]">
+          <span class="material-symbols-outlined text-xl text-[#C9D3F2]">meeting_room</span>
+          <span>Salas</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- Pie lateral: MongoDB local con punto verde -->
+    <div class="pt-4 border-t border-[#1F3A8A] flex flex-col gap-2">
+      <div class="flex items-center gap-2 px-2 py-2 rounded-lg bg-[#13235F]/60 border border-[#1F3A8A]/50">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#16A34A] flex-shrink-0 animate-pulse" aria-hidden="true"></span>
+        <div class="flex flex-col overflow-hidden">
+          <span class="text-xs font-semibold text-white tracking-wide truncate">MongoDB local</span>
+          <span class="text-[10px] text-[#94A3B8] truncate">Demo Activo · UniEspinal</span>
+        </div>
+      </div>
+      <p class="text-[10px] text-[#94A3B8] px-2 leading-tight">Semestre 2025-1 · Datos sintéticos</p>
+    </div>
+  </aside>
+
+  <!-- ÁREA PRINCIPAL -->
+  <main class="flex-1 flex flex-col h-screen overflow-hidden bg-[#0E1B4D]">
+
+    <!-- ENCABEZADO SUPERIOR / SEGMENTED CONTROL & SALUDO -->
+    <header class="flex-shrink-0 border-b border-[#1F3A8A] px-8 py-5 flex flex-col gap-4 bg-[#0E1B4D]/90 backdrop-blur-sm z-10">
+      <div class="flex items-center justify-between">
+        <!-- Conmutador segmentado en forma de píldora (Reservar vs Consultar) -->
+        <div class="inline-flex items-center p-1 rounded-full bg-[#13235F] border border-[#1F3A8A]" role="tablist" aria-label="Tipo de operación">
+          <button role="tab" aria-selected="true" class="focus-ring flex items-center justify-center px-6 h-10 rounded-full bg-[#2563EB] text-white text-sm font-bold transition-all min-h-[44px]">
+            Reservar
+          </button>
+          <button role="tab" aria-selected="false" class="focus-ring flex items-center justify-center px-6 h-10 rounded-full bg-transparent text-[#C9D3F2] hover:text-white text-sm font-medium transition-all min-h-[44px]">
+            Consultar
+          </button>
+        </div>
+
+        <!-- Meta info de la sesión activa -->
+        <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#13235F] border border-[#1F3A8A] text-xs text-[#C9D3F2]">
+          <span class="w-2 h-2 rounded-full bg-[#16A34A]"></span>
+          <span>Asistente en línea · Respuestas automáticas</span>
+        </div>
+      </div>
+
+      <!-- Saludo y subtítulo del estudiante -->
+      <div class="flex flex-col">
+        <h1 class="text-2xl font-extrabold text-white tracking-tight leading-tight">
+          Hola, Laura Gómez
+        </h1>
+        <p class="text-sm font-medium text-[#C9D3F2] mt-0.5 flex items-center gap-2">
+          <span>Carné C-1234••••</span>
+          <span class="text-[#1F3A8A]">·</span>
+          <span>Estudiante</span>
+          <span class="text-[#1F3A8A]">·</span>
+          <span class="text-xs text-[#94A3B8]">Ingeniería de Sistemas</span>
+        </p>
+      </div>
+    </header>
+
+    <!-- HILO DE CONVERSACIÓN (Scrollable) -->
+    <section class="flex-1 overflow-y-auto px-8 py-6 flex flex-col gap-6" aria-label="Mensajes del chat">
+
+      <!-- Separador de tiempo -->
+      <div class="flex items-center justify-center my-1" aria-hidden="true">
+        <span class="text-xs font-semibold px-3 py-1 rounded-full bg-[#13235F] border border-[#1F3A8A] text-[#94A3B8]">
+          Hoy, 10:14 AM
+        </span>
+      </div>
+
+      <!-- MENSAJE DEL USUARIO (Derecha, burbuja #2563EB, texto blanco) -->
+      <div class="flex flex-col items-end gap-1">
+        <div class="max-w-[70%] sm:max-w-[560px] rounded-[14px] rounded-br-[2px] bg-[#2563EB] text-white px-5 py-3.5 shadow-none text-base leading-relaxed">
+          <p class="font-medium text-white">Quiero la sala 6 mañana de 2 a 4 pm</p>
+        </div>
+        <span class="text-xs text-[#94A3B8] pr-1">10:14 AM · Entregado</span>
+      </div>
+
+      <!-- RESPUESTA DEL AGENTE (Izquierda, burbuja #13235F con borde #1F3A8A) -->
+      <div class="flex flex-col items-start gap-3 max-w-[85%] sm:max-w-[680px]">
+
+        <!-- Burbuja principal del agente -->
+        <div class="w-full rounded-[14px] rounded-tl-[2px] bg-[#13235F] border border-[#1F3A8A] p-5 flex flex-col gap-4 text-white">
+
+          <!-- Insignia de intención: "Reserva" en píldora #1E3A8A con icono de calendario -->
+          <div class="flex items-center justify-between">
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1E3A8A] border border-[#2563EB]/40 text-xs font-bold text-white tracking-wide">
+              <span class="material-symbols-outlined text-sm leading-none text-white">calendar_today</span>
+              <span>Reserva</span>
+            </div>
+            <span class="text-xs text-[#94A3B8]">Guardian Labs Asistente</span>
+          </div>
+
+          <!-- Texto de respuesta -->
+          <p class="text-base text-white font-normal leading-relaxed">
+            Revisé la Sala 6 para el martes 10 de noviembre de 14:00 a 16:00 y está libre. Ahora, ¿cuántas personas son?
+          </p>
+
+          <!-- Tarjeta de decisión con borde izquierdo verde de 6px (#16A34A), icono check y texto "Permitir" -->
+          <div class="rounded-lg bg-[#0E1B4D] border border-[#1F3A8A] border-l-[6px] border-l-[#16A34A] p-4 flex items-center justify-between gap-4" role="status">
+            <div class="flex items-center gap-3.5">
+              <div class="w-9 h-9 rounded-full bg-[#16A34A]/20 border border-[#16A34A]/40 flex items-center justify-center flex-shrink-0">
+                <span class="material-symbols-outlined text-xl text-[#16A34A] font-bold">check_circle</span>
+              </div>
+              <div class="flex flex-col">
+                <div class="flex items-center gap-2">
+                  <span class="text-base font-bold text-white tracking-tight">Permitir</span>
+                  <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#16A34A]/20 text-[#16A34A] border border-[#16A34A]/30">Horario disponible</span>
+                </div>
+                <span class="text-xs text-[#C9D3F2] font-medium mt-0.5">Sala 6 · 14:00–16:00 (Capacidad máx: 25 personas)</span>
+              </div>
+            </div>
+
+            <div class="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-[#16A34A]">
+              <span class="material-symbols-outlined text-base">verified</span>
+              <span>Validado</span>
+            </div>
+          </div>
+
+          <!-- Chips de sugerencia en píldora #13235F con borde #1F3A8A, con punto verde a la izquierda, mín 44px -->
+          <div class="pt-1 flex flex-wrap gap-2.5" role="group" aria-label="Sugerencias rápidas">
+            <!-- Chip 1: Usar Sala 8 -->
+            <button type="button" class="focus-ring inline-flex items-center gap-2.5 px-4 h-11 min-h-[44px] rounded-full bg-[#13235F] hover:bg-[#1E3A8A] border border-[#1F3A8A] text-sm font-semibold text-white transition-colors cursor-pointer select-none">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#16A34A] flex-shrink-0" aria-hidden="true"></span>
+              <span>Usar Sala 8</span>
+            </button>
+
+            <!-- Chip 2: Ver otras salas -->
+            <button type="button" class="focus-ring inline-flex items-center gap-2.5 px-4 h-11 min-h-[44px] rounded-full bg-[#13235F] hover:bg-[#1E3A8A] border border-[#1F3A8A] text-sm font-semibold text-white transition-colors cursor-pointer select-none">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#16A34A] flex-shrink-0" aria-hidden="true"></span>
+              <span>Ver otras salas</span>
+            </button>
+          </div>
+        </div>
+
+        <span class="text-xs text-[#94A3B8] pl-1">10:15 AM · Respuesta automática</span>
+
+        <!-- Indicador de escritura con tres puntos en #2563EB -->
+        <div class="flex items-center gap-2 px-3 py-2 rounded-full bg-[#13235F] border border-[#1F3A8A] mt-1" aria-label="Guardian Labs está escribiendo">
+          <div class="flex items-center gap-1.5 px-1">
+            <span class="w-2 h-2 rounded-full bg-[#2563EB] dot-1"></span>
+            <span class="w-2 h-2 rounded-full bg-[#2563EB] dot-2"></span>
+            <span class="w-2 h-2 rounded-full bg-[#2563EB] dot-3"></span>
+          </div>
+          <span class="text-xs font-medium text-[#C9D3F2]">Guardian Labs está escribiendo…</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ENTRADA ABAJO (Barra en píldora #13235F con borde #1F3A8A) -->
+    <footer class="flex-shrink-0 border-t border-[#1F3A8A] px-8 py-4 bg-[#0E1B4D] flex flex-col gap-2">
+      <form class="w-full flex items-center gap-3" onsubmit="event.preventDefault();">
+        <div class="flex-1 flex items-center rounded-full bg-[#13235F] border border-[#1F3A8A] px-5 py-1.5 focus-within:border-[#2563EB] focus-within:ring-2 focus-within:ring-[#2563EB]/40 transition-all">
+          <input
+            type="text"
+            placeholder="Escribe tu mensaje…"
+            class="focus-ring flex-1 bg-transparent border-0 outline-none text-white text-base placeholder-[#94A3B8] py-2.5"
+            aria-label="Mensaje para el asistente"
+          />
+
+          <!-- Botones a la derecha: Micrófono (opcional) y Enviar (44px) -->
+          <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+            <!-- Micrófono (opcional, icono redondo 44px) -->
+            <button
+              type="button"
+              class="focus-ring w-11 h-11 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center text-[#C9D3F2] hover:text-white hover:bg-[#1E3A8A] transition-colors"
+              aria-label="Grabar mensaje de voz"
+            >
+              <span class="material-symbols-outlined text-xl">mic</span>
+            </button>
+
+            <!-- Enviar en #2563EB con icono blanco (aria-label "Enviar", 44px) -->
+            <button
+              type="submit"
+              class="focus-ring w-11 h-11 min-h-[44px] min-w-[44px] rounded-full bg-[#2563EB] hover:bg-blue-600 active:scale-95 text-white flex items-center justify-center transition-all"
+              aria-label="Enviar"
+            >
+              <span class="material-symbols-outlined text-xl">send</span>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Ayuda en texto pequeño -->
+      <div class="flex items-center justify-between px-4 text-xs text-[#94A3B8]">
+        <p>Enter para enviar · Shift+Enter para nueva línea</p>
+        <p class="hidden sm:inline">UniEspinal · Reserva Segura de Salas</p>
+      </div>
+    </footer>
+
+  </main>
+
+</body>
+</html>
