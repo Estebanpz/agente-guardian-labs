@@ -51,7 +51,9 @@
 }
 
 .sa-lateral {
+  position: relative;
   flex: 0 0 224px;
+  width: 224px;
   background: var(--sa-lateral);
   color: #E6EBFA;
   padding: 24px 16px;
@@ -59,6 +61,80 @@
   flex-direction: column;
   gap: 24px;
   box-sizing: border-box;
+  transition: width 0.2s ease, flex-basis 0.2s ease, padding 0.2s ease;
+}
+
+/* Barra contraída: solo iconos, así el contenido recupera el ancho. */
+.sa-lateral.sa-contraida {
+  flex: 0 0 72px;
+  width: 72px;
+  padding: 24px 12px;
+}
+
+.sa-cabecera-lateral {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sa-alternar {
+  position: absolute;
+  top: 20px;
+  right: 12px;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sa-alternar:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.sa-contraida .sa-cabecera-lateral {
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.sa-contraida .sa-alternar {
+  position: static;
+}
+
+.sa-contraida .sa-marca {
+  padding: 0;
+  justify-content: center;
+}
+
+.sa-contraida .sa-texto {
+  display: none;
+}
+
+.sa-contraida .sa-nav a {
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.sa-contraida .sa-estado-base {
+  padding: 10px 0;
+  text-align: center;
+}
+
+.sa-contraida .sa-estado-base strong {
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sa-lateral {
+    transition: none;
+  }
 }
 
 .sa-principal {
@@ -874,8 +950,10 @@
 
 /* Móvil: barra lateral arriba, principal con margen de 16 px. */
 @media (max-width: 767px) {
-  .sa-lateral {
+  .sa-lateral,
+  .sa-lateral.sa-contraida {
     flex: 1 1 100%;
+    width: auto;
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
@@ -886,6 +964,14 @@
   .sa-nav {
     flex-direction: row;
     flex-wrap: wrap;
+  }
+
+  .sa-alternar {
+    display: none;
+  }
+
+  .sa-contraida .sa-texto {
+    display: inline;
   }
 
   .sa-estado-base {
