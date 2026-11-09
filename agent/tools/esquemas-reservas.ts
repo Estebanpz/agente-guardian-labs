@@ -92,9 +92,15 @@ export const DecisionReserva = z.object({
 export type DecisionReserva = z.infer<typeof DecisionReserva>;
 
 export const NotificacionDoc = z.object({
+  _id: z.string().optional(),                 // id del aviso (texto), lo asigna el repositorio
   para: z.enum(["monitor", "coordinacion", "mantenimiento"]),
   motivo: z.string(), regla: z.string(), reserva_codigo: z.string().nullable(),
+  carne: z.string().nullish(),                // solo para mostrar a quién se refiere: la API lo enmascara
+  sala: z.string().nullish(),                 // "sala-N" del aviso, si lo hay
+  fecha: z.string().nullish(),                // aaaa-mm-dd del aviso, si lo hay
+  horario: z.string().nullish(),              // "HH:MM–HH:MM" del aviso, si lo hay
   estado: z.enum(["pendiente", "atendida"]), creada: z.date(),
+  atendida_en: z.date().nullish(),
 });
 export type NotificacionDoc = z.infer<typeof NotificacionDoc>;
 

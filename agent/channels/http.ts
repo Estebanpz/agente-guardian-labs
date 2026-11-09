@@ -8,9 +8,11 @@ import { resumenSalas } from "../tools/salas.js";
 import { disponibilidad, enmascarar, type Contexto } from "../tools/reservas.js";
 import { ahora, hoyBogota } from "../tools/reloj.js";
 import { crearRepositorio, tipoDeBase } from "../store/repositorio.js";
+import { nombreDe, solicitanteDe } from "../tools/monitor.js";
+import type { CarneDoc } from "../tools/esquemas-reservas.js";
 import { casos, descripciones } from "../../data/casos.js";
 
-const app = express();
+export const app = express();
 app.use(express.json({ limit: "10kb" }));
 
 // CORS mínimo para una interfaz local (React en Vite).
@@ -119,28 +121,106 @@ app.get("/notificaciones", async (req, res) => {
   if (!v.success) return void res.status(400).json({ error: "Parámetros inválidos: estado (pendiente o atendida)." });
   try {
     const repo = await crearRepositorio();
-    res.json(await repo.notificaciones(v.data.estado));
+    const avisos = await repo.notificaciones(v.data.estado);
+    const carnes = await carnesDe(avisos.map((a) => a.carne));
+    res.json(avisos.map(({ carne, ...a }) => ({
+      ...a,
+      carne: carne ? enmascarar(carne) : null,
+      solicitante: carne ? nombreDe(carnes.get(carne)) : null,
+    })));
   } catch (e) {
     console.error("[http]", (e as Error).message);
     res.status(500).json({ error: "Error interno" });
   }
 });
 
-// Estado de las salas de reservas (solo lectura).
-app.get("/salas", async (_req, res) => {
+// Carnetización de varios carnés (sin repetir), para el nombre del solicitante.
+async function carnesDe(carnes: (string | null | undefined)[]): Promise<Map<string, CarneDoc | null>> {
+  const repo = await crearRepositorio();
+  const unicos = [...new Set(carnes.filter((c): c is string => typeof c === "string"))];
+  return new Map(await Promise.all(unicos.map(async (c) => [c, await repo.carne(c)] as const)));
+}
+
+// Estado de las salas en una fecha (vista Salas del monitor, solo lectura). `fecha` por defecto: hoy en Bogotá.
+// Las reservas del día incluyen las programadas y las escaladas; la disponibilidad solo cuenta las programadas.
+app.get("/salas", async (req, res) => {
+  const v = z.object({ fecha: Fecha.optional() }).safeParse(req.query);
+  if (!v.success) return void res.status(400).json({ error: "Parámetros inválidos: fecha (aaaa-mm-dd)." });
   try {
-    const fecha = hoyBogota();
+    const fecha = v.data.fecha ?? hoyBogota();
+    const repo = await crearRepositorio();
     const ctx = await contextoDeFecha(fecha);
+    const reservas = [...await repo.reservasDelDia(fecha), ...await repo.escaladasDelDia(fecha)];
+    const carnes = await carnesDe(reservas.map((r) => r.carne));
     res.json(ctx.salas.map((sala) => {
       const d = disponibilidad(sala, fecha, ctx.reservasDelDia, ctx);
+      const equipos = ctx.equipos.filter((q) => q.sala === sala._id);
+      // En revisión = no operativo (igual que la referencia): inventario o mantenimiento distintos de "disponible".
+      const enRevision = (q: (typeof equipos)[number]) =>
+        !(q.inventario === "disponible" && q.mantenimiento === "disponible");
       return {
         id: sala._id, nombre: sala.nombre, capacidad: sala.capacidad, computo: sala.computo,
-        operativos: d.operativos, inciertos: d.inciertos,
-        equipos: ctx.equipos.filter((q) => q.sala === sala._id),
-        reservas: ctx.reservasDelDia.filter((r) => r.sala === sala._id)
-          .map((r) => ({ codigo: r.codigo, inicio: r.inicio, fin: r.fin, tipo: r.tipo, carne: enmascarar(r.carne) })),
+        operativos: d.operativos, inciertos: d.inciertos, en_revision: equipos.filter(enRevision).length,
+        equipos: equipos.map((q) => ({ _id: q._id, inventario: q.inventario, mantenimiento: q.mantenimiento, accesible: q.accesible })),
+        reservas: reservas.filter((r) => r.sala === sala._id)
+          .sort((a, b) => a.inicio_min - b.inicio_min)
+          .map(({ carne, ...r }) => ({
+            codigo: r.codigo, inicio: r.inicio, fin: r.fin, inicio_min: r.inicio_min, fin_min: r.fin_min,
+            tipo: r.tipo, rol: r.rol, estado: r.estado, personas: r.personas, materia: r.materia,
+            reglas_aplicadas: r.reglas_aplicadas, jornada: r.jornada ?? null,
+            carne: enmascarar(carne), solicitante: nombreDe(carnes.get(carne)),
+            perfil: carnes.get(carne) ? solicitanteDe(carnes.get(carne)!) : null,
+          })),
       };
     }));
+  } catch (e) {
+    console.error("[http]", (e as Error).message);
+    res.status(500).json({ error: "Error interno" });
+  }
+});
+
+// Días del mes (aaaa-mm) con reservas: calendario del monitor.
+app.get("/reservas/dias", async (req, res) => {
+  const v = z.object({ mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) }).safeParse(req.query);
+  if (!v.success) return void res.status(400).json({ error: "Parámetro inválido: mes (aaaa-mm)." });
+  try {
+    const repo = await crearRepositorio();
+    res.json(await repo.diasConReservas(v.data.mes));
+  } catch (e) {
+    console.error("[http]", (e as Error).message);
+    res.status(500).json({ error: "Error interno" });
+  }
+});
+
+// Detalle de una reserva (cualquier estado) con los datos de quien reserva y el carné enmascarado.
+app.get("/reservas/:codigo", async (req, res) => {
+  const v = z.string().regex(/^RS-\d{4}$/).safeParse(req.params.codigo);
+  if (!v.success) return void res.status(400).json({ error: "Código inválido." });
+  try {
+    const repo = await crearRepositorio();
+    const r = await repo.reservaPorCodigo(v.data);
+    if (!r) return void res.status(404).json({ error: "Reserva no encontrada" });
+    const c = await repo.carne(r.carne);
+    const { carne, ...resto } = r;
+    res.json({ ...resto, carne: enmascarar(carne), solicitante: c ? solicitanteDe(c) : null });
+  } catch (e) {
+    console.error("[http]", (e as Error).message);
+    res.status(500).json({ error: "Error interno" });
+  }
+});
+
+// Marca un aviso como atendido. Solo ese cambio: el cuerpo debe ser exactamente { estado: "atendida" }.
+app.patch("/notificaciones/:id", async (req, res) => {
+  const v = z.object({ estado: z.literal("atendida") }).strict().safeParse(req.body);
+  if (!v.success) return void res.status(400).json({ error: "Solo se permite { estado: \"atendida\" }." });
+  const id = z.string().regex(/^[\w-]{1,64}$/).safeParse(req.params.id);
+  if (!id.success) return void res.status(400).json({ error: "Identificador inválido." });
+  try {
+    const repo = await crearRepositorio();
+    if (!(await repo.marcarAtendida(id.data, new Date()))) {
+      return void res.status(404).json({ error: "Aviso no encontrado o ya atendido" });
+    }
+    res.json({ ok: true });
   } catch (e) {
     console.error("[http]", (e as Error).message);
     res.status(500).json({ error: "Error interno" });
@@ -151,9 +231,3 @@ app.get("/salas", async (_req, res) => {
 app.get("/salas/laboratorios", (_req, res) => {
   res.json(resumenSalas());
 });
-
-const PUERTO = Number(process.env.PORT ?? 3000);
-// Solo en localhost: este prototipo no tiene autenticación.
-app.listen(PUERTO, "127.0.0.1", () =>
-  console.log(`Guardian Labs en http://127.0.0.1:${PUERTO} (${proveedorActivo()})`),
-);

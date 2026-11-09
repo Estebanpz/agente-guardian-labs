@@ -147,3 +147,19 @@ Fallos vistos en el navegador y su corrección:
 
 C-18 y C-32 cambiaron de la Sala 13 (10 puestos) a la Sala 8 (20 puestos): con el aforo temprano, 20 estudiantes ya no
 caben en la 13.
+
+## Vista Salas del monitor (sección 7.0.10, 8-11-2026)
+
+Motivo: el monitor necesitaba ver el estado de las 16 salas, la agenda del día, los equipos y los avisos en una sola
+pantalla, con la variante A aprobada (`docs/plan/PLAN_VISTA_MONITOR.md`, `docs/plan/diseno-salas/variante-a.dc.html`).
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| `GET /salas?fecha=` devuelve equipos, equipos en revisión y reservas del día (programadas y escaladas) con carné enmascarado y perfil del solicitante (sin carné). | Una sola llamada para la tabla y el detalle. | `agent/channels/http.ts`, `agent/tools/monitor.ts` | `evals/api-monitor.ts` |
+| `GET /reservas/dias?mes=` y `GET /reservas/:codigo` (detalle con solicitante y carné enmascarado). | Calendario y detalle de una reserva. | `agent/channels/http.ts`, `agent/store/*.ts` | `evals/api-monitor.ts` |
+| `PATCH /notificaciones/:id` con `{ estado: "atendida" }` (solo ese cambio). Los avisos llevan `_id`, sala, fecha, horario, carné y hora de atención. | Marcar un aviso atendido desde el panel. | `agent/channels/http.ts`, `agent/store/*.ts`, `agent/conversacion.ts` | `evals/api-monitor.ts`, `evals/mongo.ts` |
+| Semilla: materias de RS-0002 ("Bases de Datos") y RS-0003 ("Redes de Computadores"), que sí son espacios académicos de sus docentes. | Coherencia de la semilla. | `data/semilla.ts` | `evals/semilla.ts` |
+| Validador de `notificaciones` admite `carne` y `atendida_en`. | Esquema de los avisos. | `agent/store/sembrar.ts` | `npm run prueba:mongo` |
+| Servidor separado de las rutas: `agent/channels/servir.ts` arranca la API; `http.ts` exporta la aplicación para probarla sin abrir el puerto. | Pruebas de la API sin puerto. | `agent/channels/servir.ts`, `package.json` (`serve`) | `evals/api-monitor.ts` |
+| Ayuda del chat: describe reservas, disponibilidad, ocupación, saludo con carné y avisos al monitor. | Texto acorde al chat actual. | `agent/tools/ayuda.ts` | `evals/ayuda.ts` |
+| Interfaz: barra lateral compartida (Laboratorios, Chat, Salas), en la variante A; indicadores con gráficas, filtros con la URL como estado, línea de tiempo 07–22, detalle en panel lateral y avisos. Calendario con `@daypicker/react` 10.0.2 en español. | Vista del monitor. | `web/src/App.jsx`, `web/src/pages/Salas.jsx`, `web/src/pages/salas/*`, `web/src/components/salas/*`, `web/src/styles/salas.css` | revisión en el navegador (1440 px y 375 px) |

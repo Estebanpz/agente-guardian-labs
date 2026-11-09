@@ -68,12 +68,13 @@ export const TEXTO_RESERVA = [
 ].join("\n");
 
 export const AYUDA_GENERAL = [
-  "Me llamo Guardian Labs, el asistente del monitor de los laboratorios de sistemas. Puedo:",
-  "• Evaluar si una persona puede ingresar (escriba su ID, por ejemplo E-001, y la sala).",
-  "• Registrar la salida o la asistencia al cierre de la franja.",
-  "• Informar el estado de las salas: aforo, franjas y equipos.",
-  "• Explicarle qué es el ID, cómo funcionan las franjas y qué restricciones aplican.",
-  "Yo recomiendo con base en las reglas R1–R13; la decisión final siempre es suya.",
+  "Soy el asistente de reservas de los laboratorios de sistemas. Puedo:",
+  "• Saludarte cuando escribas tu carné (C- o D- y 8 dígitos).",
+  "• Reservar una sala: día, horario, número de personas y, si eres docente, el espacio académico.",
+  "• Mostrar la disponibilidad de una sala o de todas, por día, horario, personas o alto cómputo.",
+  "• Decir qué salas están ocupadas en uno o varios días.",
+  "• Avisar al monitor cuando una sala esté ocupada o haya un conflicto que no puedo resolver.",
+  "Las reglas deciden cada reserva. Para el ingreso con un ID (por ejemplo E-001), usa la pestaña Laboratorios.",
 ].join("\n");
 
 const TEXTOS: Record<Tema, (texto: string) => string> = {

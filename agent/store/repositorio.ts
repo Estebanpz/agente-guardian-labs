@@ -5,6 +5,21 @@ import { crearMemoria } from "./memoria.js";
 import { hoyBogota } from "../tools/reloj.js";
 import { crearRepositorioMongo } from "./mongo.js";
 
+// Días con reservas de un mes (calendario del monitor): programadas y escaladas por fecha.
+export type DiaConReservas = { fecha: string; programadas: number; escaladas: number };
+
+// Agrupa reservas (fecha y estado) por día, en orden de fecha. Lo usan los dos repositorios.
+export function contarDias(filas: { fecha: string; estado: string }[]): DiaConReservas[] {
+  const porDia = new Map<string, DiaConReservas>();
+  for (const f of filas) {
+    const d = porDia.get(f.fecha) ?? { fecha: f.fecha, programadas: 0, escaladas: 0 };
+    if (f.estado === "escalada") d.escaladas++;
+    else d.programadas++;
+    porDia.set(f.fecha, d);
+  }
+  return [...porDia.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
 export interface Repositorio {
   tipo: "mongo" | "memoria";
   salas(): Promise<SalaDoc[]>;
@@ -30,6 +45,11 @@ export interface Repositorio {
   // Aviso sin reserva (R17: identidad desconocida). reserva_codigo debe ser null.
   notificar(n: NotificacionDoc): Promise<void>;
   notificaciones(estado?: "pendiente" | "atendida"): Promise<NotificacionDoc[]>;
+  // Marca un aviso pendiente como atendido. false si no existe o ya estaba atendido.
+  marcarAtendida(id: string, cuando: Date): Promise<boolean>;
+  // Calendario del monitor: días del mes (aaaa-mm) con reservas, y una reserva por código (cualquier estado).
+  diasConReservas(mes: string): Promise<DiaConReservas[]>;
+  reservaPorCodigo(codigo: string): Promise<ReservaDoc | null>;
   leerConversacion(id: string): Promise<Conversacion | null>;
   guardarConversacion(c: Conversacion): Promise<void>;
   borrarConversacion(id: string): Promise<void>;

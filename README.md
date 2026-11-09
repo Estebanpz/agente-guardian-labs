@@ -187,6 +187,13 @@ Las reservas usan transacciones, que requieren un replica set. En Linux Mint 22 
 
 Si activas autenticación en MongoDB, agrega el usuario a la URI en `.env` solamente; nunca en la documentación.
 
+## Vista Salas del monitor
+
+`/salas` muestra el estado de las 16 salas del día: indicadores con gráficas, filtros (el estado de la URL se puede
+compartir), línea de tiempo 07:00–22:00, detalle de cada sala y avisos del monitor, que se pueden marcar como atendidos.
+El calendario marca los días con reservas. Los datos son sintéticos; el carné aparece siempre enmascarado.
+La barra lateral de navegación es la misma en Laboratorios, Chat y Salas. Diseño y decisiones: `docs/cambios-reservas.md`, sección 7.0.10.
+
 ## API
 
 Todas las rutas escuchan solo en `127.0.0.1` (el prototipo no tiene autenticación).

@@ -195,7 +195,8 @@ function avisosDe(d: DecisionReserva, sol: SolicitudReserva) {
       : (MOTIVO[regla] ?? "revisión necesaria");
     const motivo = `${regla}: ${causa}. Solicitante ${enmascarar(sol.carne!)}.`;
     return d.notificar.map((para) => ({
-      para, motivo, regla, reserva_codigo: codigo, estado: "pendiente" as const, creada: new Date(),
+      para, motivo, regla, reserva_codigo: codigo, carne: sol.carne, sala: sol.sala, fecha: sol.fecha,
+      horario: sol.inicio && sol.fin ? `${sol.inicio}–${sol.fin}` : null, estado: "pendiente" as const, creada: new Date(),
     }));
   };
 }
@@ -213,7 +214,8 @@ function avisoCarne(datos: SolicitudReserva): NotificacionDoc {
   return {
     para: "monitor",
     motivo: `R17: carné ${enmascarar(datos.carne!)} no aparece en carnetización o su vigencia es desconocida (${cuando}).`,
-    regla: "R17", reserva_codigo: null, estado: "pendiente", creada: new Date(),
+    regla: "R17", reserva_codigo: null, carne: datos.carne, sala: datos.sala, fecha: datos.fecha,
+    horario: datos.inicio && datos.fin ? `${datos.inicio}–${datos.fin}` : null, estado: "pendiente", creada: new Date(),
   };
 }
 
@@ -511,7 +513,8 @@ async function escalarAlMonitor(conv: Conversacion, repo: Repositorio): Promise<
   await repo.notificar({
     para: "monitor",
     motivo: `${regla}: ${etiqueta} el ${d.fecha} de ${d.inicio} a ${d.fin} está ocupada de ${ocupada.inicio} a ${ocupada.fin} por ${quien} (carné ${enmascarar(ocupada.carne)}). Solicitante ${enmascarar(d.carne!)}: sin reserva; pidió escalar.`,
-    regla, reserva_codigo: null, estado: "pendiente", creada: new Date(),
+    regla, reserva_codigo: null, carne: d.carne, sala: d.sala, fecha: d.fecha, horario: `${d.inicio}–${d.fin}`,
+    estado: "pendiente", creada: new Date(),
   });
   await repo.borrarConversacion(conv._id);
   await repo.borrarSesion(conv._id);

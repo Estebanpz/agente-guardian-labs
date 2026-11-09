@@ -97,6 +97,20 @@ try {
   const indices = await db.collection("sesiones").indexes();
   comprobar(indices.some((i) => i.key?.actualizado === 1 && i.expireAfterSeconds === 1800), "índice TTL de sesiones (1800 s)");
 
+  // 6) Aviso: se guarda con id, se marca atendido una sola vez y guarda la hora; el calendario del mes cuenta reservas.
+  await repo.notificar({
+    para: "monitor", motivo: "prueba de atención", regla: "R17", reserva_codigo: null,
+    carne: "C-10000002", estado: "pendiente", creada: new Date(),
+  });
+  const aviso = (await repo.notificaciones("pendiente")).find((n) => n.motivo === "prueba de atención");
+  comprobar(typeof aviso?._id === "string", "aviso guardado con id de texto");
+  const id = aviso?._id ?? "";
+  comprobar(await repo.marcarAtendida(id, new Date()) === true, "marcar atendido: cambia el aviso");
+  comprobar(await repo.marcarAtendida(id, new Date()) === false, "marcar atendido otra vez: no cambia nada");
+  const atendido = (await repo.notificaciones("atendida")).find((n) => n._id === id);
+  comprobar(atendido?.atendida_en instanceof Date, "el aviso atendido guarda la hora");
+  comprobar((await repo.diasConReservas("2026-11")).some((d) => d.programadas > 0), "calendario: días del mes con reservas");
+
   await repo.cerrar();
   await vaciarBase(db);
   console.log(`\nBase de pruebas "${nombre}" vaciada (colecciones borradas).`);

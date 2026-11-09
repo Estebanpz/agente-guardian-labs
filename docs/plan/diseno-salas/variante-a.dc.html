@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Salas del monitor · Variante A</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #2563EB;outline-offset:2px}
+.ga-row:hover{background:#F7F9FE}
+.ga-chip:hover{border-color:#2563EB}
+.ga-blk:hover{filter:brightness(0.92)}
+.ga-nav:hover{background:rgba(255,255,255,0.08)}
+.ga-kpi:hover{border-color:#2563EB}
+.ga-day:hover{background:#EEF3FF}
+</style>
+</helmet>
+<div style="min-height: 100%; display: flex; flex-wrap: wrap; background: #F4F6FB; color: #0F172A; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 14px">
+
+  <aside style="flex: 1 1 220px; background: #0E1B4D; color: #E6EBFA; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: #2563EB; display: flex; align-items: center; justify-content: center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"></path><path d="M9 12l2 2 4-4"></path></svg>
+      </div>
+      <span style="font-weight: 700; font-size: 17px; color: #FFFFFF">Guardian Labs</span>
+    </div>
+    <nav aria-label="Secciones" style="display: flex; flex-direction: column; gap: 4px">
+      <a class="ga-nav" href="#" style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; color: #C9D3F2; text-decoration: none; min-height: 44px; box-sizing: border-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path></svg>Laboratorios</a>
+      <a class="ga-nav" href="#" style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; color: #C9D3F2; text-decoration: none; min-height: 44px; box-sizing: border-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg>Chat</a>
+      <a href="#" aria-current="page" style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; color: #FFFFFF; background: #1F3A8A; text-decoration: none; font-weight: 600; min-height: 44px; box-sizing: border-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Salas</a>
+    </nav>
+    <div style="margin-top: auto; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.06); font-size: 12px; line-height: 1.5; color: #C9D3F2">
+      <div style="display: flex; align-items: center; gap: 8px; color: #FFFFFF; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #34D399"></span>MongoDB local</div>
+      <div>ollama · llama3.2:3b</div>
+      <div>Datos sintéticos de demostración</div>
+    </div>
+  </aside>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 28px 32px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div>
+        <div style="font-size: 12px; color: #5B6478">Guardian Labs › <span style="color: #1D4ED8; font-weight: 600">Salas</span></div>
+        <h1 style="margin: 4px 0 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">Estado de las salas</h1>
+        <p style="margin: 4px 0 0; color: #5B6478">{{subtitulo}}</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; position: relative">
+        <button type="button" onClick="{{toggleCal}}" aria-expanded="{{calOpen}}" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #D5DBEA; background: #FFFFFF; font-weight: 600; color: #0F172A">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>{{fechaTexto}}</button>
+        <button type="button" onClick="{{irHoy}}" style="min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #D5DBEA; background: #FFFFFF; color: #0F172A">Hoy</button>
+        <button type="button" onClick="{{irManana}}" style="min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #D5DBEA; background: #FFFFFF; color: #0F172A">Mañana</button>
+        <sc-if value="{{calOpen}}" hint-placeholder-val="{{ false }}">
+          <div role="dialog" aria-label="Elegir fecha" style="position: absolute; right: 0; top: 52px; z-index: 20; width: 300px; background: #FFFFFF; border: 1px solid #D5DBEA; border-radius: 14px; box-shadow: 0 12px 32px rgba(15,23,42,0.14); padding: 16px">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px">
+              <button type="button" onClick="{{mesAnterior}}" aria-label="Mes anterior" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #D5DBEA; background: #FFFFFF">‹</button>
+              <strong style="text-transform: capitalize">{{cal.titulo}}</strong>
+              <button type="button" onClick="{{mesSiguiente}}" aria-label="Mes siguiente" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #D5DBEA; background: #FFFFFF">›</button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; text-align: center; font-size: 11px; color: #5B6478; margin-bottom: 4px">
+              <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px">
+              <sc-for list="{{cal.celdas}}" as="d" hint-placeholder-count="35">
+                <sc-if value="{{d.vacia}}" hint-placeholder-val="{{ false }}"><span></span></sc-if>
+                <sc-if value="{{d.dia}}" hint-placeholder-val="{{ true }}">
+                  <button type="button" class="ga-day" onClick="{{d.pick}}" aria-label="{{d.aria}}" aria-pressed="{{d.sel}}" style="{{d.estilo}}">{{d.num}}<span style="{{d.punto}}"></span></button>
+                </sc-if>
+              </sc-for>
+            </div>
+            <p style="margin: 10px 0 0; font-size: 12px; color: #5B6478">Los días con punto tienen reservas.</p>
+          </div>
+        </sc-if>
+      </div>
+    </header>
+
+    <section aria-label="Indicadores" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px">
+      <sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+        <button type="button" class="ga-kpi" onClick="{{k.pick}}" aria-pressed="{{k.activo}}" style="{{k.estilo}}">
+          <span style="font-size: 12px; color: #5B6478; font-weight: 600">{{k.titulo}}</span>
+          <span style="font-size: 30px; font-weight: 800; line-height: 1.1; color: #0F172A">{{k.valor}}</span>
+          <span style="font-size: 12px; color: #5B6478">{{k.nota}}</span>
+        </button>
+      </sc-for>
+    </section>
+
+    <section aria-label="Filtros" style="display: flex; flex-direction: column; gap: 12px; background: #FFFFFF; border: 1px solid #E2E7F2; border-radius: 14px; padding: 14px 16px">
+      <div role="group" aria-label="Estado de la sala" style="display: flex; flex-wrap: wrap; gap: 8px">
+        <sc-for list="{{chips}}" as="c" hint-placeholder-count="6">
+          <button type="button" class="ga-chip" onClick="{{c.pick}}" aria-pressed="{{c.activo}}" style="{{c.estilo}}">{{c.texto}}<span style="{{c.cuentaEstilo}}">{{c.cuenta}}</span></button>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px">
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #5B6478; font-weight: 600">Libre desde
+          <select value="{{desde}}" onChange="{{onDesde}}" style="min-height: 40px; border-radius: 8px; border: 1px solid #D5DBEA; padding: 0 10px; font-family: inherit; color: #0F172A; background: #FFFFFF">
+            <sc-for list="{{horas}}" as="h" hint-placeholder-count="31"><option value="{{h.v}}">{{h.t}}</option></sc-for>
+          </select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #5B6478; font-weight: 600">hasta
+          <select value="{{hasta}}" onChange="{{onHasta}}" style="min-height: 40px; border-radius: 8px; border: 1px solid #D5DBEA; padding: 0 10px; font-family: inherit; color: #0F172A; background: #FFFFFF">
+            <sc-for list="{{horas}}" as="h" hint-placeholder-count="31"><option value="{{h.v}}">{{h.t}}</option></sc-for>
+          </select>
+        </label>
+        <label style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #5B6478; font-weight: 600">Buscar sala
+          <input type="search" value="{{busca}}" onChange="{{onBusca}}" placeholder="Número o nombre, ej. 13" style="min-height: 40px; border-radius: 8px; border: 1px solid #D5DBEA; padding: 0 12px; font-family: inherit; font-size: 14px; color: #0F172A">
+        </label>
+        <button type="button" onClick="{{limpiar}}" style="min-height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #D5DBEA; background: #FFFFFF; color: #1D4ED8; font-weight: 600">Limpiar filtros</button>
+      </div>
+      <sc-if value="{{rangoInvalido}}" hint-placeholder-val="{{ false }}"><p role="alert" style="margin: 0; color: #A11B1B; font-size: 13px">La hora final debe ser posterior a la inicial.</p></sc-if>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <section aria-label="Salas" style="flex: 999 1 640px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E7F2; border-radius: 14px; overflow: hidden">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid #E2E7F2">
+          <strong>{{resultado}}</strong>
+          <span style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #5B6478">
+            <span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 3px; background: #2563EB"></span>Programada</span>
+            <span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 3px; background: repeating-linear-gradient(135deg,#B45309 0 3px,#F59E0B 3px 6px)"></span>Escalada</span>
+            <span style="display: flex; align-items: center; gap: 6px"><span style="width: 2px; height: 12px; background: #DC2626"></span>Ahora</span>
+          </span>
+        </div>
+        <div style="overflow-x: auto">
+          <div style="min-width: 860px">
+            <div style="display: grid; grid-template-columns: 170px 120px minmax(320px, 1fr) 150px 110px; gap: 12px; padding: 10px 16px; font-size: 12px; font-weight: 700; color: #5B6478; background: #F7F9FE; border-bottom: 1px solid #E2E7F2">
+              <span>Sala</span><span>Equipos</span><span>Agenda 07:00 – 22:00</span><span>Estado</span><span></span>
+            </div>
+            <sc-if value="{{sinSalas}}" hint-placeholder-val="{{ false }}">
+              <div style="padding: 40px 16px; text-align: center; color: #5B6478">Ninguna sala cumple estos filtros. <button type="button" onClick="{{limpiar}}" style="border: 0; background: none; color: #1D4ED8; font-weight: 700; text-decoration: underline; min-height: 44px">Limpiar filtros</button></div>
+            </sc-if>
+            <sc-for list="{{filas}}" as="s" hint-placeholder-count="8">
+              <div class="ga-row" style="display: grid; grid-template-columns: 170px 120px minmax(320px, 1fr) 150px 110px; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid #EEF1F7">
+                <div>
+                  <div style="font-weight: 700">{{s.nombre}}</div>
+                  <div style="font-size: 12px; color: #5B6478">{{s.tipo}} · {{s.cap}} puestos</div>
+                </div>
+                <div>
+                  <div style="font-size: 13px; font-weight: 600">{{s.op}}/{{s.total}} operativos</div>
+                  <div style="height: 6px; border-radius: 3px; background: #E7ECF6; margin-top: 6px; overflow: hidden"><div style="{{s.barra}}"></div></div>
+                  <sc-if value="{{s.rev}}" hint-placeholder-val="{{ false }}"><div style="font-size: 11px; color: #8A5300; margin-top: 4px">{{s.revTexto}}</div></sc-if>
+                </div>
+                <div>
+                  <div style="position: relative; height: 30px; border-radius: 8px; background: #EEF2FA">
+                    <sc-if value="{{s.rango}}" hint-placeholder-val="{{ false }}"><div style="{{s.rangoEstilo}}"></div></sc-if>
+                    <sc-for list="{{s.bloques}}" as="b" hint-placeholder-count="1">
+                      <button type="button" class="ga-blk" onClick="{{b.pick}}" aria-label="{{b.aria}}" title="{{b.aria}}" style="{{b.estilo}}">{{b.texto}}</button>
+                    </sc-for>
+                    <sc-if value="{{s.ahora}}" hint-placeholder-val="{{ false }}"><div style="{{s.ahoraEstilo}}"></div></sc-if>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 10px; color: #5B6478; margin-top: 3px"><span>07</span><span>10</span><span>13</span><span>16</span><span>19</span><span>22</span></div>
+                </div>
+                <div><span style="{{s.estadoEstilo}}">{{s.estado}}</span></div>
+                <div style="text-align: right"><button type="button" onClick="{{s.abrir}}" style="min-height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #D5DBEA; background: #FFFFFF; color: #1D4ED8; font-weight: 600">Ver detalle</button></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Avisos del monitor" style="flex: 1 1 300px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E7F2; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 700">Avisos del monitor</h2>
+        </div>
+        <div role="tablist" aria-label="Estado de los avisos" style="display: flex; gap: 4px; border-bottom: 1px solid #E2E7F2">
+          <sc-for list="{{avisoTabs}}" as="t" hint-placeholder-count="2">
+            <button type="button" role="tab" aria-selected="{{t.activo}}" onClick="{{t.pick}}" style="{{t.estilo}}">{{t.texto}} <span style="{{t.cuentaEstilo}}">{{t.cuenta}}</span></button>
+          </sc-for>
+        </div>
+        <sc-if value="{{sinAvisos}}" hint-placeholder-val="{{ false }}"><p style="margin: 8px 0; color: #5B6478">{{sinAvisosTexto}}</p></sc-if>
+        <sc-for list="{{avisos}}" as="a" hint-placeholder-count="3">
+          <article style="border: 1px solid #E2E7F2; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+            <div style="display: flex; align-items: center; gap: 8px"><span style="font-size: 11px; font-weight: 800; color: #1D4ED8; background: #EAF0FF; border-radius: 6px; padding: 2px 8px">{{a.regla}}</span><span style="font-size: 12px; color: #5B6478">Para {{a.para}}</span></div>
+            <div style="font-weight: 600; line-height: 1.4">{{a.motivo}}</div>
+            <div style="font-size: 12px; color: #5B6478; line-height: 1.5">{{a.donde}}<br>{{a.quien}}</div>
+            <sc-if value="{{a.pendiente}}" hint-placeholder-val="{{ true }}">
+              <sc-if value="{{a.confirmando}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px">¿Marcar como atendido?
+                  <button type="button" onClick="{{a.si}}" style="min-height: 40px; padding: 0 14px; border-radius: 8px; border: 0; background: #1D4ED8; color: #FFFFFF; font-weight: 700">Sí</button>
+                  <button type="button" onClick="{{a.no}}" style="min-height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #D5DBEA; background: #FFFFFF; color: #0F172A">No</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{a.noConfirmando}}" hint-placeholder-val="{{ true }}">
+                <button type="button" onClick="{{a.pedir}}" style="align-self: flex-start; min-height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid #1D4ED8; background: #FFFFFF; color: #1D4ED8; font-weight: 700">Marcar atendido</button>
+              </sc-if>
+            </sc-if>
+            <sc-if value="{{a.atendido}}" hint-placeholder-val="{{ false }}"><div style="font-size: 12px; color: #136C3A; font-weight: 600">Atendido {{a.cuando}}</div></sc-if>
+          </article>
+        </sc-for>
+      </section>
+    </div>
+  </main>
+
+  <sc-if value="{{detalle.abierto}}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 40; background: rgba(15,23,42,0.35); display: flex; justify-content: flex-end">
+      <button type="button" onClick="{{cerrar}}" aria-label="Cerrar detalle" style="flex: 1 1 auto; border: 0; background: transparent; cursor: default"></button>
+      <aside role="dialog" aria-modal="true" aria-label="{{detalle.titulo}}" style="width: 480px; max-width: 100%; height: 100%; overflow-y: auto; background: #FFFFFF; box-shadow: -12px 0 32px rgba(15,23,42,0.18); padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+          <div>
+            <div style="font-size: 12px; color: #5B6478">{{fechaTexto}}</div>
+            <h2 style="margin: 2px 0 0; font-size: 22px; font-weight: 800">{{detalle.titulo}}</h2>
+            <div style="font-size: 13px; color: #5B6478; margin-top: 4px">{{detalle.resumen}}</div>
+          </div>
+          <button type="button" onClick="{{cerrar}}" aria-label="Cerrar" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #D5DBEA; background: #FFFFFF; font-size: 20px; color: #0F172A">×</button>
+        </div>
+        <div role="tablist" aria-label="Detalle de la sala" style="display: flex; gap: 4px; border-bottom: 1px solid #E2E7F2">
+          <sc-for list="{{detalle.tabs}}" as="t" hint-placeholder-count="3">
+            <button type="button" role="tab" aria-selected="{{t.activo}}" onClick="{{t.pick}}" style="{{t.estilo}}">{{t.texto}}</button>
+          </sc-for>
+        </div>
+        <sc-if value="{{detalle.verAgenda}}" hint-placeholder-val="{{ true }}">
+          <sc-if value="{{detalle.agendaVacia}}" hint-placeholder-val="{{ false }}"><p style="margin: 0; color: #5B6478">Sin reservas este día. La sala está libre de 07:00 a 22:00.</p></sc-if>
+          <sc-for list="{{detalle.agenda}}" as="r" hint-placeholder-count="2">
+            <article style="{{r.estiloCaja}}">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+                <strong style="font-size: 15px">{{r.horario}}</strong>
+                <span style="{{r.estadoEstilo}}">{{r.estado}}</span>
+              </div>
+              <div style="font-weight: 600">{{r.nombre}}</div>
+              <div style="font-size: 13px; color: #5B6478; line-height: 1.5">{{r.rol}} · carné {{r.carne}}<br>{{r.detalle}}<br>{{r.personas}} · {{r.codigo}}</div>
+              <sc-if value="{{r.tieneReglas}}" hint-placeholder-val="{{ false }}"><div style="font-size: 12px; color: #8A5300">{{r.reglas}}</div></sc-if>
+            </article>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{detalle.verEquipos}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; font-size: 13px; color: #5B6478">{{detalle.equiposResumen}}</p>
+          <div style="display: flex; flex-direction: column; border: 1px solid #E2E7F2; border-radius: 10px; overflow: hidden">
+            <div style="display: grid; grid-template-columns: 80px 1fr 1fr; gap: 8px; padding: 8px 12px; font-size: 12px; font-weight: 700; color: #5B6478; background: #F7F9FE"><span>Equipo</span><span>Inventario</span><span>Mantenimiento</span></div>
+            <sc-for list="{{detalle.equipos}}" as="e" hint-placeholder-count="6">
+              <div style="{{e.fila}}"><span style="font-weight: 600">{{e.codigo}}</span><span>{{e.inv}}</span><span>{{e.mant}}</span><sc-if value="{{e.nota}}" hint-placeholder-val="{{ false }}"><span style="grid-column: 1 / -1; font-size: 12px; color: #8A5300">{{e.notaTexto}}</span></sc-if></div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{detalle.verHuecos}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; font-size: 13px; color: #5B6478">Rangos sin reserva de 30 minutos o más.</p>
+          <sc-for list="{{detalle.huecos}}" as="h" hint-placeholder-count="2">
+            <div style="display: flex; justify-content: space-between; padding: 12px; border: 1px solid #E2E7F2; border-radius: 10px"><strong>{{h.rango}}</strong><span style="color: #5B6478">{{h.dura}}</span></div>
+          </sc-for>
+        </sc-if>
+      </aside>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+// Datos sintéticos (semilla de Guardian Labs). Hora de referencia de la demo: lunes 9 de noviembre de 2026, 10:30.
+const HOY = '2026-11-09';
+const AHORA = 630;
+const ABRE = 420, CIERRA = 1320;
+const SALAS = [
+  ['sala-1','Sala 1',25,'estandar',10,{'PC-06':['mantenimiento','mantenimiento'],'PC-07':['disponible','diagnostico']},'PC-'],
+  ['sala-2','Sala 2',20,'estandar',6,{'S2-02':['mantenimiento','mantenimiento']},'S2-'],
+  ['sala-3','Sala 3',15,'estandar',5,{'S3-03':['diagnostico','diagnostico'],'S3-05':['disponible','desconocido']},'S3-'],
+  ['sala-4','Sala 4',30,'estandar',30,{},'S4-'],
+  ['sala-5','Sala 5',30,'estandar',30,{},'S5-'],
+  ['sala-6','Sala 6',25,'estandar',25,{},'S6-'],
+  ['sala-7','Sala 7',25,'estandar',25,{},'S7-'],
+  ['sala-8','Sala 8',20,'estandar',20,{},'S8-'],
+  ['sala-9','Sala 9',20,'estandar',20,{'S09-20':['disponible','diagnostico']},'S09-'],
+  ['sala-10','Sala 10',20,'estandar',20,{},'S10-'],
+  ['sala-11','Sala 11',15,'estandar',15,{},'S11-'],
+  ['sala-12','Sala 12',15,'estandar',15,{'S12-14':['disponible','desconocido'],'S12-15':['disponible','desconocido']},'S12-'],
+  ['sala-13','Sala 13',10,'estandar',10,{},'S13-'],
+  ['sala-14','Sala 14',25,'alto',25,{},'S14-'],
+  ['sala-15','Sala 15',20,'alto',20,{'S15-19':['mantenimiento','mantenimiento'],'S15-20':['mantenimiento','mantenimiento']},'S15-'],
+  ['sala-16','Sala 16',30,'alto',30,{},'S16-'],
+].map(([id,nombre,cap,k,total,exc,pre]) => {
+  const equipos = [];
+  for (let i = 1; i <= total; i++) {
+    const cod = pre + String(i).padStart(2, '0');
+    const [inv, mant] = exc[cod] || ['disponible','disponible'];
+    equipos.push({ cod, inv, mant });
+  }
+  const op = equipos.filter((e) => e.inv === 'disponible' && e.mant === 'disponible').length;
+  return { id, nombre, cap, k, total, equipos, op, rev: total - op };
+});
+const PERSONAS = {
+  'C-10000001': ['Laura Valentina Gómez Rojas','estudiante','Ingeniería de Sistemas','Noche'],
+  'C-10000002': ['Juan Camilo Torres Díaz','estudiante','Gestión Informática','Mañana'],
+  'C-10000003': ['María José Rincón Castro','estudiante','Técnica Profesional en Programación Web','Noche'],
+  'C-10000004': ['Andrés Felipe Morales Pérez','estudiante','Ingeniería Electrónica','Mañana'],
+  'C-10000006': ['Santiago Herrera López','estudiante','Ingeniería Ambiental','Noche'],
+  'C-10000009': ['Natalia Guzmán Ospina','estudiante','Trabajo Social','Mañana'],
+  'C-10000012': ['Diego Alejandro Pardo Rubio','estudiante','Ingeniería Agronómica','Mañana'],
+  'D-20000001': ['Carlos Eduardo Medina Ríos','docente'],
+  'D-20000002': ['Patricia Elena Soto Quintero','docente'],
+  'D-20000003': ['Luis Fernando Acosta Beltrán','docente'],
+};
+const RES = [
+  ['RS-0002','sala-5','2026-11-09','08:00','10:00','D-20000001',25,'Bases de Datos','programada',''],
+  ['RS-0003','sala-15','2026-11-09','10:00','12:00','D-20000002',18,'Redes de Computadores','programada',''],
+  ['RS-0005','sala-12','2026-11-09','10:00','12:00','D-20000003',14,'Excel Financiero','escalada','R19: 2 equipos con estado desconocido. Avisé a monitor y mantenimiento.'],
+  ['RS-0001','sala-6','2026-11-09','13:00','15:00','C-10000002',5,null,'programada',''],
+  ['RS-0004','sala-4','2026-11-09','14:00','16:00','C-10000001',5,null,'programada',''],
+  ['RS-0006','sala-8','2026-11-10','07:00','09:00','C-10000004',6,null,'programada',''],
+  ['RS-0007','sala-16','2026-11-10','15:00','18:00','D-20000002',28,'Sistemas Operativos','programada',''],
+  ['RS-0008','sala-1','2026-11-10','18:00','20:00','C-10000003',4,null,'programada',''],
+  ['RS-0009','sala-2','2026-11-11','09:00','11:00','C-10000009',5,null,'programada',''],
+  ['RS-0010','sala-14','2026-11-11','13:00','15:00','D-20000001',22,'Ingeniería de Software','programada',''],
+  ['RS-0011','sala-10','2026-11-12','19:00','21:00','C-10000006',8,null,'programada',''],
+].map(([codigo,sala,fecha,ini,fin,carne,personas,materia,estado,reglas]) => ({ codigo, sala, fecha, ini, fin, carne, personas, materia, estado, reglas }));
+const AVISOS = [
+  { id: 'N1', regla: 'R20', para: 'monitor', motivo: 'Un docente pidió la Sala 6, ocupada por estudiantes.', sala: 'Sala 6', fecha: '2026-11-09', hora: '14:00–16:00', carne: 'D-20000001', estado: 'pendiente', cuando: '' },
+  { id: 'N2', regla: 'R19', para: 'mantenimiento', motivo: 'Reserva RS-0005 escalada: 2 equipos con estado desconocido.', sala: 'Sala 12', fecha: '2026-11-09', hora: '10:00–12:00', carne: 'D-20000003', estado: 'pendiente', cuando: '' },
+  { id: 'N3', regla: 'R17', para: 'monitor', motivo: 'Carné con vigencia desconocida en carnetización.', sala: null, fecha: '2026-11-09', hora: null, carne: 'C-10000012', estado: 'pendiente', cuando: '' },
+  { id: 'N4', regla: 'R22', para: 'monitor', motivo: 'Una estudiante pidió hablar con el monitor por la Sala 6 ocupada.', sala: 'Sala 6', fecha: '2026-11-09', hora: '13:00–15:00', carne: 'C-10000001', estado: 'atendida', cuando: 'hoy a las 09:12' },
+];
+const aMin = (h) => { const [a, b] = h.split(':').map(Number); return a * 60 + b; };
+const aHora = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+const mask = (c) => c.slice(0, 2) + '****' + c.slice(-4);
+const fechaLarga = (f) => new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(f + 'T12:00:00Z')).replace(',', '');
+const sumar = (f, n) => { const d = new Date(f + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const pct = (m) => ((m - ABRE) / (CIERRA - ABRE) * 100).toFixed(2) + '%';
+const HORAS = [{ v: '', t: '—' }];
+for (let m = ABRE; m <= CIERRA; m += 30) HORAS.push({ v: aHora(m), t: aHora(m) });
+const ESTADO = {
+  libre: 'display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #E7F7EE; color: #136C3A',
+  ocupada: 'display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #EAF0FF; color: #1D4ED8',
+  revision: 'display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #FFF4DB; color: #8A5300',
+  escalada: 'display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #FDECDD; color: #9A3412',
+};
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { fecha: HOY, mes: '2026-11', calOpen: false, filtro: 'todas', desde: '', hasta: '', busca: '', abierta: null, tab: 'agenda', resSel: null, avisos: AVISOS, avisoTab: 'pendiente', confirmar: null };
+  }
+  renderVals() {
+    const st = this.state;
+    const set = (o) => () => this.setState(o);
+    const esHoy = st.fecha === HOY;
+    const resDia = RES.filter((r) => r.fecha === st.fecha);
+    const rangoOk = st.desde && st.hasta && aMin(st.hasta) > aMin(st.desde);
+    const rangoInvalido = Boolean(st.desde && st.hasta && !rangoOk);
+    const q = st.busca.trim().toLowerCase();
+
+    const info = SALAS.map((s) => {
+      const rs = resDia.filter((r) => r.sala === s.id).sort((a, b) => aMin(a.ini) - aMin(b.ini));
+      const actual = esHoy ? rs.find((r) => aMin(r.ini) <= AHORA && aMin(r.fin) > AHORA) : null;
+      const libreRango = rangoOk ? !rs.some((r) => aMin(r.ini) < aMin(st.hasta) && aMin(r.fin) > aMin(st.desde)) : true;
+      const escalada = rs.some((r) => r.estado === 'escalada');
+      return { s, rs, actual, libreRango, escalada };
+    });
+    const pasa = {
+      todas: () => true,
+      libres: (x) => (rangoOk ? x.libreRango : (esHoy ? !x.actual : x.rs.length === 0)),
+      reservas: (x) => x.rs.length > 0,
+      escaladas: (x) => x.escalada,
+      revision: (x) => x.s.rev > 0,
+      alto: (x) => x.s.k === 'alto',
+    };
+    const base = info.filter((x) => (!q || x.s.nombre.toLowerCase().includes(q) || x.s.id.replace('sala-', '') === q) && (!rangoOk || x.libreRango));
+    const visibles = base.filter(pasa[st.filtro]);
+
+    const CHIPS = [['todas','Todas'],['libres', rangoOk ? 'Libres en el rango' : (esHoy ? 'Libres ahora' : 'Sin reservas')],['reservas','Con reservas'],['escaladas','Con escaladas'],['revision','Equipos en revisión'],['alto','Alto cómputo']];
+    const chips = CHIPS.map(([id, texto]) => {
+      const activo = st.filtro === id;
+      return {
+        texto, activo, cuenta: base.filter(pasa[id]).length, pick: set({ filtro: id }),
+        estilo: `display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; border: 1px solid ${activo ? '#1D4ED8' : '#D5DBEA'}; background: ${activo ? '#1D4ED8' : '#FFFFFF'}; color: ${activo ? '#FFFFFF' : '#0F172A'}`,
+        cuentaEstilo: `font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: ${activo ? 'rgba(255,255,255,0.22)' : '#EEF2FA'}; color: ${activo ? '#FFFFFF' : '#1D4ED8'}`,
+      };
+    });
+
+    const filas = visibles.map((x) => {
+      const s = x.s;
+      let estado = 'Libre todo el día', est = 'libre';
+      if (esHoy) {
+        if (x.actual) { estado = `Ocupada hasta ${x.actual.fin}`; est = x.actual.estado === 'escalada' ? 'escalada' : 'ocupada'; }
+        else { const prox = x.rs.find((r) => aMin(r.ini) > AHORA); estado = prox ? `Libre hasta ${prox.ini}` : 'Libre ahora'; }
+      } else if (x.rs.length) { estado = `${x.rs.length} ${x.rs.length === 1 ? 'reserva' : 'reservas'}`; est = 'ocupada'; }
+      if (x.escalada && est !== 'escalada') { estado += ' · escalada'; est = 'escalada'; }
+      if (est === 'libre' && s.op < s.total && s.op < s.cap) est = 'libre';
+      const bloques = x.rs.map((r) => {
+        const izq = pct(aMin(r.ini)), ancho = ((aMin(r.fin) - aMin(r.ini)) / (CIERRA - ABRE) * 100).toFixed(2) + '%';
+        const fondo = r.estado === 'escalada' ? 'repeating-linear-gradient(135deg,#B45309 0 6px,#D97706 6px 12px)' : '#2563EB';
+        const quien = PERSONAS[r.carne] ? PERSONAS[r.carne][0] : mask(r.carne);
+        return {
+          texto: `${r.ini}–${r.fin}`,
+          aria: `Reserva ${r.codigo}, ${r.ini} a ${r.fin}, ${quien}${r.estado === 'escalada' ? ', escalada' : ''}`,
+          estilo: `position: absolute; top: 3px; bottom: 3px; left: ${izq}; width: ${ancho}; border: 0; border-radius: 6px; background: ${fondo}; color: #FFFFFF; font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; padding: 0 6px; text-align: left`,
+          pick: set({ abierta: s.id, tab: 'agenda', resSel: r.codigo, calOpen: false }),
+        };
+      });
+      const total = s.total;
+      return {
+        nombre: s.nombre, tipo: s.k === 'alto' ? 'Alto cómputo' : 'Estándar', cap: s.cap, op: s.op, total,
+        barra: `height: 100%; width: ${(s.op / Math.max(s.cap, total) * 100).toFixed(0)}%; background: ${s.op < s.cap ? '#F59E0B' : '#10B981'}`,
+        rev: s.rev > 0, revTexto: `${s.rev} en revisión`,
+        bloques, ahora: esHoy,
+        ahoraEstilo: `position: absolute; top: -3px; bottom: -3px; left: ${pct(AHORA)}; width: 2px; background: #DC2626; pointer-events: none`,
+        rango: Boolean(rangoOk), rangoEstilo: rangoOk ? `position: absolute; top: 0; bottom: 0; left: ${pct(aMin(st.desde))}; width: ${((aMin(st.hasta) - aMin(st.desde)) / (CIERRA - ABRE) * 100).toFixed(2)}%; background: rgba(16,185,129,0.18); border: 1px dashed #10B981; border-radius: 6px` : '',
+        estado, estadoEstilo: ESTADO[est],
+        abrir: set({ abierta: s.id, tab: 'agenda', resSel: null, calOpen: false }),
+      };
+    });
+
+    // Indicadores
+    const libresAhora = info.filter(pasa.libres).length;
+    const revisionTotal = SALAS.reduce((n, s) => n + s.rev, 0);
+    const pendientes = st.avisos.filter((a) => a.estado === 'pendiente').length;
+    const KPI = [
+      ['libres', esHoy ? 'Salas libres ahora' : 'Salas sin reservas', libresAhora, `de ${SALAS.length} salas`],
+      ['reservas', 'Reservas del día', resDia.length, `${resDia.filter((r) => r.estado === 'escalada').length} escaladas`],
+      ['revision', 'Equipos en revisión', revisionTotal, `en ${SALAS.filter((s) => s.rev > 0).length} salas`],
+      ['avisos', 'Avisos pendientes', pendientes, 'del monitor'],
+    ];
+    const kpis = KPI.map(([id, titulo, valor, nota]) => {
+      const activo = id !== 'avisos' && st.filtro === id;
+      return {
+        titulo, valor, nota, activo,
+        pick: id === 'avisos' ? set({ avisoTab: 'pendiente' }) : set({ filtro: id }),
+        estilo: `display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px; border-radius: 14px; text-align: left; background: #FFFFFF; border: 1px solid ${activo ? '#1D4ED8' : '#E2E7F2'}; box-shadow: ${activo ? '0 0 0 3px rgba(37,99,235,0.15)' : 'none'}; min-height: 104px`,
+      };
+    });
+
+    // Calendario
+    const [anio, mesN] = st.mes.split('-').map(Number);
+    const primero = new Date(Date.UTC(anio, mesN - 1, 1));
+    const diasMes = new Date(Date.UTC(anio, mesN, 0)).getUTCDate();
+    const desfase = (primero.getUTCDay() + 6) % 7;
+    const celdas = [];
+    for (let i = 0; i < desfase; i++) celdas.push({ vacia: true, dia: false });
+    for (let d = 1; d <= diasMes; d++) {
+      const f = `${st.mes}-${String(d).padStart(2, '0')}`;
+      const n = RES.filter((r) => r.fecha === f).length;
+      const sel = f === st.fecha, hoy = f === HOY;
+      celdas.push({
+        vacia: false, dia: true, num: d, sel,
+        aria: `${fechaLarga(f)}${n ? `, ${n} reservas` : ''}`,
+        pick: set({ fecha: f, calOpen: false, abierta: null }),
+        estilo: `position: relative; height: 36px; border-radius: 8px; border: ${hoy ? '1px solid #1D4ED8' : '1px solid transparent'}; background: ${sel ? '#1D4ED8' : 'transparent'}; color: ${sel ? '#FFFFFF' : '#0F172A'}; font-weight: ${sel || hoy ? 700 : 500}; font-size: 13px`,
+        punto: n ? `position: absolute; left: 50%; bottom: 4px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: ${sel ? '#FFFFFF' : '#1D4ED8'}` : 'display: none',
+      });
+    }
+    const cambiarMes = (n) => () => { const d = new Date(Date.UTC(anio, mesN - 1 + n, 1)); this.setState({ mes: d.toISOString().slice(0, 7) }); };
+    const cal = { titulo: new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(primero), celdas };
+
+    // Avisos
+    const avisoTabs = [['pendiente','Pendientes'],['atendida','Atendidos']].map(([id, texto]) => {
+      const activo = st.avisoTab === id;
+      return {
+        texto, activo, cuenta: st.avisos.filter((a) => a.estado === id).length, pick: set({ avisoTab: id, confirmar: null }),
+        estilo: `min-height: 44px; padding: 0 12px; border: 0; border-bottom: 3px solid ${activo ? '#1D4ED8' : 'transparent'}; background: transparent; font-weight: ${activo ? 700 : 500}; color: ${activo ? '#1D4ED8' : '#5B6478'}`,
+        cuentaEstilo: `font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: ${activo ? '#EAF0FF' : '#EEF2FA'}; color: #1D4ED8`,
+      };
+    });
+    const avisos = st.avisos.filter((a) => a.estado === st.avisoTab).map((a) => {
+      const p = PERSONAS[a.carne];
+      return {
+        regla: a.regla, para: a.para, motivo: a.motivo,
+        donde: [a.sala, a.fecha ? fechaLarga(a.fecha) : null, a.hora].filter(Boolean).join(' · '),
+        quien: `${p ? p[0] + ' · ' : ''}carné ${mask(a.carne)}`,
+        pendiente: a.estado === 'pendiente', atendido: a.estado === 'atendida', cuando: a.cuando,
+        confirmando: st.confirmar === a.id, noConfirmando: st.confirmar !== a.id,
+        pedir: set({ confirmar: a.id }), no: set({ confirmar: null }),
+        si: () => this.setState({ confirmar: null, avisos: st.avisos.map((x) => (x.id === a.id ? { ...x, estado: 'atendida', cuando: 'hoy a las 10:31' } : x)) }),
+      };
+    });
+
+    // Detalle de sala
+    let detalle = { abierto: false, tabs: [], agenda: [], equipos: [], huecos: [] };
+    if (st.abierta) {
+      const s = SALAS.find((x) => x.id === st.abierta);
+      const rs = resDia.filter((r) => r.sala === s.id).sort((a, b) => aMin(a.ini) - aMin(b.ini));
+      const tabs = [['agenda', `Agenda (${rs.length})`], ['equipos', `Equipos (${s.total})`], ['huecos', 'Huecos libres']].map(([id, texto]) => {
+        const activo = st.tab === id;
+        return { texto, activo, pick: set({ tab: id }), estilo: `min-height: 44px; padding: 0 12px; border: 0; border-bottom: 3px solid ${activo ? '#1D4ED8' : 'transparent'}; background: transparent; font-weight: ${activo ? 700 : 500}; color: ${activo ? '#1D4ED8' : '#5B6478'}` };
+      });
+      const agenda = rs.map((r) => {
+        const p = PERSONAS[r.carne] || ['Persona sin registro'];
+        const docente = p[1] === 'docente';
+        const sel = st.resSel === r.codigo;
+        return {
+          horario: `${r.ini} – ${r.fin}`, nombre: p[0], rol: docente ? 'Docente' : 'Estudiante', carne: mask(r.carne),
+          detalle: docente ? `Espacio académico: ${r.materia}` : `${p[2]} · jornada de la ${p[3] === 'Mañana' ? 'mañana' : 'noche'}`,
+          personas: `${r.personas} personas`, codigo: r.codigo,
+          estado: r.estado === 'escalada' ? 'Escalada' : 'Programada', estadoEstilo: r.estado === 'escalada' ? ESTADO.escalada : ESTADO.ocupada,
+          tieneReglas: Boolean(r.reglas), reglas: r.reglas,
+          estiloCaja: `display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 12px; border: ${sel ? '2px solid #1D4ED8' : '1px solid #E2E7F2'}; background: ${sel ? '#F5F8FF' : '#FFFFFF'}`,
+        };
+      });
+      const equipos = s.equipos.map((e) => {
+        const contra = e.inv === 'disponible' && e.mant !== 'disponible' && e.mant !== 'desconocido';
+        const incierto = e.mant === 'desconocido';
+        const malo = e.inv !== 'disponible';
+        return {
+          codigo: e.cod, inv: e.inv, mant: e.mant,
+          nota: contra || incierto, notaTexto: contra ? 'Contradicción entre inventario y mantenimiento (R3/R9)' : 'Estado desconocido en mantenimiento',
+          fila: `display: grid; grid-template-columns: 80px 1fr 1fr; gap: 4px 8px; padding: 8px 12px; font-size: 13px; border-top: 1px solid #EEF1F7; background: ${contra || incierto ? '#FFF8E8' : (malo ? '#FDF1F1' : '#FFFFFF')}`,
+        };
+      });
+      const huecos = [];
+      let cursor = ABRE;
+      rs.forEach((r) => { if (aMin(r.ini) - cursor >= 30) huecos.push([cursor, aMin(r.ini)]); cursor = Math.max(cursor, aMin(r.fin)); });
+      if (CIERRA - cursor >= 30) huecos.push([cursor, CIERRA]);
+      detalle = {
+        abierto: true, titulo: s.k === 'alto' ? `${s.nombre} · alto cómputo` : s.nombre,
+        resumen: `${s.cap} puestos · ${s.op} de ${s.total} equipos operativos`,
+        tabs, verAgenda: st.tab === 'agenda', verEquipos: st.tab === 'equipos', verHuecos: st.tab === 'huecos',
+        agenda, agendaVacia: agenda.length === 0,
+        equipos, equiposResumen: `${s.op} operativos, ${s.rev} en revisión. Las filas resaltadas no coinciden entre inventario y mantenimiento o tienen estado desconocido.`,
+        huecos: huecos.map(([a, b]) => ({ rango: `${aHora(a)} – ${aHora(b)}`, dura: `${Math.floor((b - a) / 60)} h${(b - a) % 60 ? ' ' + ((b - a) % 60) + ' min' : ''}` })),
+      };
+    }
+
+    return {
+      subtitulo: esHoy ? 'Agenda de hoy, equipos y avisos. Hora de referencia de la demo: 10:30.' : 'Agenda del día elegido, equipos y avisos.',
+      fechaTexto: fechaLarga(st.fecha).replace(/^./, (c) => c.toUpperCase()),
+      calOpen: st.calOpen, toggleCal: set({ calOpen: !st.calOpen }), cal,
+      mesAnterior: cambiarMes(-1), mesSiguiente: cambiarMes(1),
+      irHoy: set({ fecha: HOY, mes: HOY.slice(0, 7), calOpen: false }), irManana: set({ fecha: sumar(HOY, 1), mes: HOY.slice(0, 7), calOpen: false }),
+      kpis, chips, horas: HORAS, desde: st.desde, hasta: st.hasta, busca: st.busca, rangoInvalido,
+      onDesde: (e) => this.setState({ desde: e.target.value }), onHasta: (e) => this.setState({ hasta: e.target.value }), onBusca: (e) => this.setState({ busca: e.target.value }),
+      limpiar: set({ filtro: 'todas', desde: '', hasta: '', busca: '' }),
+      resultado: `${filas.length} de ${SALAS.length} salas · ${fechaLarga(st.fecha)}`,
+      filas, sinSalas: filas.length === 0,
+      ahoraEstilo: `position: absolute; top: -3px; bottom: -3px; left: ${pct(AHORA)}; width: 2px; background: #DC2626; pointer-events: none`,
+      avisoTabs, avisos, sinAvisos: avisos.length === 0, sinAvisosTexto: st.avisoTab === 'pendiente' ? 'No hay avisos pendientes.' : 'Todavía no hay avisos atendidos.',
+      detalle, cerrar: set({ abierta: null, resSel: null }),
+    };
+  }
+}
+</script>
+</body>
+</html>

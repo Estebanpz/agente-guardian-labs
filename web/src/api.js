@@ -29,4 +29,10 @@ export const api = {
   disponibilidad: (sala, fecha, signal) => pedir(`/disponibilidad${consulta({ sala, fecha })}`, { signal }),
   reservas: (fecha, signal) => pedir(`/reservas${consulta({ fecha })}`, { signal }),
   notificaciones: (estado = "pendiente", signal) => pedir(`/notificaciones${consulta({ estado })}`, { signal }),
+  // Vista Salas del monitor (plan de la vista): estado de un día, días del mes con reservas y avisos.
+  salasDia: (fecha, signal) => pedir(`/salas${consulta({ fecha })}`, { signal }),
+  diasMes: (mes, signal) => pedir(`/reservas/dias${consulta({ mes })}`, { signal }),
+  avisos: (estado, signal) => pedir(`/notificaciones${consulta({ estado })}`, { signal }),
+  marcarAtendida: (id) =>
+    pedir(`/notificaciones/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ estado: "atendida" }) }),
 };

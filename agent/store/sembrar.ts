@@ -55,8 +55,10 @@ const VALIDADORES: Record<string, Document> = {
       motivo: { bsonType: "string" },
       regla: { bsonType: "string" },
       reserva_codigo: { bsonType: ["string", "null"] },
+      carne: { bsonType: ["string", "null"] },
       estado: { enum: ["pendiente", "atendida"] },
       creada: { bsonType: "date" },
+      atendida_en: { bsonType: ["date", "null"] },
     },
   },
 };

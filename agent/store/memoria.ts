@@ -4,7 +4,7 @@ import type {
 import {
   carnetizacionSemilla, equiposSemilla, reservasSemilla, salasSemilla, usuariosSemilla,
 } from "../../data/semilla.js";
-import type { Repositorio } from "./repositorio.js";
+import { contarDias, type Repositorio } from "./repositorio.js";
 
 // Repositorio en memoria (pruebas y respaldo sin red), sembrado desde data/semilla.ts.
 // Sin `await` dentro de crearReservaAtomica: en Node no hay intercalado entre sus pasos.
@@ -15,6 +15,8 @@ export function crearMemoria(hoy: string): Repositorio {
   const usuarios = new Map<string, UsuarioDoc>(usuariosSemilla.map((u) => [u._id, u]));
   const reservas: ReservaDoc[] = reservasSemilla(hoy);
   const notificaciones: NotificacionDoc[] = [];
+  let idAviso = 0;
+  const conId = (n: NotificacionDoc): NotificacionDoc => ({ ...n, _id: String(++idAviso) });
   const conversaciones = new Map<string, Conversacion>();
   const sesiones = new Map<string, SesionDoc>();
   let ultimo = 3; // las tres reservas de la semilla son RS-0001 … RS-0003
@@ -70,17 +72,33 @@ export function crearMemoria(hoy: string): Repositorio {
       const reserva = construirReserva(codigo);
       if (reserva.estado !== "escalada") throw new Error("registrarEscalada exige estado escalada");
       reservas.push(reserva);
-      notificaciones.push(...construirAvisos(codigo));
+      notificaciones.push(...construirAvisos(codigo).map(conId));
       return codigo;
     },
 
     async notificar(n) {
       if (n.reserva_codigo !== null) throw new Error("notificar sin reserva exige reserva_codigo null");
-      notificaciones.push(n);
+      notificaciones.push(conId(n));
     },
 
     async notificaciones(estado) {
       return notificaciones.filter((n) => !estado || n.estado === estado);
+    },
+
+    async marcarAtendida(id, cuando) {
+      const aviso = notificaciones.find((n) => n._id === id && n.estado === "pendiente");
+      if (!aviso) return false;
+      aviso.estado = "atendida";
+      aviso.atendida_en = cuando;
+      return true;
+    },
+
+    async diasConReservas(mes) {
+      return contarDias(reservas.filter((r) => r.fecha.startsWith(`${mes}-`)).map((r) => ({ fecha: r.fecha, estado: r.estado })));
+    },
+
+    async reservaPorCodigo(codigo) {
+      return reservas.find((r) => r.codigo === codigo) ?? null;
     },
 
     async leerConversacion(id) {

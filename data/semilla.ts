@@ -144,7 +144,7 @@ export function reservasSemilla(hoy: string): ReservaDoc[] {
   });
   return [
     construir({ codigo: "RS-0001", sala: "sala-6", inicio: "13:00", fin: "15:00", tipo: "estudiantes", carne: "C-10000002", personas: 5, alto: false, materia: null }),
-    construir({ codigo: "RS-0002", sala: "sala-5", inicio: "08:00", fin: "10:00", tipo: "clase", carne: "D-20000001", personas: 25, alto: false, materia: "Redes" }),
-    construir({ codigo: "RS-0003", sala: "sala-15", inicio: "10:00", fin: "12:00", tipo: "clase", carne: "D-20000002", personas: 18, alto: true, materia: "Inteligencia Artificial" }),
+    construir({ codigo: "RS-0002", sala: "sala-5", inicio: "08:00", fin: "10:00", tipo: "clase", carne: "D-20000001", personas: 25, alto: false, materia: "Bases de Datos" }),
+    construir({ codigo: "RS-0003", sala: "sala-15", inicio: "10:00", fin: "12:00", tipo: "clase", carne: "D-20000002", personas: 18, alto: true, materia: "Redes de Computadores" }),
   ];
 }

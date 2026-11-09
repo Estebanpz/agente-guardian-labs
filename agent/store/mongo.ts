@@ -1,10 +1,10 @@
-import { MongoClient, type Db, type ClientSession } from "mongodb";
+import { MongoClient, ObjectId, type Db, type ClientSession } from "mongodb";
 import { z } from "zod";
 import {
   CarneDoc, Carne, Conversacion, SesionDoc, DecisionReserva, EquipoDoc, Fecha, NotificacionDoc, ReservaDoc,
   SalaDoc, SalaId, UsuarioDoc,
 } from "../tools/esquemas-reservas.js";
-import type { Repositorio } from "./repositorio.js";
+import { contarDias, type Repositorio } from "./repositorio.js";
 
 // Un solo MongoClient por proceso.
 let cliente: MongoClient | null = null;
@@ -32,7 +32,9 @@ const PROY_RESERVA = {
   carne: 1, rol: 1, jornada: 1, personas: 1, equipos: 1, computo_alto: 1, materia: 1, estado: 1,
   reglas_aplicadas: 1, traza: 1, version_reglas: 1, creada: 1, origen: 1,
 };
-const PROY_NOTIFICACION = { _id: 0, para: 1, motivo: 1, regla: 1, reserva_codigo: 1, estado: 1, creada: 1 };
+const PROY_NOTIFICACION = { _id: 1, para: 1, motivo: 1, regla: 1, reserva_codigo: 1, carne: 1, sala: 1, fecha: 1, horario: 1, estado: 1, creada: 1, atendida_en: 1 };
+// Un aviso se guarda sin _id: lo asigna Mongo. Al leerlo, el id sale como texto.
+const sinId = (a: { _id?: string }) => { const { _id, ...resto } = a; void _id; return resto; };
 const PROY_SESION = { _id: 1, carne: 1, actualizado: 1, pendiente_texto: 1 };
 const PROY_CONVERSACION = { _id: 1, flujo: 1, pendiente: 1, datos: 1, intentos: 1, propuesta: 1, validado: 1, respaldo: 1, ofrecer: 1, actualizado: 1 };
 
@@ -144,7 +146,7 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
         const avisos = construirAvisos(codigo).map((a) => NotificacionDoc.parse(a));
         if (reserva.estado !== "escalada") throw new Error("registrarEscalada exige estado escalada");
         await db.collection("reservas").insertOne({ ...reserva }, { session: s });
-        await db.collection("notificaciones").insertMany(avisos.map((a) => ({ ...a })), { session: s });
+        await db.collection("notificaciones").insertMany(avisos.map(sinId), { session: s });
         salida.codigo = codigo;
       }));
       if (!salida.codigo) throw new Error("La transacción de escalada no devolvió código");
@@ -154,7 +156,7 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
     async notificar(n) {
       const v = NotificacionDoc.parse(n);
       if (v.reserva_codigo !== null) throw new Error("notificar sin reserva exige reserva_codigo null");
-      await db.collection("notificaciones").insertOne({ ...v });
+      await db.collection("notificaciones").insertOne(sinId(v));
     },
 
     async notificaciones(estado) {
@@ -164,7 +166,29 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
         .sort({ creada: -1 })
         .limit(100)
         .toArray();
-      return docs.map((d) => NotificacionDoc.parse(d));
+      return docs.map((d) => NotificacionDoc.parse({ ...d, _id: String(d._id) }));
+    },
+
+    async marcarAtendida(id, cuando) {
+      if (!/^[a-f0-9]{24}$/i.test(id)) return false;
+      const r = await db.collection("notificaciones").updateOne(
+        { _id: new ObjectId(id), estado: "pendiente" },
+        { $set: { estado: "atendida", atendida_en: cuando } },
+      );
+      return r.matchedCount === 1;
+    },
+
+    async diasConReservas(mes) {
+      const docs = await db.collection("reservas")
+        .find({ fecha: { $gte: `${mes}-01`, $lte: `${mes}-31` }, estado: { $in: ["programada", "escalada"] } },
+          { projection: { _id: 0, fecha: 1, estado: 1 } })
+        .toArray();
+      return contarDias(docs.map((d) => ({ fecha: String(d.fecha), estado: String(d.estado) })));
+    },
+
+    async reservaPorCodigo(codigo) {
+      const d = await db.collection("reservas").findOne({ codigo: z.string().parse(codigo) }, { projection: PROY_RESERVA });
+      return d ? ReservaDoc.parse(d) : null;
     },
 
     async leerConversacion(id) {
