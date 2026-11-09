@@ -22,6 +22,9 @@ type Salida = {
   flujo?: { tipo: string; pendiente: string | null; opciones: string[] } | null;
   reserva?: { decision: string; reglas_aplicadas: string[]; alternativas: string[] };
   solicitud?: { materia?: string | null };
+  identidad?: { nombres?: string; carne?: string };
+  sesion_olvidada?: boolean;
+  cierre?: string;
 };
 
 // `respaldo`: modelo simulado para el respaldo de sala y horario (7.0.8). Sin él, las pruebas no llaman al modelo.
@@ -319,6 +322,7 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
           [(salidas[0].respuesta ?? "").includes(PIDE_CARNE), "«hola» pide el carné"],
           [saludo.startsWith("¡Buenos días, Laura Valentina Gómez Rojas!"), "saludo con nombre y momento del día"],
           [saludo.includes("Ingeniería de Sistemas") && saludo.includes("jornada de la noche"), "programa y jornada"],
+          [salidas[1].identidad?.nombres === "Laura Valentina" && salidas[1].identidad?.carne === "C-****0001", "identidad para el saludo, carné enmascarado"],
         ]));
     }
 
@@ -356,7 +360,9 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
       const sesion = await repo.leerSesion(sid(4));
       filas.push(fila("C-20", "Olvido tras reservar", "C-10000001 → … → sí → hola",
         "tras confirmar, mensaje de olvido; la sesión se borra; «hola» vuelve a pedir el carné", [
-          [(salidas[5].respuesta ?? "").includes("Por tu seguridad olvidé tu carné"), "mensaje de olvido tras la reserva"],
+          [(salidas[5].cierre ?? "").includes("Hasta pronto, sesión finalizada") && (salidas[5].cierre ?? "").includes("Por tu seguridad olvidé tu carné"), "despedida y olvido en el aviso de cierre"],
+          [!(salidas[5].respuesta ?? "").includes("Hasta pronto"), "el cierre no va dentro de la respuesta de la reserva"],
+          [salidas[5].sesion_olvidada === true, "la respuesta marca la sesión olvidada"],
           [(salidas[6].respuesta ?? "").includes(PIDE_CARNE), "el siguiente mensaje pide el carné"],
           [sesion === null || sesion.carne === null, "sin carné identificado en la sesión"],
         ]));

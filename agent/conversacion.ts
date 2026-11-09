@@ -15,6 +15,12 @@ export type RespuestaChat = {
   intencion: string; respuesta: string;
   flujo: { tipo: string; pendiente: string | null; opciones: string[] } | null;
   reserva?: DecisionReserva; solicitud?: object; disponibilidad?: object; alerta?: string;
+  // La sesión se cerró tras una reserva: la pantalla quita el saludo con el nombre.
+  sesion_olvidada?: boolean;
+  // Aviso de cierre (despedida y carné olvidado), que se muestra fuera de la tarjeta de la reserva.
+  cierre?: string;
+  // Identidad tras validar el carné (saludo de la pantalla). Sin el carné completo.
+  identidad?: { nombres: string; apellidos: string; rol: string; programa: string | null; carne: string };
 };
 
 const norm = (t: string): string => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -294,10 +300,10 @@ async function responder(
     }
     await repo.borrarConversacion(conv._id);
     // Tras una reserva escalada registrada, se olvida el carné (plan de identidad, sección 4.6).
-    const olvido = codigo ? `\n${OLVIDO}` : "";
     if (codigo) await repo.borrarSesion(conv._id);
-    return cerrado("solicitud_reserva", prefijo + textoEscalar(d, sol, ctx.salas, codigo) + olvido, [],
-      { reserva: d, solicitud: resumenDe(sol, ctx.salas, sol.sala) });
+    // El cierre va aparte de la tarjeta: la respuesta de la reserva no lo incluye.
+    return cerrado("solicitud_reserva", prefijo + textoEscalar(d, sol, ctx.salas, codigo), [],
+      { reserva: d, solicitud: resumenDe(sol, ctx.salas, sol.sala), sesion_olvidada: codigo ? true : undefined, cierre: codigo ? OLVIDO : undefined });
   }
   if (d.decision === "negar") {
     if (d.reglas_aplicadas.includes("R16")) {
@@ -348,8 +354,8 @@ async function confirmar(conv: Conversacion, repo: Repositorio): Promise<Respues
   if (res.reserva) {
     await repo.borrarConversacion(conv._id);
     await repo.borrarSesion(conv._id);
-    const texto = `Listo. Reserva ${res.reserva.codigo} confirmada: ${nombreSala(ctx.salas, sala)}, ${fechaLarga(sol.fecha!)}, ${sol.inicio} a ${sol.fin}. Queda registrada en la base de demostración (datos sintéticos).\n${OLVIDO}`;
-    return cerrado("solicitud_reserva", texto, [], { reserva: res.decision, solicitud: resumenDe(sol, ctx.salas, sala) });
+    const texto = `Listo. Reserva ${res.reserva.codigo} confirmada: ${nombreSala(ctx.salas, sala)}, ${fechaLarga(sol.fecha!)}, ${sol.inicio} a ${sol.fin}. Queda registrada en la base de demostración (datos sintéticos).`;
+    return cerrado("solicitud_reserva", texto, [], { reserva: res.decision, solicitud: resumenDe(sol, ctx.salas, sala), sesion_olvidada: true, cierre: OLVIDO });
   }
   conv.propuesta = null;
   return responder(conv, res.decision, sol, ctx, repo, "Los datos cambiaron mientras confirmaba. ");

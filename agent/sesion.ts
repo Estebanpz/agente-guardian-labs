@@ -5,7 +5,8 @@ import type { CarneDoc } from "./tools/esquemas-reservas.js";
 const norm = (t: string): string => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 export const PEDIR_CARNE = "¡Hola! Para atenderte, escríbeme tu carné (C- o D- seguido de 8 dígitos).";
-export const OLVIDO = "Te envié el resumen de tu solicitud. Por tu seguridad olvidé tu carné; si necesitas otra solicitud, escríbeme de nuevo tu carné.";
+// Cierre tras una reserva (programada o escalada): despedida, sesión finalizada y carné olvidado.
+export const OLVIDO = "Ya tu reserva quedó. Hasta pronto, sesión finalizada. Por tu seguridad olvidé tu carné; si necesitas otra solicitud, escríbeme de nuevo tu carné.";
 export const CHIPS_SALUDO = ["Reservar una sala", "Ver disponibilidad", "Salas ocupadas por fecha", "Ayuda"];
 
 // Hora de Bogotá en minutos del día: 05–11 mañana, 12–17 tarde, 18–04 noche.

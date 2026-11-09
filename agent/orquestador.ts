@@ -15,6 +15,7 @@ import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
 import { continuar, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
 import { CHIPS_SALUDO, PEDIR_CARNE, esSalida, esSaludo, saludoPara } from "./sesion.js";
 import { carne as carneDe } from "./tools/extraer.js";
+import { enmascarar } from "./tools/reservas.js";
 import { ahora } from "./tools/reloj.js";
 
 // Ingreso (vista Laboratorios): las tres salas de la evaluación (las reservas usan sala-1 a sala-16).
@@ -126,11 +127,15 @@ async function identificar(carneTxt: string, texto: string, sesion: string | und
   const peticion = resto.length > 4 && !esSaludo(resto) && rutaRapida(resto) !== "registro_usuario" ? resto : pendiente;
   if (sesion) await repo.guardarSesion({ _id: sesion, carne: carneTxt, actualizado: new Date(), pendiente_texto: null });
   const saludo = saludoPara(doc, ahora().minutos);
+  const identidad = {
+    nombres: doc.nombres, apellidos: doc.apellidos, rol: doc.rol,
+    programa: doc.rol === "estudiante" ? doc.programa : null, carne: enmascarar(carneTxt),
+  };
   if (peticion && sesion) {
     const r = (await mensaje(peticion, { sesion })) as RespuestaChat & { explicacion?: string };
-    return { ...r, respuesta: `${prefijo}${saludo}\n\n${r.respuesta ?? r.explicacion ?? ""}` };
+    return { ...r, identidad, respuesta: `${prefijo}${saludo}\n\n${r.respuesta ?? r.explicacion ?? ""}` };
   }
-  return { intencion: "saludo", respuesta: `${prefijo}${saludo}`, flujo: { tipo: "sugerencia", pendiente: null, opciones: CHIPS_SALUDO } };
+  return { intencion: "saludo", identidad, respuesta: `${prefijo}${saludo}`, flujo: { tipo: "sugerencia", pendiente: null, opciones: CHIPS_SALUDO } };
 }
 
 export async function mensaje(

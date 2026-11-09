@@ -2,7 +2,7 @@
 
 | Dato | Valor |
 |---|---|
-| Fecha de ejecución | 8/11/2026, 10:10:52 p. m. |
+| Fecha de ejecución | 8/11/2026, 10:48:16 p. m. |
 | Versión de las reglas | 2.0.0 |
 | Proveedor y modelo | ollama:llama3.2:3b |
 | Versión de Ollama | 0.34.2 |
@@ -70,10 +70,10 @@ producen la misma decisión. P-06, P-07, S-01 y S-02 pasan por el modelo local.
 | C-14 | Ocupación de dos días | C-10000001 → Que salas tienes ocupadas el jueves y viernes? | Conversación | dos bloques (jueves 12 y viernes 13), ambos sin reservas; no responde con el estado de ahora | un bloque por día, sin reservas; no responde con el estado de ahora | ✅ |
 | C-15 | Ocupación de un día | C-10000001 → ¿Qué salas están ocupadas el martes? | Conversación | martes 10 con 3 reservas en orden 08:00, 10:00, 13:00; «Las otras 13 salas están libres todo el día.»; sin carnés | bloque del martes con 3 reservas; ordenadas por hora de inicio; resume las salas libres; no muestra carnés | ✅ |
 | C-16 | Estado de ahora (regresión) | C-10000001 → ¿Cuál es el estado de las salas? | Conversación | vista «Ahora (…)» con la línea de ayuda para otro día | estado de ahora; termina con la línea de ayuda | ✅ |
-| C-17 | Saludo de estudiante | hola → C-10000001 | Conversación | primero pide el carné; luego «¡Buenos días, Laura Valentina Gómez Rojas! … Ingeniería de Sistemas … jornada de la noche» | «hola» pide el carné; saludo con nombre y momento del día; programa y jornada | ✅ |
+| C-17 | Saludo de estudiante | hola → C-10000001 | Conversación | primero pide el carné; luego «¡Buenos días, Laura Valentina Gómez Rojas! … Ingeniería de Sistemas … jornada de la noche» | «hola» pide el carné; saludo con nombre y momento del día; programa y jornada; identidad para el saludo, carné enmascarado | ✅ |
 | C-18 | Saludo y espacio de docente | D-20000001 → reserva (sala 8, 20 estudiantes) → 20 → no → 2 | Conversación | saludo «Bienvenido(a) a Guardian Labs»; al pedir materia, chips con sus 3 espacios; «2» fija Programación Orientada a Objetos | saludo de docente sin tratamiento de género; chips ["Bases de Datos","Programación Orientada a Objetos","Ingeniería de Software"]; materia Programación Orientada a Objetos en la solicitud | ✅ |
 | C-19 | Petición antes del carné | quiero reservar la sala 13 mañana de 2 a 4 → C-10000001 | Conversación | primero pide el carné; luego saluda y sigue la reserva (sala 13 y fecha ya tomadas) sin preguntar qué necesita | pide el carné primero; saluda y continúa la reserva; sala 13 y fecha mañana ya tomadas; no vuelve a preguntar qué necesita | ✅ |
-| C-20 | Olvido tras reservar | C-10000001 → … → sí → hola | Conversación | tras confirmar, mensaje de olvido; la sesión se borra; «hola» vuelve a pedir el carné | mensaje de olvido tras la reserva; el siguiente mensaje pide el carné; sin carné identificado en la sesión | ✅ |
+| C-20 | Olvido tras reservar | C-10000001 → … → sí → hola | Conversación | tras confirmar, mensaje de olvido; la sesión se borra; «hola» vuelve a pedir el carné | despedida y olvido en el aviso de cierre; el cierre no va dentro de la respuesta de la reserva; la respuesta marca la sesión olvidada; el siguiente mensaje pide el carné; sin carné identificado en la sesión | ✅ |
 | C-21 | Horario abierto | C-10000001 → Quiero reservar una sala → mañana → de 5:30 a 7:30 | Conversación | horario 17:30–19:30; pregunta las personas | pregunta las personas; horario 17:30–19:30 | ✅ |
 | C-22 | Salir y cancelar | C-10000001 → salir → Quiero reservar; y C-10000001 → Quiero reservar → cancelar → Quiero reservar | Conversación | «salir» borra la sesión y la siguiente petición pide el carné; «cancelar» no borra la sesión | «salir» cierra la sesión; tras salir se pide el carné otra vez; «cancelar» cancela la solicitud; tras cancelar no vuelve a pedir el carné | ✅ |
 | C-23 | Carné vencido en el inicio | C-10000011 | Conversación | «Tu carné está vencido; remítete a carnetización.»; sin saludo y sin sesión | remite a carnetización; sin saludo; sin sesión guardada | ✅ |

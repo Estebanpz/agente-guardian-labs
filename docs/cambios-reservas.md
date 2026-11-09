@@ -163,3 +163,14 @@ pantalla, con la variante A aprobada (`docs/plan/PLAN_VISTA_MONITOR.md`, `docs/p
 | Servidor separado de las rutas: `agent/channels/servir.ts` arranca la API; `http.ts` exporta la aplicación para probarla sin abrir el puerto. | Pruebas de la API sin puerto. | `agent/channels/servir.ts`, `package.json` (`serve`) | `evals/api-monitor.ts` |
 | Ayuda del chat: describe reservas, disponibilidad, ocupación, saludo con carné y avisos al monitor. | Texto acorde al chat actual. | `agent/tools/ayuda.ts` | `evals/ayuda.ts` |
 | Interfaz: barra lateral compartida (Laboratorios, Chat, Salas), en la variante A; indicadores con gráficas, filtros con la URL como estado, línea de tiempo 07–22, detalle en panel lateral y avisos. Calendario con `@daypicker/react` 10.0.2 en español. | Vista del monitor. | `web/src/App.jsx`, `web/src/pages/Salas.jsx`, `web/src/pages/salas/*`, `web/src/components/salas/*`, `web/src/styles/salas.css` | revisión en el navegador (1440 px y 375 px) |
+
+## Chat en la variante Clara (sección 7.0.11, 9-11-2026)
+
+Motivo: la variante Clara de Stitch (`docs/plan/diseno-chat/variante-1.html`) fue la elegida para la pantalla del chat.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| La respuesta de identificación trae `identidad` (nombres, apellidos, rol, programa y carné enmascarado) para el saludo grande. | El saludo necesita el nombre tras validar el carné; nunca sale el carné completo. | `agent/conversacion.ts`, `agent/orquestador.ts` | C-17 |
+| Pantalla: historial del día (solo la conversación actual), saludo con nombre y apellido, cuatro accesos rápidos, burbujas, insignia de intención, chips con punto, entrada en píldora con botón redondo. Sin texto inventado de la maqueta (sin «Reserva Segura», «Validado» ni historial de ejemplo). | Diseño aprobado con datos reales. | `web/src/pages/Chat.jsx`, `web/src/styles/chat.css` | revisión en el navegador (1440 px y 375 px sin desbordamiento) |
+| «Mis reservas» aparece deshabilitado con «Próximamente». | La función no existe todavía. | `web/src/pages/Chat.jsx` | — |
+| «Ejemplos para probar» y «Cómo funciona» quedan plegados en la columna de historial. | Conservar la guía sin ocupar la pantalla. | `web/src/pages/Chat.jsx` | — |
