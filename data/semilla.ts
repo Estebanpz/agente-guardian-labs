@@ -2,6 +2,7 @@
 // Todos los datos son ficticios. Los equipos de sala-1 a sala-3 vienen de data/equipos.ts.
 import type { CarneDoc, EquipoDoc, ReservaDoc, SalaDoc, UsuarioDoc } from "../agent/tools/esquemas-reservas.js";
 import { equipos } from "./equipos.js";
+import { facultadPorId } from "./programas.js";
 
 type Estado = EquipoDoc["inventario"];
 
@@ -65,16 +66,35 @@ export function equiposSemilla(): EquipoDoc[] {
   return [...base, ...generados];
 }
 
+// Carnetización simulada: 12 estudiantes y 5 docentes ficticios (plan de identidad, sección 2).
+// Las facultades usan el nombre completo del catálogo (data/programas.ts).
+const ING = facultadPorId("ingenieria")!.nombre;
+const ECO = facultadPorId("economicas")!.nombre;
+const SOC = facultadPorId("sociales")!.nombre;
+type Vig = "vigente" | "vencido" | "desconocida";
+const estudiante = (_id: string, vigencia: Vig, nombres: string, apellidos: string, programa: string, facultad: string, jornada: "Mañana" | "Noche"): CarneDoc =>
+  ({ _id, rol: "estudiante", vigencia, nombres, apellidos, programa, facultad, jornada });
+const docente = (_id: string, vigencia: Vig, nombres: string, apellidos: string, facultad: string, espacios: string[]): CarneDoc =>
+  ({ _id, rol: "docente", vigencia, nombres, apellidos, facultad, espacios });
+
 export const carnetizacionSemilla: CarneDoc[] = [
-  ...Array.from({ length: 10 }, (_, i): CarneDoc => ({
-    _id: `C-${10000001 + i}`, rol: "estudiante", vigencia: "vigente",
-  })),
-  { _id: "C-10000011", rol: "estudiante", vigencia: "vencido" },
-  { _id: "C-10000012", rol: "estudiante", vigencia: "desconocida" },
-  ...Array.from({ length: 4 }, (_, i): CarneDoc => ({
-    _id: `D-${20000001 + i}`, rol: "docente", vigencia: "vigente",
-  })),
-  { _id: "D-20000005", rol: "docente", vigencia: "vencido" },
+  estudiante("C-10000001", "vigente", "Laura Valentina", "Gómez Rojas", "Ingeniería de Sistemas", ING, "Noche"),
+  estudiante("C-10000002", "vigente", "Juan Camilo", "Torres Díaz", "Gestión Informática", ING, "Mañana"),
+  estudiante("C-10000003", "vigente", "María José", "Rincón Castro", "Técnica Profesional en Programación Web", ING, "Noche"),
+  estudiante("C-10000004", "vigente", "Andrés Felipe", "Morales Pérez", "Ingeniería Electrónica", ING, "Mañana"),
+  estudiante("C-10000005", "vigente", "Daniela", "Ortiz Suárez", "Ingeniería Civil", ING, "Mañana"),
+  estudiante("C-10000006", "vigente", "Santiago", "Herrera López", "Ingeniería Ambiental", ING, "Noche"),
+  estudiante("C-10000007", "vigente", "Valeria", "Cárdenas Mejía", "Contaduría Pública", ECO, "Noche"),
+  estudiante("C-10000008", "vigente", "Sebastián", "Ramírez Vargas", "Administración de Empresas", ECO, "Mañana"),
+  estudiante("C-10000009", "vigente", "Natalia", "Guzmán Ospina", "Trabajo Social", SOC, "Mañana"),
+  estudiante("C-10000010", "vigente", "Miguel Ángel", "Bermúdez Silva", "Actividad Física y Deporte", SOC, "Noche"),
+  estudiante("C-10000011", "vencido", "Camila Andrea", "Reyes Muñoz", "Gestión Empresarial", ECO, "Noche"),
+  estudiante("C-10000012", "desconocida", "Diego Alejandro", "Pardo Rubio", "Ingeniería Agronómica", ING, "Mañana"),
+  docente("D-20000001", "vigente", "Carlos Eduardo", "Medina Ríos", ING, ["Bases de Datos", "Programación Orientada a Objetos", "Ingeniería de Software"]),
+  docente("D-20000002", "vigente", "Patricia Elena", "Soto Quintero", ING, ["Redes de Computadores", "Sistemas Operativos", "Seguridad Informática"]),
+  docente("D-20000003", "vigente", "Luis Fernando", "Acosta Beltrán", ECO, ["Sistemas de Información Contable", "Excel Financiero"]),
+  docente("D-20000004", "vigente", "Adriana Marcela", "Lozano Ruiz", SOC, ["Estadística Aplicada", "Informática Básica"]),
+  docente("D-20000005", "vencido", "Jorge Iván", "Castaño Prieto", ING, ["Electrónica Digital", "Microcontroladores"]),
 ];
 
 // Fecha fija de registro para que la semilla sea idempotente.

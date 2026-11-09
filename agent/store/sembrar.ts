@@ -35,6 +35,7 @@ const VALIDADORES: Record<string, Document> = {
       version_reglas: { bsonType: "string" },
       creada: { bsonType: "date" },
       origen: { enum: ["chat", "semilla"] },
+      jornada: { enum: ["Mañana", "Noche", null] },
     },
   },
   usuarios: {
@@ -62,7 +63,7 @@ const VALIDADORES: Record<string, Document> = {
 
 const COLECCIONES = [
   "salas", "equipos", "carnetizacion", "usuarios", "reservas", "notificaciones",
-  "conversaciones", "bloqueos", "contadores",
+  "conversaciones", "bloqueos", "contadores", "sesiones",
 ];
 
 // El driver tipa _id como ObjectId en colecciones sin tipo; aquí los _id son strings del dominio.
@@ -76,6 +77,7 @@ async function crearIndices(db: Db): Promise<void> {
   await db.collection("equipos").createIndex({ sala: 1 });
   await db.collection("notificaciones").createIndex({ estado: 1, creada: -1 });
   await db.collection("conversaciones").createIndex({ actualizado: 1 }, { expireAfterSeconds: 1800 });
+  await db.collection("sesiones").createIndex({ actualizado: 1 }, { expireAfterSeconds: 1800 });
 }
 
 // Crea las colecciones que falten (con validador) y aplica el validador a las que ya existen.
@@ -101,7 +103,7 @@ async function aplicarEsquemas(db: Db): Promise<void> {
 
 // Vacía las colecciones de estado que se borran con --reset.
 export async function resetear(db: Db): Promise<void> {
-  for (const nombre of ["reservas", "notificaciones", "conversaciones", "bloqueos", "contadores"]) {
+  for (const nombre of ["reservas", "notificaciones", "conversaciones", "bloqueos", "contadores", "sesiones"]) {
     await db.collection(nombre).deleteMany({});
   }
 }

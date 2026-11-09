@@ -114,6 +114,29 @@ export function candidatas(s: SolicitudReserva, c: Contexto): SalaDoc[] {
 const alternativas = (s: SolicitudReserva, c: Contexto, sin?: string): string[] =>
   candidatas(s, c).map((x) => x._id).filter((id) => id !== sin).slice(0, 3);
 
+// Causa concreta de un incumplimiento de R15 (la misma comprobación que la regla), o null si todo está permitido.
+// `campo` dice qué dato hay que cambiar: la fecha o el horario.
+export type CausaR15 = { campo: "fecha" | "horario"; motivo: string };
+export function causaR15(fecha: string, inicio: string, fin: string, hoy: { fecha: string; minutos: number }): CausaR15 | null {
+  const i = aMin(inicio);
+  const f = aMin(fin);
+  const dur = f - i;
+  if (fecha < hoy.fecha) return { campo: "fecha", motivo: "esa fecha ya pasó" };
+  if (fecha > sumarDias(hoy.fecha, P.dias_adelante_max)) {
+    return { campo: "fecha", motivo: `solo se puede reservar hasta ${P.dias_adelante_max} días adelante` };
+  }
+  if (fecha === hoy.fecha && i <= hoy.minutos) {
+    return { campo: "horario", motivo: `Ese horario de hoy ya pasó (son las ${aHora(hoy.minutos)})` };
+  }
+  if (i < aMin(P.horario_abre) || f > aMin(P.horario_cierra)) {
+    return { campo: "horario", motivo: `las salas abren de ${P.horario_abre} a ${P.horario_cierra}` };
+  }
+  if (f <= i) return { campo: "horario", motivo: "la hora de fin debe ser posterior a la de inicio" };
+  if (dur < P.duracion_min_min) return { campo: "horario", motivo: `la reserva dura menos de ${P.duracion_min_min} minutos` };
+  if (dur > P.duracion_max_min) return { campo: "horario", motivo: `la reserva dura más de ${P.duracion_max_min / 60} horas` };
+  return null;
+}
+
 // Evalúa una solicitud completa, en el orden de la sección 6.3 del plan.
 export function evaluarReserva(s: SolicitudReserva, c: Contexto): DecisionReserva {
   const docente = s.carne?.startsWith("D-") ?? false;
@@ -138,15 +161,9 @@ export function evaluarReserva(s: SolicitudReserva, c: Contexto): DecisionReserv
   const fecha = s.fecha!;
   const inicio = aMin(s.inicio!);
   const fin = aMin(s.fin!);
-  const duracion = fin - inicio;
 
   // R15: fecha, horario y duración permitidos.
-  const fueraDeRango =
-    fecha < c.hoy.fecha || fecha > sumarDias(c.hoy.fecha, P.dias_adelante_max)
-    || inicio < aMin(P.horario_abre) || fin > aMin(P.horario_cierra)
-    || fin <= inicio || duracion < P.duracion_min_min || duracion > P.duracion_max_min
-    || (fecha === c.hoy.fecha && inicio <= c.hoy.minutos);
-  if (fueraDeRango) {
+  if (causaR15(fecha, s.inicio!, s.fin!, c.hoy)) {
     return decidir({ decision: "negar", estado: "falso", accion: "orientar_proceso", reglas: ["R15"] });
   }
 

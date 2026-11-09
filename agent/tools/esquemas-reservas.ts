@@ -22,10 +22,21 @@ export const EquipoDoc = z.object({
 });
 export type EquipoDoc = z.infer<typeof EquipoDoc>;
 
-export const CarneDoc = z.object({            // carnetización simulada (fuente institucional, solo lectura)
-  _id: Carne, rol: z.enum(["estudiante", "docente"]),
-  vigencia: z.enum(["vigente", "vencido", "desconocida"]),
+// Carnetización simulada (fuente institucional, solo lectura). Unión por rol (plan de identidad, sección 2).
+// programa y facultad: la facultad va con su nombre completo (existe en data/programas.ts).
+const Vigencia = z.enum(["vigente", "vencido", "desconocida"]);
+const CarneEstudiante = z.object({
+  _id: Carne, rol: z.literal("estudiante"), vigencia: Vigencia,
+  nombres: z.string(), apellidos: z.string(),
+  programa: z.string(), facultad: z.string(),
+  jornada: z.enum(["Mañana", "Noche"]),
 });
+const CarneDocente = z.object({
+  _id: Carne, rol: z.literal("docente"), vigencia: Vigencia,
+  nombres: z.string(), apellidos: z.string(), facultad: z.string(),
+  espacios: z.array(z.string()).min(1).max(6),
+});
+export const CarneDoc = z.discriminatedUnion("rol", [CarneEstudiante, CarneDocente]);
 export type CarneDoc = z.infer<typeof CarneDoc>;
 
 export const UsuarioDoc = z.object({ _id: Carne, rol: z.enum(["estudiante", "docente"]), registrado: z.date() });
@@ -53,6 +64,7 @@ export const ReservaDoc = z.object({
   estado: z.enum(["programada", "escalada"]),
   reglas_aplicadas: z.array(z.string()), traza: z.array(z.string()),
   version_reglas: z.string(), creada: z.date(), origen: z.enum(["chat", "semilla"]),
+  jornada: z.enum(["Mañana", "Noche"]).nullable().optional(), // solo estudiantes (plan de identidad, sección 2)
 });
 export type ReservaDoc = z.infer<typeof ReservaDoc>;
 
@@ -86,6 +98,15 @@ export const NotificacionDoc = z.object({
 });
 export type NotificacionDoc = z.infer<typeof NotificacionDoc>;
 
+// Sesión identificada por carné (plan de identidad, sección 4.1). carne es null mientras solo hay un texto pendiente.
+export const SesionDoc = z.object({
+  _id: z.uuid(),
+  carne: Carne.nullable(),
+  actualizado: z.date(),
+  pendiente_texto: z.string().nullable(),
+});
+export type SesionDoc = z.infer<typeof SesionDoc>;
+
 export const Conversacion = z.object({
   _id: z.uuid(),                                // id de sesión del navegador
   flujo: z.enum(["reserva", "registro", "disponibilidad"]),
@@ -93,6 +114,7 @@ export const Conversacion = z.object({
   datos: SolicitudReserva,
   intentos: z.number().int().min(0),            // respuestas no entendidas seguidas
   propuesta: z.object({ sala: SalaId }).nullable(), // sala lista para confirmar
+  validado: z.string().nullish(),               // última combinación fecha|horario|sala revisada (7.0.6)
   actualizado: z.date(),
 });
 export type Conversacion = z.infer<typeof Conversacion>;

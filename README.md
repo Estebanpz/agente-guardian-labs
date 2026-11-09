@@ -160,6 +160,33 @@ Para correr el prototipo sin red y sin Atlas, usa el repositorio en memoria:
 REPOSITORIO=memoria npm run app
 ```
 
+### MongoDB local con replica set `rs0`
+
+Las reservas usan transacciones, que requieren un replica set. En Linux Mint 22 (base Ubuntu 24.04, *noble*):
+
+1. Instala MongoDB Community Server siguiendo la guía oficial para Ubuntu 24.04 (*noble*).
+2. Edita `/etc/mongod.conf` y añade el nombre del replica set:
+
+   ```yaml
+   replication:
+     replSetName: rs0
+   ```
+
+3. Reinicia el servicio y inicia el replica set una sola vez:
+
+   ```sh
+   sudo systemctl restart mongod
+   mongosh --eval "rs.initiate()"
+   ```
+
+4. En `.env` usa la URI local (ya está en `.env.example`, sin credenciales):
+
+   ```sh
+   MONGODB_URI=mongodb://127.0.0.1:27017/?replicaSet=rs0
+   ```
+
+Si activas autenticación en MongoDB, agrega el usuario a la URI en `.env` solamente; nunca en la documentación.
+
 ## API
 
 Todas las rutas escuchan solo en `127.0.0.1` (el prototipo no tiene autenticación).

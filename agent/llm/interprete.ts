@@ -82,7 +82,8 @@ export function rutaRapida(texto: string): TipoIntencion | null {
   if (/\b(soy nuevo|primera vez|registrarme|registro)\b/.test(t)) return "registro_usuario";
   if (/\b(reservar|separar|apartar|agendar|programar)\b/.test(t)) return "solicitud_reserva";
   if (/\bnecesit\w*\b.{0,25}\bsalas?\b/.test(t)) return "solicitud_reserva";
-  if (/^ver todas\b/.test(t.trim())) return "consulta_disponibilidad"; // chip "Ver todas (día)" de la lista de salas
+  if (/\b(quiero|necesito)\s+(la\s+|una\s+|un\s+)?(sala|laboratorio)s?\b/.test(t)) return "solicitud_reserva";
+  if (/^ver (disponibilidad|todas)\b/.test(t.trim())) return "consulta_disponibilidad"; // chips de saludo y de lista // chip "Ver todas (día)" de la lista de salas
   if (/\b(disponibilidad|disponibles?|libres?|agenda)\b/.test(t) && /\b(sala|salas|laboratorio)\b/.test(t)) {
     return "consulta_disponibilidad";
   }

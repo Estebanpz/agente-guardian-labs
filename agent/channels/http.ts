@@ -7,7 +7,7 @@ import { proveedorActivo } from "../llm/proveedor.js";
 import { resumenSalas } from "../tools/salas.js";
 import { disponibilidad, enmascarar, type Contexto } from "../tools/reservas.js";
 import { ahora, hoyBogota } from "../tools/reloj.js";
-import { crearRepositorio } from "../store/repositorio.js";
+import { crearRepositorio, tipoDeBase } from "../store/repositorio.js";
 import { casos, descripciones } from "../../data/casos.js";
 
 const app = express();
@@ -24,7 +24,8 @@ app.use((req, res, next) => {
 app.get("/salud", async (_req, res) => {
   try {
     const repo = await crearRepositorio();
-    res.json({ ok: true, proveedor: proveedorActivo(), repositorio: repo.tipo });
+    // La base se informa por tipo (local, atlas, remota o memoria); la URI nunca sale de la API.
+    res.json({ ok: true, proveedor: proveedorActivo(), repositorio: repo.tipo, base: tipoDeBase(repo.tipo, process.env.MONGODB_URI) });
   } catch (e) {
     console.error("[http]", (e as Error).message);
     res.status(500).json({ error: "Error interno" });

@@ -80,3 +80,44 @@ Motivo: "Que salas tienes ocupadas el jueves y viernes?" se respondió con el es
 | `ocupacionTurno` lista por día las reservas programadas (sala, hora y si es de docente o estudiantes), sin carnés, y cuántas salas quedan libres. | Responder qué está ocupado, no solo los huecos libres. | `agent/conversacion.ts`, `agent/tools/reservas.ts` (`horarioLaboratorio`) | C-14, C-15 |
 | Ruta antes del modelo: un texto con fecha sobre salas va a ocupación (si dice ocupadas/reservadas o trae dos fechas o más) o a disponibilidad (una fecha). Se aplica también si el modelo devuelve `consulta_salas`. | Que la fecha no se pierda aunque el modelo se equivoque o esté apagado. | `agent/orquestador.ts` | C-14, C-15 (sin modelo) |
 | El estado de ahora termina con «Para otro día, pregunta por ejemplo: ¿qué salas están ocupadas el viernes?». | Indicar cómo preguntar por otra fecha. | `agent/conversacion.ts` | C-16 |
+
+## Identidad por carné, sesión y saludo (sección 7.0.5, 8-11-2026)
+
+Motivo: el chat necesitaba el carné en cada reserva y no saludaba ni recordaba a la persona. Plan: `docs/plan/PLAN_IDENTIDAD_SALUDO.md`.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| Toda conversación empieza con el carné (salvo datos prohibidos y la guardia). Sin carné, el texto se guarda y se continúa al identificarse. | Identificar a la persona antes de atender. | `agent/orquestador.ts`, `agent/sesion.ts` | C-01, C-06, C-10 a C-13, C-17, C-19, I-01 |
+| Carné vigente: se guarda la sesión (colección `sesiones`, TTL 1800 s) y se saluda con plantilla (hora de Bogotá). Vencido: remite a carnetización, sin sesión. Desconocido: R17 como antes. | No pedir el carné en cada mensaje; saludo determinista. | `agent/orquestador.ts`, `agent/sesion.ts`, `agent/store/*.ts` | C-17, C-23, C-07, C-08 |
+| Registro (R26): al identificar a un carné vigente sin registro se registra y se avisa. | Mantener el flujo de registro. | `agent/orquestador.ts` | C-03 |
+| La reserva toma el carné de la sesión. Docentes eligen el espacio académico entre sus chips (número o nombre); estudiantes no. | Materia real de cada docente. | `agent/conversacion.ts` | C-18, C-24 |
+| Jornada del estudiante (Mañana/Noche), solo informativa: va en el saludo y en la reserva. | Saludo y registro. | `agent/tools/esquemas-reservas.ts`, `agent/store/sembrar.ts`, `agent/conversacion.ts` | C-17 |
+| Al terminar una reserva (programada o escalada) se añade el aviso de olvido y se borra la sesión. «salir» o «cerrar sesión» borran la sesión; «cancelar» no. | Privacidad: no se conserva el carné después de la solicitud. | `agent/conversacion.ts`, `agent/orquestador.ts` | C-20, C-22 |
+| Horarios abiertos: «de 5:30 a 7:30» → 17:30–19:30; «8:30 a. m.», «8.30», «8h30», «y media», «y cuarto». | Aceptar formas habituales de escribir la hora. | `agent/tools/extraer.ts` | `evals/extraer.ts`, C-21 |
+| Datos de carnetización: 12 estudiantes y 5 docentes con el catálogo de programas (`data/programas.ts`). | Semilla del plan de identidad. | `data/semilla.ts`, `data/programas.ts` | `evals/semilla.ts` |
+| Interfaz: mensaje inicial con el chip «Soy nuevo» y botón «Cerrar sesión» (envía «salir»). | Empezar por el carné. | `web/src/pages/Chat.jsx` | revisión en el navegador (mensaje, chip y botón visibles; sin errores de consola) |
+| Rutas rápidas: «ver disponibilidad» y «ver todas» van a disponibilidad. | Chips del saludo. | `agent/llm/interprete.ts` | C-04 |
+| `npm run seed -- --reset --si` también borra `sesiones`. Prueba de MongoDB: sesión guardada, leída y borrada; índice TTL 1800 s. | Restaurar la demostración sin sesiones viejas. | `agent/store/sembrar.ts`, `evals/mongo.ts` | `npm run prueba:mongo` |
+| Matriz: se añaden C-17 a C-24 e I-01; P-06, P-07 y S-02 corren con la sesión identificada. | Reflejar el carné primero. | `evals/matriz.ts`, `evals/escenarios-conversacion.ts` | `npm run matriz` (62/62) |
+
+## Chat de reservas: oferta de mañana, validación temprana y sala ocupada (sección 7.0.6, 8-11-2026)
+
+Motivo: en una prueba del 8-11-2026 a las 20:23, el chat heredó la fecha de hoy tras ofrecer revisar mañana, pidió
+datos de una solicitud que ya no se podía y tardó sin decir nada. Esta sección junta las rondas de ajustes.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| Sin salas con 2 horas libres hoy, se ofrece revisar mañana con el chip «Sí, revisar mañana». La oferta queda en el contexto de la sesión. «Sí, quiero la sala 1» reserva mañana; nunca hereda la fecha de hoy. | Que la respuesta corresponda a lo pedido. | `agent/conversacion.ts` | C-27 |
+| Una fecha de hoy no se hereda si el horario que quedaría ya pasó. | Evitar fechas vencidas. | `agent/conversacion.ts` | C-27, C-30 |
+| Separadores «hasta la», «a la», «hasta las», «a las»: «de 11AM hasta la 1PM» y «de 11 a la 1» dan 11:00–13:00. | Frases habituales de horario. | `agent/tools/extraer.ts` | `evals/extraer.ts`, C-28, C-35 |
+| Validación temprana: con fecha y horario se evalúa R15 antes de pedir personas, equipos, cómputo o materia. Si nombró una sala, se revisa si está libre (choques en la base). Libre: «Revisé la Sala 1 para el martes 10 de noviembre de 11:00 a 13:00 y está libre ✅. Ahora, ¿cuántas personas son?». | Avisar al momento, no después de cuatro preguntas. | `agent/conversacion.ts` | C-31, C-35 |
+| Sala ocupada (R20, R21 o R22): aviso en ese mismo turno con quién la tiene (estudiantes u otro docente, carné enmascarado, sin nombres) y los chips «Ver otras salas» y «Escalar al monitor». | No seguir pidiendo datos de una solicitud que no se puede. | `agent/conversacion.ts` | C-02, C-29, C-34 |
+| «Ver otras salas»: hasta 3 salas libres a esa hora como chips «Usar Sala N»; la solicitud sigue. | Alternativa concreta. | `agent/conversacion.ts` | C-32 |
+| «Escalar al monitor»: no pide más datos ni crea reserva. Crea un aviso al monitor con `reserva_codigo: null` (R20 o R21 si el solicitante es docente según el choque; R22 si es estudiante), con sala, fecha, horario y carné enmascarado. Cierra la conversación, borra la sesión y responde «Listo, {Nombres}: le pasé tu caso al monitor…». | El monitor confirma con la persona; el motor sigue sin crear reservas escaladas desde el chat en este caso. | `agent/conversacion.ts` | C-02, C-33 |
+| Causa concreta de R15: «Ese horario de hoy ya pasó (son las HH:MM)»; fuera de 07:00–22:00; menos de 30 minutos o más de 4 horas; fecha a más de 30 días. La comprobación es la misma de la regla (`causaR15`). | Decir qué cambiar. | `agent/tools/reservas.ts`, `agent/conversacion.ts` | C-30 y `evals/reservas.ts` (RS-01 a RS-20 sin cambios) |
+| Indicador de espera en el chat: «Un momento, estoy revisando la disponibilidad…» si el mensaje nombra una sala o un horario; «Estoy trabajando en tu solicitud…» en los demás casos. | No dejar silencio mientras responde. | `web/src/pages/Chat.jsx` | revisión de lint y build |
+| Etiqueta de la base: la API informa `base` (local, atlas, remota o memoria) sin la URI. La interfaz muestra «MongoDB local», «MongoDB Atlas», «MongoDB remoto» o «Memoria». | Que la etiqueta diga dónde están los datos. | `agent/store/repositorio.ts` (`tipoDeBase`), `agent/channels/http.ts`, `web/src/App.jsx` | revisión de `tipoDeBase` con URIs de ejemplo |
+| Chat: se quita el selector «Laboratorio»; `api.mensaje` ya no envía `laboratorio`. El campo sigue opcional en la API y en el orquestador (la pestaña Laboratorios y las pruebas lo usan). | La sala la dice el mensaje. | `web/src/pages/Chat.jsx`, `web/src/api.js` | C-34 a C-36 |
+| Chat: subtítulo «Escribe en lenguaje natural. Empieza con tu carné (C- o D- y 8 dígitos).»; sugerencias nuevas en orden; panel «Cómo funciona» de 7 pasos. | Empezar por el carné y reflejar el flujo real. | `web/src/pages/Chat.jsx` | C-34 a C-36 |
+| Ruta rápida «quiero/necesito la sala…» → solicitud de reserva, sin depender del modelo. | «Quiero la sala 1 mañana…» no debe depender del modelo. | `agent/llm/interprete.ts` | C-35 |
+| «salir» cancela una reserva solo como mensaje completo, igual que cierra la sesión. | «hasta salir de clase» no debe cancelar. | `agent/tools/extraer.ts` (`cancelar`) | C-25 |

@@ -2,21 +2,29 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import TarjetaDecision from "../components/TarjetaDecision.jsx";
 import TarjetaReserva from "../components/TarjetaReserva.jsx";
-import Ilustracion from "../components/Ilustracion.jsx";
 
 // Mensajes de ejemplo: reservas, disponibilidad, registro, ingreso, fuera de alcance y datos prohibidos.
+// Sugerencias en orden de uso: primero el carné (la conversación empieza con la identidad).
 const SUGERENCIAS = [
+  "C-10000001",
+  "D-20000001",
+  "Soy nuevo en el sistema",
   "¿Qué puedes hacer?",
   "¿Qué disponibilidad hay en la sala 6 mañana?",
-  "Quiero reservar una sala",
-  "Soy nuevo en el sistema",
-  "Soy D-20000001, necesito la sala 6 mañana de 2 a 4 pm para 20 estudiantes",
-  "Soy E-001, ¿puede entrar?",
+  "¿Qué salas están ocupadas el jueves y viernes?",
+  "Quiero la sala 1 mañana de 11AM hasta la 1PM",
+  "Necesito la sala 6 mañana de 2 a 4 pm",
   "¿Cuál es mi nota de programación?",
   "Mi cédula es 1070612345, ¿puedo reservar?",
 ];
 
 const MAX = 500;
+
+// El indicador de espera dice qué se está revisando: una sala o un horario, o cualquier otra solicitud.
+const NOMBRA_SALA_U_HORARIO = /\b(sala|salas|laboratorio)\b|\b\d{1,2}(:\d{2}|\.\d{2})?\s*(am|pm|a\.?\s?m\.?|p\.?\s?m\.?)(?!\w)|\bde\s+\d{1,2}\b|\b\d{1,2}:\d{2}\b|\b(hasta|a) las?\s+\d/i;
+const textoEspera = (t) => (NOMBRA_SALA_U_HORARIO.test(t)
+  ? "Un momento, estoy revisando la disponibilidad…"
+  : "Estoy trabajando en tu solicitud…");
 const CLAVE_SESION = "gl-sesion";
 
 const ETIQUETAS = {
@@ -30,7 +38,16 @@ const ETIQUETAS = {
   consulta_disponibilidad: { texto: "Disponibilidad", clase: "text-bg-success", icono: "bi-calendar3" },
   registro_usuario: { texto: "Registro", clase: "text-bg-info", icono: "bi-person-plus" },
   solicitud_reserva: { texto: "Reserva", clase: "text-bg-primary", icono: "bi-calendar-plus" },
+  identidad: { texto: "Identidad", clase: "text-bg-info", icono: "bi-person-badge" },
 };
+
+// Primer mensaje del agente: la conversación empieza con el carné (plan de identidad, sección 5).
+const mensajeInicial = () => ({
+  id: "bienvenida",
+  de: "agente",
+  r: { intencion: "identidad", respuesta: "¡Hola! Soy Guardian Labs. Para empezar, escríbeme tu carné." },
+  opciones: ["Soy nuevo"],
+});
 
 // La sesión identifica la conversación del navegador. Si sessionStorage no está disponible, se usa una
 // sesión nueva por carga de página.
@@ -95,12 +112,12 @@ function RespuestaAgente({ r, opciones, onElegir, cargando }) {
 }
 
 export default function Chat() {
-  const [mensajes, setMensajes] = useState([]);
+  const [mensajes, setMensajes] = useState(() => [mensajeInicial()]);
   const [texto, setTexto] = useState("");
-  const [sala, setSala] = useState("sala-1");
   const [sesion, setSesion] = useState(leerSesion);
   const [flujoActivo, setFlujoActivo] = useState(false);
   const [cargando, setCargando] = useState(false);
+  const [espera, setEspera] = useState("");
   const fin = useRef(null);
   const entrada = useRef(null);
 
@@ -123,8 +140,9 @@ export default function Chat() {
     setTexto("");
     setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "yo", texto: limpio }]);
     setCargando(true);
+    setEspera(textoEspera(limpio));
     try {
-      const r = await api.mensaje(limpio, sala, sesion);
+      const r = await api.mensaje(limpio, sesion);
       const opciones = r.flujo?.opciones ?? [];
       setFlujoActivo(Boolean(r.flujo?.pendiente) || r.flujo?.tipo === "reserva" || r.flujo?.tipo === "registro");
       setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r, opciones }]);
@@ -139,7 +157,7 @@ export default function Chat() {
     const nueva = crypto.randomUUID();
     guardarSesion(nueva);
     setSesion(nueva);
-    setMensajes([]);
+    setMensajes([mensajeInicial()]);
     setFlujoActivo(false);
     setTexto("");
   }
@@ -154,29 +172,19 @@ export default function Chat() {
           <div className="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2 py-3">
             <div>
               <h5 className="mb-0"><i className="bi bi-robot me-2" />Asistente de los laboratorios</h5>
-              <small className="gl-subtitulo">Escriba en lenguaje natural. Use solo ids sintéticos (E-001…) y carnés sintéticos.</small>
+              <small className="gl-subtitulo">Escribe en lenguaje natural. Empieza con tu carné (C- o D- y 8 dígitos).</small>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <label htmlFor="sala-chat" className="small text-secondary">Laboratorio</label>
-              <select id="sala-chat" className="form-select form-select-sm" style={{ width: 110 }} value={sala} onChange={(e) => setSala(e.target.value)}>
-                <option value="sala-1">Sala 1</option>
-                <option value="sala-2">Sala 2</option>
-                <option value="sala-3">Sala 3</option>
-              </select>
               <button type="button" className="btn btn-outline-secondary btn-sm" onClick={nuevaConversacion} disabled={cargando}>
                 <i className="bi bi-arrow-counterclockwise me-1" />Nueva conversación
+              </button>
+              <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => enviar("salir")} disabled={cargando}>
+                <i className="bi bi-box-arrow-right me-1" />Cerrar sesión
               </button>
             </div>
           </div>
 
           <div className="card-body gl-chat" aria-live="polite">
-            {mensajes.length === 0 && (
-              <div className="text-center gl-vacio py-4">
-                <Ilustracion nombre="chat" ancho={200} className="mb-3" />
-                <h6>¿En qué le ayudo en los laboratorios?</h6>
-                <p className="gl-subtitulo small mb-0">Pruebe una de las sugerencias de la derecha.</p>
-              </div>
-            )}
             {mensajes.map((m, i) => (
               <div key={m.id} className={`d-flex mb-3 ${m.de === "yo" ? "justify-content-end" : "justify-content-start"}`}>
                 {m.de === "yo"
@@ -188,7 +196,7 @@ export default function Chat() {
               <div className="d-flex mb-3">
                 <div className="gl-burbuja gl-burbuja-agente">
                   <span className="gl-escribiendo me-2"><span /><span /><span /></span>
-                  <small className="text-secondary">Pensando…</small>
+                  <small className="text-secondary">{espera}</small>
                 </div>
               </div>
             )}
@@ -252,11 +260,13 @@ export default function Chat() {
           <div className="card-body small gl-subtitulo">
             <h6 className="text-body"><i className="bi bi-info-circle me-2" />Cómo funciona</h6>
             <ol className="ps-3 mb-0">
-              <li>Se bloquean datos personales (cédula, correo, teléfono).</li>
-              <li>Se reconoce la intención del mensaje.</li>
-              <li>Se preguntan los datos que falten, uno a la vez.</li>
-              <li>Las reglas deciden y la reserva se registra en la base de demostración.</li>
-              <li>Los conflictos se escalan a una persona.</li>
+              <li>Escribe tu carné y te saludo.</li>
+              <li>Bloqueo datos personales (cédula, correo, teléfono).</li>
+              <li>Entiendo lo que necesitas.</li>
+              <li>Reviso la sala apenas me das fecha y hora.</li>
+              <li>Pido los datos que falten, uno a la vez.</li>
+              <li>Las reglas deciden y queda registrado.</li>
+              <li>Si hay un conflicto, se lo paso al monitor.</li>
             </ol>
           </div>
         </div>

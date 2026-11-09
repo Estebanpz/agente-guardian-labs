@@ -11,7 +11,10 @@ import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import { salas } from "../data/salas.js";
 import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
-import { continuar, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
+import { continuar, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
+import { CHIPS_SALUDO, PEDIR_CARNE, esSalida, esSaludo, saludoPara } from "./sesion.js";
+import { carne as carneDe } from "./tools/extraer.js";
+import { ahora } from "./tools/reloj.js";
 
 // Ingreso (vista Laboratorios): las tres salas de la evaluación (las reservas usan sala-1 a sala-16).
 type SalaId = "sala-1" | "sala-2" | "sala-3";
@@ -81,6 +84,56 @@ async function porFecha(
 }
 
 // Texto libre del monitor o del usuario. `contexto` = sala de la interfaz y sesión del navegador.
+// Identidad (plan de identidad, sección 4): sin carné identificado solo se pide el carné. Lo que la persona
+// escribió antes queda pendiente y se continúa al identificarse.
+const CHIP_SOY_NUEVO = { tipo: "sugerencia", pendiente: null, opciones: ["Soy nuevo"] };
+
+async function sinIdentidad(texto: string, sesion: string | undefined, repo: Repositorio, eludir: boolean): Promise<RespuestaChat> {
+  // La guardia responde su alerta aunque no haya carné.
+  if (eludir) {
+    return { intencion: "intento_eludir_reglas", respuesta: `${ALERTA_ELUSION}\n\n${PEDIR_CARNE}`, alerta: ALERTA_ELUSION, flujo: CHIP_SOY_NUEVO };
+  }
+  const carneTxt = carneDe(texto);
+  if (carneTxt) return identificar(carneTxt, texto, sesion, repo);
+  if (esSalida(texto)) {
+    if (sesion) await repo.borrarSesion(sesion);
+    return { intencion: "cerrar_sesion", respuesta: "Sesión cerrada. Escribe tu carné cuando quieras continuar.", flujo: null };
+  }
+  // Una petición sin carné se guarda para continuarla; un saludo o "Soy nuevo" no.
+  const pendiente = sesion && rutaRapida(texto) !== "registro_usuario" && !esSaludo(texto) ? texto : null;
+  if (sesion) await repo.guardarSesion({ _id: sesion, carne: null, actualizado: new Date(), pendiente_texto: pendiente });
+  return { intencion: "identidad", respuesta: PEDIR_CARNE, flujo: CHIP_SOY_NUEVO };
+}
+
+async function identificar(carneTxt: string, texto: string, sesion: string | undefined, repo: Repositorio): Promise<RespuestaChat> {
+  const doc = await repo.carne(carneTxt);
+  if (!doc || doc.vigencia === "desconocida") {
+    if (sesion) await repo.borrarSesion(sesion);
+    return { intencion: "identidad", respuesta: await escalarCarneDesconocido(carneTxt, repo), flujo: null };
+  }
+  if (doc.vigencia === "vencido") {
+    if (sesion) await repo.borrarSesion(sesion);
+    return { intencion: "identidad", respuesta: "Tu carné está vencido; remítete a carnetización.", flujo: null };
+  }
+  // Vigente sin registro: se registra (R26) y se saluda.
+  let prefijo = "";
+  if (!(await repo.usuario(carneTxt))) {
+    await repo.registrarUsuario({ _id: carneTxt, rol: doc.rol, registrado: new Date() });
+    prefijo = `Listo, quedaste registrado como ${doc.rol} con el carné ${carneTxt}.\n\n`;
+  }
+  const pendiente = sesion ? ((await repo.leerSesion(sesion))?.pendiente_texto ?? null) : null;
+  // Lo que queda del mensaje sin el carné: si es una petición, se continúa en este mismo turno.
+  const resto = texto.replace(/\b[CD]-?\d{8}\b/gi, " ").replace(/\s+/g, " ").trim();
+  const peticion = resto.length > 4 && !esSaludo(resto) && rutaRapida(resto) !== "registro_usuario" ? resto : pendiente;
+  if (sesion) await repo.guardarSesion({ _id: sesion, carne: carneTxt, actualizado: new Date(), pendiente_texto: null });
+  const saludo = saludoPara(doc, ahora().minutos);
+  if (peticion && sesion) {
+    const r = (await mensaje(peticion, { sesion })) as RespuestaChat & { explicacion?: string };
+    return { ...r, respuesta: `${prefijo}${saludo}\n\n${r.respuesta ?? r.explicacion ?? ""}` };
+  }
+  return { intencion: "saludo", respuesta: `${prefijo}${saludo}`, flujo: { tipo: "sugerencia", pendiente: null, opciones: CHIPS_SALUDO } };
+}
+
 export async function mensaje(
   texto: string,
   contexto: { laboratorio?: SalaId; franja?: string; sesion?: string } = {},
@@ -99,6 +152,20 @@ export async function mensaje(
   const repo = await repoActual();
   const eludir = esIntentoDeElusion(texto);
   const resumen = texto.slice(0, 200);
+
+  // Identidad: sin sesión identificada solo se pide el carné (la guardia responde igual).
+  const sesionDoc = sesion ? await repo.leerSesion(sesion) : null;
+  if (!sesionDoc?.carne) {
+    const r = await sinIdentidad(texto, sesion, repo, eludir);
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+    return r;
+  }
+  // Salir o cerrar sesión: se olvida el carné y se cierra la conversación abierta.
+  if (esSalida(texto) && sesion) {
+    await repo.borrarSesion(sesion);
+    await repo.borrarConversacion(sesion);
+    return { intencion: "cerrar_sesion", respuesta: "Sesión cerrada. Escribe tu carné cuando quieras continuar.", flujo: null };
+  }
 
   // Paso 2: flujo abierto. La guardia corre antes: con elusión, la alerta y la pregunta, sin cambiar datos.
   if (sesion) {

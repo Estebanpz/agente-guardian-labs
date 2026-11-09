@@ -88,6 +88,15 @@ try {
     `notificaciones pendientes = ${pendientes.length}, referencia ${pendientes[0]?.reserva_codigo ?? "—"}`);
   comprobar((await repo.reservasDelDia(FECHA, SALA)).length === 1, "la escalada no cuenta como programada");
 
+  // 5) Sesión identificada: se guarda, se lee y se borra; el índice TTL de sesiones existe (1800 s).
+  const sesion = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  await repo.guardarSesion({ _id: sesion, carne: "C-10000001", actualizado: new Date(), pendiente_texto: null });
+  comprobar((await repo.leerSesion(sesion))?.carne === "C-10000001", "sesión guardada y leída");
+  await repo.borrarSesion(sesion);
+  comprobar((await repo.leerSesion(sesion)) === null, "sesión borrada");
+  const indices = await db.collection("sesiones").indexes();
+  comprobar(indices.some((i) => i.key?.actualizado === 1 && i.expireAfterSeconds === 1800), "índice TTL de sesiones (1800 s)");
+
   await repo.cerrar();
   await vaciarBase(db);
   console.log(`\nBase de pruebas "${nombre}" vaciada (colecciones borradas).`);

@@ -5,13 +5,16 @@ import Monitor from "./pages/Monitor.jsx";
 import Chat from "./pages/Chat.jsx";
 import Salas from "./pages/Salas.jsx";
 
+// Etiqueta de la base según el tipo que informa la API (sin URI).
+const ETIQUETA_BASE = { local: "MongoDB local", atlas: "MongoDB Atlas", remota: "MongoDB remoto", memoria: "Memoria" };
+
 export default function App() {
   const [proveedor, setProveedor] = useState(null);
-  const [repositorio, setRepositorio] = useState(null);
+  const [base, setBase] = useState(null);
 
   useEffect(() => {
     api.salud()
-      .then((s) => { setProveedor(s.proveedor); setRepositorio(s.repositorio); })
+      .then((s) => { setProveedor(s.proveedor); setBase(s.base); })
       .catch(() => setProveedor(false));
   }, []);
 
@@ -34,9 +37,9 @@ export default function App() {
           <span className="gl-estado-api d-none d-md-flex align-items-center gap-2">
             <span className="gl-punto" style={{ background: colorPunto }} />
             {proveedor === null ? "Conectando…" : proveedor ? proveedor : "API sin conexión"}
-            {repositorio && (
+            {base && (
               <span className="d-inline-flex align-items-center gap-1" title="Base de datos de demostración">
-                <i className="bi bi-database" />{repositorio === "mongo" ? "Atlas" : "Memoria"}
+                <i className="bi bi-database" />{ETIQUETA_BASE[base] ?? "Memoria"}
               </span>
             )}
           </span>

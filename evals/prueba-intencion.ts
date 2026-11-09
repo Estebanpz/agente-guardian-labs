@@ -17,11 +17,25 @@ const casos: [string, TipoIntencion][] = [
   ["Qué significa su id? puedo inventar uno? cómo funciona eso?", "ayuda"],
 ];
 
-let fallos = 0;
+// Dos clases de fallo: "clasificación incorrecta" (el modelo respondió otra intención) y
+// "error del proveedor" (no hubo respuesta: 429, red, clave o modelo apagado). El error del proveedor
+// no es una clasificación: se cuenta aparte y también hace fallar la prueba.
+let incorrectas = 0;
+let errores = 0;
 for (const [texto, esperado] of casos) {
-  const obtenido = (await interpretar(texto)).intencion;
-  const ok = obtenido === esperado;
-  if (!ok) fallos++;
-  console.log(`${ok ? "✅" : "❌"} ${obtenido.padEnd(22)} <- ${texto}`);
+  const r = await interpretar(texto);
+  if (r.fallo) {
+    errores++;
+    console.log(`❌ error del proveedor: ${r.fallo.slice(0, 160)} <- ${texto}`);
+    continue;
+  }
+  const ok = r.intencion === esperado;
+  if (!ok) incorrectas++;
+  console.log(`${ok ? "✅" : "❌ clasificación incorrecta"} ${r.intencion.padEnd(22)} <- ${texto}${ok ? "" : ` (esperada: ${esperado})`}`);
 }
+const fallos = incorrectas + errores;
+if (errores) console.log(`\n${errores} con error del proveedor (no se pudo clasificar; revisar clave, cuota o modelo)`);
+if (incorrectas) console.log(`${incorrectas} con clasificación incorrecta`);
 console.log(fallos === 0 ? "\nTodas pasaron" : `\n${fallos} fallaron`);
+// Código de salida 1 si algo falla, para que npm run pruebas no lo oculte.
+process.exitCode = fallos === 0 ? 0 : 1;

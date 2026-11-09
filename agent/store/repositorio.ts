@@ -1,5 +1,5 @@
 import type {
-  CarneDoc, Conversacion, DecisionReserva, EquipoDoc, NotificacionDoc, ReservaDoc, SalaDoc, UsuarioDoc,
+  CarneDoc, Conversacion, DecisionReserva, EquipoDoc, NotificacionDoc, ReservaDoc, SalaDoc, SesionDoc, UsuarioDoc,
 } from "../tools/esquemas-reservas.js";
 import { crearMemoria } from "./memoria.js";
 import { hoyBogota } from "../tools/reloj.js";
@@ -33,12 +33,24 @@ export interface Repositorio {
   leerConversacion(id: string): Promise<Conversacion | null>;
   guardarConversacion(c: Conversacion): Promise<void>;
   borrarConversacion(id: string): Promise<void>;
+  // Sesión identificada (colección sesiones, TTL 1800 s sobre actualizado).
+  leerSesion(id: string): Promise<SesionDoc | null>;
+  guardarSesion(s: SesionDoc): Promise<void>;
+  borrarSesion(id: string): Promise<void>;
   cerrar(): Promise<void>;
 }
 
 // Quita la cadena de conexión de cualquier mensaje antes de imprimirlo.
 function sinUri(mensaje: string, uri: string): string {
   return mensaje.split(uri).join("[uri]").replace(/mongodb(\+srv)?:\/\/\S+/g, "[uri]");
+}
+
+// Tipo de base que se muestra en la interfaz. Solo el tipo, nunca la URI:
+// "local" (127.0.0.1 o localhost), "atlas" (mongodb+srv), "remota" (otro host de mongodb) o "memoria".
+export function tipoDeBase(tipo: Repositorio["tipo"], uri: string | undefined): "local" | "atlas" | "remota" | "memoria" {
+  if (tipo !== "mongo" || !uri) return "memoria";
+  if (uri.startsWith("mongodb+srv://")) return "atlas";
+  return /^mongodb:\/\/(?:[^@/]*@)?(?:127\.0\.0\.1|localhost)(?::\d+)?(?:[/?]|$)/.test(uri) ? "local" : "remota";
 }
 
 let instancia: Promise<Repositorio> | null = null;

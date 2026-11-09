@@ -3,7 +3,8 @@
 // Uso: npm run matriz   (requiere Ollama corriendo para P-06, P-07, S-01 y S-02)
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { evaluar } from "../agent/tools/motor.js";
-import { mensaje } from "../agent/orquestador.js";
+import { configurarParaPruebas, mensaje } from "../agent/orquestador.js";
+import { crearMemoria } from "../agent/store/memoria.js";
 import { proveedorActivo } from "../agent/llm/proveedor.js";
 import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
@@ -84,13 +85,19 @@ try {
   ollama = v.version;
 } catch { /* Ollama apagado */ }
 const modeloDisponible = !proveedorActivo().startsWith("ollama") || ollama !== "no disponible";
+// Identidad (plan de identidad, sección 4): las filas con modelo corren con una sesión ya identificada,
+// como una conversación real después del carné. Repositorio en memoria propio para no escribir en la base.
+const SESION_MATRIZ = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+configurarParaPruebas({ repo: crearMemoria("2026-11-09") });
+await mensaje("C-10000001", { sesion: SESION_MATRIZ });
+
 async function conModelo(id: string, tipo: string, texto: string, regla: string, esperado: string, observar: (r: R) => [string, boolean], requiereModelo = true) {
   if (requiereModelo && !modeloDisponible) {
     filas.push({ id, tipo, entrada: `"${texto}"`, regla, esperado, observado: "No ejecutada: Ollama no disponible", ok: false });
     return;
   }
   try {
-    const r = (await mensaje(texto)) as R;
+    const r = (await mensaje(texto, { sesion: SESION_MATRIZ })) as R;
     const [observado, ok] = observar(r);
     filas.push({ id, tipo, entrada: `"${texto}"`, regla, esperado, observado, ok });
   } catch (e) {
@@ -118,7 +125,20 @@ await conModelo("S-02", "Aclaración (falta la sala)", "Soy E-001, ¿puedo entra
   "pide aclaración, sin decisión",
   (r) => [r.aclaracion ? `aclaración: ${r.respuesta}` : `${r.intencion}, ${r.decision ? "con decisión" : "sin aclaración"}`, r.aclaracion === true && !r.decision]);
 
-// 3b) Reservas (RS-01…RS-20, RS-04a/b, RS-17…RS-19) y conversación (C-01…C-09). Sin modelo.
+// I-01 (identidad): sin carné no se llama al modelo; se pide el carné. Determinista.
+{
+  configurarParaPruebas({ repo: crearMemoria("2026-11-09") });
+  const r = (await mensaje("¿Cuál es mi nota de programación?", { sesion: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" })) as R;
+  const texto = String(r.respuesta ?? "");
+  filas.push({
+    id: "I-01", tipo: "Identidad", entrada: '"¿Cuál es mi nota de programación?" sin carné', regla: "Identidad",
+    esperado: "pide el carné, sin clasificar el texto",
+    observado: `${r.intencion}: ${texto.includes("escríbeme tu carné") ? "pide el carné" : texto.slice(0, 60)}`,
+    ok: r.intencion === "identidad" && texto.includes("escríbeme tu carné") && !r.decision,
+  });
+}
+
+// 3b) Reservas (RS-01…RS-20, RS-04a/b, RS-17…RS-19) y conversación (C-01…C-24). Sin modelo.
 filas.push(...(await correrEscenariosReservas()));
 filas.push(...(await correrEscenariosConversacion()).map((f) => ({ ...f, regla: "Conversación" })));
 

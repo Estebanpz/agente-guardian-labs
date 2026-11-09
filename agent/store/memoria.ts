@@ -1,5 +1,5 @@
 import type {
-  CarneDoc, Conversacion, DecisionReserva, EquipoDoc, NotificacionDoc, ReservaDoc, SalaDoc, UsuarioDoc,
+  CarneDoc, Conversacion, DecisionReserva, EquipoDoc, NotificacionDoc, ReservaDoc, SalaDoc, SesionDoc, UsuarioDoc,
 } from "../tools/esquemas-reservas.js";
 import {
   carnetizacionSemilla, equiposSemilla, reservasSemilla, salasSemilla, usuariosSemilla,
@@ -16,6 +16,7 @@ export function crearMemoria(hoy: string): Repositorio {
   const reservas: ReservaDoc[] = reservasSemilla(hoy);
   const notificaciones: NotificacionDoc[] = [];
   const conversaciones = new Map<string, Conversacion>();
+  const sesiones = new Map<string, SesionDoc>();
   let ultimo = 3; // las tres reservas de la semilla son RS-0001 … RS-0003
 
   const siguienteCodigo = () => `RS-${String(++ultimo).padStart(4, "0")}`;
@@ -92,6 +93,18 @@ export function crearMemoria(hoy: string): Repositorio {
 
     async borrarConversacion(id) {
       conversaciones.delete(id);
+    },
+
+    async leerSesion(id) {
+      return sesiones.get(id) ?? null;
+    },
+
+    async guardarSesion(s) {
+      sesiones.set(s._id, s);
+    },
+
+    async borrarSesion(id) {
+      sesiones.delete(id);
     },
 
     async cerrar() {

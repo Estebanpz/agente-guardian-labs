@@ -1,7 +1,7 @@
 import { MongoClient, type Db, type ClientSession } from "mongodb";
 import { z } from "zod";
 import {
-  CarneDoc, Carne, Conversacion, DecisionReserva, EquipoDoc, Fecha, NotificacionDoc, ReservaDoc,
+  CarneDoc, Carne, Conversacion, SesionDoc, DecisionReserva, EquipoDoc, Fecha, NotificacionDoc, ReservaDoc,
   SalaDoc, SalaId, UsuarioDoc,
 } from "../tools/esquemas-reservas.js";
 import type { Repositorio } from "./repositorio.js";
@@ -25,15 +25,16 @@ const porId = (id: unknown) => ({ _id: id }) as never;
 // Proyecciones explícitas: solo los campos que usa la interfaz.
 const PROY_SALA = { _id: 1, nombre: 1, capacidad: 1, computo: 1, activa: 1, fuente: 1 };
 const PROY_EQUIPO = { _id: 1, sala: 1, inventario: 1, mantenimiento: 1, accesible: 1 };
-const PROY_CARNE = { _id: 1, rol: 1, vigencia: 1 };
+const PROY_CARNE = { _id: 1, rol: 1, vigencia: 1, nombres: 1, apellidos: 1, programa: 1, facultad: 1, jornada: 1, espacios: 1 };
 const PROY_USUARIO = { _id: 1, rol: 1, registrado: 1 };
 const PROY_RESERVA = {
   _id: 0, codigo: 1, sala: 1, fecha: 1, inicio: 1, fin: 1, inicio_min: 1, fin_min: 1, tipo: 1,
-  carne: 1, rol: 1, personas: 1, equipos: 1, computo_alto: 1, materia: 1, estado: 1,
+  carne: 1, rol: 1, jornada: 1, personas: 1, equipos: 1, computo_alto: 1, materia: 1, estado: 1,
   reglas_aplicadas: 1, traza: 1, version_reglas: 1, creada: 1, origen: 1,
 };
 const PROY_NOTIFICACION = { _id: 0, para: 1, motivo: 1, regla: 1, reserva_codigo: 1, estado: 1, creada: 1 };
-const PROY_CONVERSACION = { _id: 1, flujo: 1, pendiente: 1, datos: 1, intentos: 1, propuesta: 1, actualizado: 1 };
+const PROY_SESION = { _id: 1, carne: 1, actualizado: 1, pendiente_texto: 1 };
+const PROY_CONVERSACION = { _id: 1, flujo: 1, pendiente: 1, datos: 1, intentos: 1, propuesta: 1, validado: 1, actualizado: 1 };
 
 // Código siguiente RS-NNNN con el contador de la transacción (se revierte si la transacción falla).
 async function siguienteCodigo(db: Db, session: ClientSession): Promise<string> {
@@ -180,6 +181,22 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
     async borrarConversacion(id) {
       if (!z.uuid().safeParse(id).success) return;
       await db.collection("conversaciones").deleteOne(porId(id));
+    },
+
+    async leerSesion(id) {
+      if (!z.uuid().safeParse(id).success) return null;
+      const d = await db.collection("sesiones").findOne(porId(id), { projection: PROY_SESION });
+      return d ? SesionDoc.parse(d) : null;
+    },
+
+    async guardarSesion(s) {
+      const v = SesionDoc.parse(s);
+      await db.collection("sesiones").replaceOne(porId(v._id), { ...v }, { upsert: true });
+    },
+
+    async borrarSesion(id) {
+      if (!z.uuid().safeParse(id).success) return;
+      await db.collection("sesiones").deleteOne(porId(id));
     },
 
     async cerrar() {

@@ -23,8 +23,9 @@ export const api = {
   salas: (signal) => pedir("/salas", { signal }),
   casos: () => pedir("/casos"),
   evaluar: (entrada) => pedir("/evaluar", { method: "POST", body: JSON.stringify(entrada) }),
-  mensaje: (texto, laboratorio, sesion) =>
-    pedir("/mensaje", { method: "POST", body: JSON.stringify({ texto, laboratorio, sesion }) }),
+  // El chat ya no envía laboratorio: la sala la dice el mensaje (la pestaña Laboratorios usa su propio flujo).
+  mensaje: (texto, sesion) =>
+    pedir("/mensaje", { method: "POST", body: JSON.stringify({ texto, sesion }) }),
   disponibilidad: (sala, fecha, signal) => pedir(`/disponibilidad${consulta({ sala, fecha })}`, { signal }),
   reservas: (fecha, signal) => pedir(`/reservas${consulta({ fecha })}`, { signal }),
   notificaciones: (estado = "pendiente", signal) => pedir(`/notificaciones${consulta({ estado })}`, { signal }),

@@ -1,6 +1,6 @@
 // Extractores deterministas del chat de reservas (sin modelo).
 // Orden obligatorio en `extraer`: carné → fecha → horario → sala → (quitar esos fragmentos) → números.
-import { aHora, diaSemana, sumarDias } from "./reloj.js";
+import { aHora, aMin, diaSemana, sumarDias } from "./reloj.js";
 
 // Minúsculas y sin tildes, para reconocer las frases.
 const norm = (t: string): string => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -75,6 +75,8 @@ export function fechas(t: string, hoy: string): string[] {
 // ── Horario ──────────────────────────────────────────────────────────────
 // Horas sin am/pm: 7–11 mañana, 12 mediodía, 1–6 tarde (+12), 13–22 tal cual.
 // Con am/pm se respeta el sufijo; si la hora de inicio no lo trae, usa el del final.
+// Hora de 24 h a partir de la hora dicha: 7–11 mañana, 12 mediodía, 1–6 tarde (+12), 13–22 tal cual.
+// Con am/pm se respeta el sufijo (si la hora de inicio no lo trae, usa el del final).
 function a24(h: number, min: number, sufijo: string | undefined): string | null {
   if (h > 24 || min > 59) return null;
   let hora = h;
@@ -85,14 +87,37 @@ function a24(h: number, min: number, sufijo: string | undefined): string | null 
   return aHora(hora * 60 + min);
 }
 
+// Hora dicha como "8", "8:30", "8.30", "8h30", "8 y media" o "8 y cuarto".
+const HORA = "(\\d{1,2})(?:(?::|\\.|h)(\\d{2})|\\s*y\\s*(media|cuarto))?";
+// Sufijo am/pm opcional (después de "a. m." normalizado a "am").
+const SUFIJO = "(?:\\s*(am|pm))?";
+const RE_HORARIO = new RegExp(
+  "(?:desde las |desde |de )?" + HORA + SUFIJO + "\\s*(?:a|hasta|-|–|al)\\s*(?:las?\\s+)?" + HORA + SUFIJO,
+);
+
+function minutosDe(exacto: string | undefined, fraccion: string | undefined): number {
+  if (exacto !== undefined) return Number(exacto);
+  if (fraccion === "media") return 30;
+  if (fraccion === "cuarto") return 15;
+  return 0;
+}
+
 function buscarHorario(t: string): Hallazgo<{ inicio: string; fin: string }> | null {
-  const m = norm(t).match(
-    /(?:desde las |desde |de )?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:a|hasta|-|–|al)\s*(?:las\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/,
-  );
+  // "a. m.", "a.m.", "a m", "p. m.", "pm." → "am" / "pm" antes de buscar.
+  const n = norm(t).replace(/\b([ap])\.?\s?m\b\.?/g, "$1m");
+  const m = n.match(RE_HORARIO);
   if (!m) return null;
-  const inicio = a24(Number(m[1]), Number(m[2] ?? 0), m[3] ?? m[6]);
-  const fin = a24(Number(m[4]), Number(m[5] ?? 0), m[6]);
+  const h1 = Number(m[1]), min1 = minutosDe(m[2], m[3]), suf1 = m[4];
+  const h2 = Number(m[5]), min2 = minutosDe(m[6], m[7]), suf2 = m[8];
+  // Am/pm del final aplica al inicio si el inicio no lo trae ("de 1 a 3 pm").
+  const inicio = a24(h1, min1, suf1 ?? suf2);
+  let fin = a24(h2, min2, suf2);
   if (!inicio || !fin) return null;
+  // Fin sin am/pm que queda antes del inicio: se suman 12 h si cae en 07:00–22:00 y después del inicio.
+  if (!suf2 && aMin(fin) <= aMin(inicio)) {
+    const pm = aMin(fin) + 12 * 60;
+    if (pm >= 7 * 60 && pm <= 22 * 60 && pm > aMin(inicio)) fin = aHora(pm);
+  }
   return { valor: { inicio, fin }, texto: m[0] };
 }
 
@@ -163,8 +188,10 @@ export function confirmacion(t: string): "si" | "no" | null {
   return null;
 }
 
+// "salir" cancela solo como mensaje completo: "hasta salir de clase" no cancela la reserva.
 export function cancelar(t: string): boolean {
-  return /\b(cancelar|cancela|olvidalo|salir|empezar de nuevo)\b/.test(norm(t));
+  const n = norm(t).replace(/^[¡¿\s]+|[.!?¡¿,;:\s]+$/g, "");
+  return /\b(cancelar|cancela|olvidalo|empezar de nuevo)\b/.test(n) || n === "salir";
 }
 
 // ── Extracción completa de un mensaje ────────────────────────────────────

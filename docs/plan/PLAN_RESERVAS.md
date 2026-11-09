@@ -3,6 +3,7 @@
 **Para:** el agente que implementa (Claude Haiku 5.5) · **Dueño:** Esteban Páez Leonel · **Rama:** `dev`
 **Versión del plan:** 1.1 (4 nov 2026: se agrega el MCP de MongoDB Atlas y la aceptación por fase)
 · **Versión de reglas al terminar:** `2.0.0`
+· **Plan posterior (identidad por carné, sesión y saludo):** [PLAN_IDENTIDAD_SALUDO.md](PLAN_IDENTIDAD_SALUDO.md)
 
 > Lee este documento completo antes de tocar código. Si algo no está definido aquí, **no lo
 > inventes**: detente y pregúntale a Esteban. Cada fase termina con pruebas en verde y un commit.
@@ -634,7 +635,8 @@ primera regla bloqueante (anota en `traza` cada regla que se aplica, con el form
      - **R20** si el solicitante es docente y todos los choques son de estudiantes →
        `escalar`, `contradictorio`, `revision_humana`, `notificar: ["monitor"]`;
      - **R21** si es docente y algún choque es de docente → `escalar`, `contradictorio`,
-       `notificar: ["coordinacion"]`;
+       `revision_humana`, `notificar: ["monitor"]`: escala al monitor (primera instancia), que remite a
+       coordinación si hace falta (igual que `reglas.json` 2.0.0 y `agent/tools/reservas.ts`);
      - **R22** si es estudiante → `negar`, `falso`.
      - En los tres casos, `conflictos` lleva cada reserva con el carné **enmascarado**.
    - Si nada bloquea → **R25** con esa sala.
