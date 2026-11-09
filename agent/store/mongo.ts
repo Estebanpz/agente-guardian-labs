@@ -34,7 +34,7 @@ const PROY_RESERVA = {
 };
 const PROY_NOTIFICACION = { _id: 0, para: 1, motivo: 1, regla: 1, reserva_codigo: 1, estado: 1, creada: 1 };
 const PROY_SESION = { _id: 1, carne: 1, actualizado: 1, pendiente_texto: 1 };
-const PROY_CONVERSACION = { _id: 1, flujo: 1, pendiente: 1, datos: 1, intentos: 1, propuesta: 1, validado: 1, actualizado: 1 };
+const PROY_CONVERSACION = { _id: 1, flujo: 1, pendiente: 1, datos: 1, intentos: 1, propuesta: 1, validado: 1, respaldo: 1, ofrecer: 1, actualizado: 1 };
 
 // Código siguiente RS-NNNN con el contador de la transacción (se revierte si la transacción falla).
 async function siguienteCodigo(db: Db, session: ClientSession): Promise<string> {

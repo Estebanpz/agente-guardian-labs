@@ -25,7 +25,6 @@ const NOMBRA_SALA_U_HORARIO = /\b(sala|salas|laboratorio)\b|\b\d{1,2}(:\d{2}|\.\
 const textoEspera = (t) => (NOMBRA_SALA_U_HORARIO.test(t)
   ? "Un momento, estoy revisando la disponibilidad…"
   : "Estoy trabajando en tu solicitud…");
-const CLAVE_SESION = "gl-sesion";
 
 const ETIQUETAS = {
   fuera_de_alcance: { texto: "Fuera de alcance", clase: "text-bg-secondary", icono: "bi-slash-circle" },
@@ -49,27 +48,9 @@ const mensajeInicial = () => ({
   opciones: ["Soy nuevo"],
 });
 
-// La sesión identifica la conversación del navegador. Si sessionStorage no está disponible, se usa una
-// sesión nueva por carga de página.
-function leerSesion() {
-  try {
-    const guardada = sessionStorage.getItem(CLAVE_SESION);
-    if (guardada) return guardada;
-    const nueva = crypto.randomUUID();
-    sessionStorage.setItem(CLAVE_SESION, nueva);
-    return nueva;
-  } catch {
-    return crypto.randomUUID();
-  }
-}
-
-function guardarSesion(id) {
-  try {
-    sessionStorage.setItem(CLAVE_SESION, id);
-  } catch {
-    // Sin almacenamiento: la sesión solo dura lo que dure la página.
-  }
-}
+// Cada carga de la página empieza una sesión nueva: la pantalla arranca vacía, así que el servidor no debe
+// recordar una conversación que la persona ya no ve (7.0.9). Dentro de la página, la sesión recuerda el carné.
+const nuevaSesion = () => crypto.randomUUID();
 
 function Chips({ opciones, onElegir, deshabilitado }) {
   return (
@@ -114,7 +95,7 @@ function RespuestaAgente({ r, opciones, onElegir, cargando }) {
 export default function Chat() {
   const [mensajes, setMensajes] = useState(() => [mensajeInicial()]);
   const [texto, setTexto] = useState("");
-  const [sesion, setSesion] = useState(leerSesion);
+  const [sesion, setSesion] = useState(nuevaSesion);
   const [flujoActivo, setFlujoActivo] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [espera, setEspera] = useState("");
@@ -142,7 +123,8 @@ export default function Chat() {
     setCargando(true);
     setEspera(textoEspera(limpio));
     try {
-      const r = await api.mensaje(limpio, sesion);
+      // El indicador de espera se ve al menos 600 ms, aunque la respuesta llegue antes.
+      const [r] = await Promise.all([api.mensaje(limpio, sesion), new Promise((ok) => setTimeout(ok, 600))]);
       const opciones = r.flujo?.opciones ?? [];
       setFlujoActivo(Boolean(r.flujo?.pendiente) || r.flujo?.tipo === "reserva" || r.flujo?.tipo === "registro");
       setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r, opciones }]);
@@ -154,9 +136,7 @@ export default function Chat() {
   }
 
   function nuevaConversacion() {
-    const nueva = crypto.randomUUID();
-    guardarSesion(nueva);
-    setSesion(nueva);
+    setSesion(nuevaSesion());
     setMensajes([mensajeInicial()]);
     setFlujoActivo(false);
     setTexto("");

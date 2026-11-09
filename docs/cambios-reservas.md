@@ -121,3 +121,29 @@ datos de una solicitud que ya no se podía y tardó sin decir nada. Esta secció
 | Chat: subtítulo «Escribe en lenguaje natural. Empieza con tu carné (C- o D- y 8 dígitos).»; sugerencias nuevas en orden; panel «Cómo funciona» de 7 pasos. | Empezar por el carné y reflejar el flujo real. | `web/src/pages/Chat.jsx` | C-34 a C-36 |
 | Ruta rápida «quiero/necesito la sala…» → solicitud de reserva, sin depender del modelo. | «Quiero la sala 1 mañana…» no debe depender del modelo. | `agent/llm/interprete.ts` | C-35 |
 | «salir» cancela una reserva solo como mensaje completo, igual que cierra la sesión. | «hasta salir de clase» no debe cancelar. | `agent/tools/extraer.ts` (`cancelar`) | C-25 |
+
+## Sala antes que horario y respaldo del modelo (sección 7.0.8, 8-11-2026)
+
+- Orden de extracción: carné → fecha → sala → horario → números. El número de la sala ya no se lee como hora
+  ("la sala 1 mañana a la 1PM hasta las 3PM" → Sala 1, 13:00–15:00).
+- Separadores "a la(s)", "hasta la(s)", "desde la(s)", "de la(s)"; am/pm de la hora final aplicado a la inicial si el rango es válido.
+- Respaldo con el modelo (`agent/llm/respaldo.ts`): solo cuando el código no entiende la sala o el horario. El modelo
+  devuelve sala, día y horas con esquema Zod; el código calcula la fecha, valida cada dato y descarta lo que no esté en
+  el texto. Antes de usarlo se confirma con la persona ("Entendí: … ¿Es correcto?"). Pruebas C-37 a C-39.
+
+## Recorrido del chat corregido (sección 7.0.9, 8-11-2026)
+
+Fallos vistos en el navegador y su corrección:
+
+| Fallo | Corrección | Prueba |
+|---|---|---|
+| Tras recargar la página, el carné no saludaba y seguía una reserva vieja | Cada carga de la página abre una sesión nueva; un carné escrito con la sesión ya identificada vuelve a saludar y cierra el flujo anterior | C-40 |
+| "Ver otras salas" ofrecía salas sin saber cuántas personas eran, y la elegida terminaba en R18 | Si faltan las personas, se preguntan primero; se ofrecen solo salas que alcanzan, con puestos y equipos operativos | C-41, C-32 |
+| "quiero la 4" no elegía sala | Con salas en oferta se acepta "13", "la 13", "quiero la 13" o "sala 13"; un número solo cuando se piden personas sigue siendo la cantidad | C-42 |
+| R18 al final, con mensaje genérico y pidiendo otro horario | Aforo temprano: con sala y personas se revisa el aforo antes de pedir más datos; el mensaje da la cifra y conserva el horario | C-43 |
+| "de 2 a 4 pm en la sala 6 mañana" se tomaba como consulta de disponibilidad | Sala + rango de horas sin pregunta es una reserva | C-44 |
+| El indicador de espera casi no se veía | Se muestra al menos 600 ms | — |
+| Texto de fuera de alcance hablaba solo de ingreso | "Te ayudo con reservas, disponibilidad y ocupación de las salas de sistemas." | — |
+
+C-18 y C-32 cambiaron de la Sala 13 (10 puestos) a la Sala 8 (20 puestos): con el aforo temprano, 20 estudiantes ya no
+caben en la 13.

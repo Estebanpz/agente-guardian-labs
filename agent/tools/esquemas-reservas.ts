@@ -115,6 +115,8 @@ export const Conversacion = z.object({
   intentos: z.number().int().min(0),            // respuestas no entendidas seguidas
   propuesta: z.object({ sala: SalaId }).nullable(), // sala lista para confirmar
   validado: z.string().nullish(),               // última combinación fecha|horario|sala revisada (7.0.6)
+  respaldo: z.array(z.string()).nullish(),      // campos que vinieron del modelo y esperan confirmación (7.0.8)
+  ofrecer: z.boolean().nullish(),               // "Ver otras salas" sin personas: ofrecer salas al saberlas (7.0.9)
   actualizado: z.date(),
 });
 export type Conversacion = z.infer<typeof Conversacion>;

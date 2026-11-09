@@ -1,11 +1,12 @@
-import { appendFileSync } from "node:fs";
 import { z } from "zod";
 import { EntradaEvaluar } from "./tools/esquemas.js";
 import { evaluar } from "./tools/motor.js";
 import { redactar } from "./llm/redactor.js";
 import { interpretar, porRegex, rutaRapida, type Interpretacion } from "./llm/interprete.js";
 import { esIntentoDeElusion } from "./llm/guardia.js";
-import { datosProhibidos, enmascararCarnes } from "./tools/privacidad.js";
+import { datosProhibidos } from "./tools/privacidad.js";
+import { registrar } from "./tools/traza.js";
+import { configurarRespaldo, type Fuente } from "./llm/respaldo.js";
 import { AYUDA_GENERAL, TEXTO_RESERVA, estadoSalas, responderTemas, temasDe } from "./tools/ayuda.js";
 import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
@@ -20,10 +21,6 @@ import { ahora } from "./tools/reloj.js";
 type SalaId = "sala-1" | "sala-2" | "sala-3";
 const SALAS_INGRESO: string[] = ["sala-1", "sala-2", "sala-3"];
 
-const LOG = new URL("../logs/evaluaciones.jsonl", import.meta.url);
-// Los carnés se enmascaran antes de escribir: nunca quedan completos en logs/.
-const registrar = (r: object) =>
-  appendFileSync(LOG, enmascararCarnes(JSON.stringify({ ts: new Date().toISOString(), ...r })) + "\n");
 
 const ALERTA_ELUSION = "Intento de eludir las reglas registrado. Las reglas no cambian; notificar a coordinación.";
 
@@ -31,8 +28,10 @@ type Clasificador = (texto: string) => Promise<Interpretacion & { fallo?: string
 
 // Inyección para pruebas: repositorio y clasificador de mentira (sección 7.4).
 let inyeccion: { repo?: Repositorio; interpretar?: Clasificador } = {};
-export function configurarParaPruebas(opciones: { repo?: Repositorio; interpretar?: Clasificador }): void {
-  inyeccion = opciones;
+// Sin `respaldo`, las pruebas no llaman al modelo (null); la app usa el modelo real.
+export function configurarParaPruebas(opciones: { repo?: Repositorio; interpretar?: Clasificador; respaldo?: Fuente }): void {
+  inyeccion = { repo: opciones.repo, interpretar: opciones.interpretar };
+  configurarRespaldo(opciones.respaldo ?? null);
 }
 const repoActual = async (): Promise<Repositorio> => inyeccion.repo ?? crearRepositorio();
 const clasificar: Clasificador = (texto) => (inyeccion.interpretar ?? interpretar)(texto);
@@ -160,6 +159,15 @@ export async function mensaje(
     registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
     return r;
   }
+  // Un carné solo (o "Soy C-…") con la sesión ya identificada: se vuelve a identificar y saludar, y se cierra
+  // la conversación abierta. Pasa al recargar la página o al cambiar de persona (7.0.9).
+  const carneNuevo = carneDe(texto);
+  if (carneNuevo && sesion && texto.replace(/\b[CD]-?\d{8}\b/gi, " ").replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(Boolean).length <= 2) {
+    await repo.borrarConversacion(sesion);
+    const r = await identificar(carneNuevo, texto, sesion, repo);
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+    return r;
+  }
   // Salir o cerrar sesión: se olvida el carné y se cierra la conversación abierta.
   if (esSalida(texto) && sesion) {
     await repo.borrarSesion(sesion);
@@ -261,7 +269,7 @@ export async function mensaje(
 
   if (c.intencion === "fuera_de_alcance") {
     const respuesta =
-      "Esa consulta está fuera de mi alcance. Solo oriento sobre ingreso, uso de equipos y asistencia en los laboratorios de sistemas.";
+      "Esa consulta está fuera de mi alcance. Te ayudo con reservas, disponibilidad y ocupación de las salas de sistemas.";
     registrar({ texto: resumen, intencion: c.intencion, respuesta });
     return { intencion: c.intencion, respuesta };
   }

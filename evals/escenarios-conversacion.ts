@@ -8,6 +8,7 @@ import { rutaRapida, type Interpretacion } from "../agent/llm/interprete.js";
 import { crearMemoria } from "../agent/store/memoria.js";
 import type { Repositorio } from "../agent/store/repositorio.js";
 import { fijarReloj, liberarReloj } from "../agent/tools/reloj.js";
+import type { Fuente } from "../agent/llm/respaldo.js";
 
 export type FilaConv = { id: string; tipo: string; entrada: string; esperado: string; observado: string; ok: boolean };
 
@@ -23,9 +24,10 @@ type Salida = {
   solicitud?: { materia?: string | null };
 };
 
-async function guion(sesion: string, textos: string[]): Promise<{ repo: Repositorio; salidas: Salida[] }> {
+// `respaldo`: modelo simulado para el respaldo de sala y horario (7.0.8). Sin él, las pruebas no llaman al modelo.
+async function guion(sesion: string, textos: string[], respaldo?: Fuente): Promise<{ repo: Repositorio; salidas: Salida[] }> {
   const repo = crearMemoria("2026-11-09");
-  configurarParaPruebas({ repo, interpretar: clasificadorFijo });
+  configurarParaPruebas({ repo, interpretar: clasificadorFijo, respaldo });
   const salidas: Salida[] = [];
   for (const t of textos) salidas.push(await mensaje(t, { sesion }) as Salida);
   return { repo, salidas };
@@ -99,13 +101,14 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
     // C-32 (7.0.7): docente con sala ocupada → "Ver otras salas" muestra salas libres y la solicitud sigue.
     {
       const { salidas } = await guion(sid(7), [
-        "Soy D-20000001, necesito la sala 6 mañana de 2 a 4 pm para 20 estudiantes", "Ver otras salas", "Usar Sala 13",
+        "Soy D-20000001, necesito la sala 6 mañana de 2 a 4 pm para 20 estudiantes", "Ver otras salas", "Usar Sala 8",
       ]);
       const chips = salidas[1].flujo?.opciones ?? [];
-      filas.push(fila("C-32", "Ver otras salas (docente)", "Soy D-20000001, necesito la sala 6 mañana de 2 a 4 pm para 20 estudiantes → Ver otras salas → Usar Sala 13",
+      filas.push(fila("C-32", "Ver otras salas (docente)", "Soy D-20000001, necesito la sala 6 mañana de 2 a 4 pm para 20 estudiantes → Ver otras salas → Usar Sala 8",
         "ofrece hasta 3 salas libres como chips; al elegir una, la solicitud sigue (revisa la sala y pide equipos)", [
           [chips.length > 0 && chips.length <= 3 && chips.every((c) => c.startsWith("Usar Sala ")), `salas ofrecidas ${JSON.stringify(chips)}`],
-          [(salidas[2].respuesta ?? "").includes("Revisé la Sala 13") && pendiente(salidas[2]) === "equipos", "la solicitud sigue: sala libre y pregunta equipos"],
+          [chips.includes("Usar Sala 8") && !chips.includes("Usar Sala 13"), "solo salas con 20 puestos o más (la 13 tiene 10)"],
+          [(salidas[2].respuesta ?? "").includes("Revisé la Sala 8") && pendiente(salidas[2]) === "equipos", "la solicitud sigue: sala libre y pregunta equipos"],
         ]));
     }
 
@@ -321,11 +324,11 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
 
     // C-18: docente. El saludo no trae género; al pedir la materia salen sus tres espacios y "2" escoge el segundo.
     {
-      const repo18 = await guion(sid(2), ["D-20000001", "Quiero reservar la sala 13 mañana de 2 a 4 pm para 20 estudiantes", "20", "no", "2"]);
+      const repo18 = await guion(sid(2), ["D-20000001", "Quiero reservar la sala 8 mañana de 2 a 4 pm para 20 estudiantes", "20", "no", "2"]);
       const { salidas } = repo18;
       const materia = salidas[4].solicitud?.materia ?? null;
       const opciones = salidas[3].flujo?.opciones ?? [];
-      filas.push(fila("C-18", "Saludo y espacio de docente", "D-20000001 → reserva (sala 13, 20 estudiantes) → 20 → no → 2",
+      filas.push(fila("C-18", "Saludo y espacio de docente", "D-20000001 → reserva (sala 8, 20 estudiantes) → 20 → no → 2",
         "saludo «Bienvenido(a) a Guardian Labs»; al pedir materia, chips con sus 3 espacios; «2» fija Programación Orientada a Objetos", [
           [(salidas[0].respuesta ?? "").includes("Bienvenido(a) a Guardian Labs") && (salidas[0].respuesta ?? "").includes("Carlos Eduardo Medina Ríos"), "saludo de docente sin tratamiento de género"],
           [JSON.stringify(opciones) === JSON.stringify(["Bases de Datos", "Programación Orientada a Objetos", "Ingeniería de Software"]), `chips ${JSON.stringify(opciones)}`],
@@ -518,6 +521,105 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
         ]));
     }
 
+    // C-37: frase con "a la X hasta las Y" en medio de una reserva. Sin error de "hora de fin".
+    {
+      const { repo, salidas } = await guion(sid(4), ["C-10000001", "Quiero reservar una sala", "Mejor quiero la sala 1 mañana a la 1PM hasta las 3PM"]);
+      const r = salidas[2];
+      const conv = await repo.leerConversacion(sid(4));
+      filas.push(fila("C-37", "Sala, día y horario en una frase", "C-10000001 → Quiero reservar una sala → Mejor quiero la sala 1 mañana a la 1PM hasta las 3PM",
+        "sala-1, mañana, 13:00–15:00; revisa la Sala 1 y pregunta las personas; sin error de hora de fin", [
+          [conv?.datos.sala === "sala-1" && conv?.datos.inicio === "13:00" && conv?.datos.fin === "15:00", "sala-1 y 13:00–15:00"],
+          [(r.respuesta ?? "").includes("Revisé la Sala 1 para el martes 10 de noviembre de 13:00 a 15:00"), "revisa la Sala 1 a esa hora"],
+          [!(r.respuesta ?? "").includes("hora de fin"), "sin error de hora de fin"],
+        ]));
+    }
+
+    // C-38: modelo simulado (7.0.8). Mala ortografía: el código no entiende el horario; el modelo propone sala, día
+    // y horario. El agente pide confirmación con esos datos antes de seguir.
+    {
+      const propuesta: Fuente = async () => ({ sala: "sala-3", dia: "mañana", inicio: "13:00", fin: "15:00" });
+      const { repo, salidas } = await guion(sid(5), ["C-10000001", "Quiero reservar una sala", "la sala 3 mñana ala 1 asta las 3", "Sí"], propuesta);
+      const r = salidas[2];
+      const conv = await repo.leerConversacion(sid(5));
+      filas.push(fila("C-38", "Respaldo del modelo con mala ortografía", "C-10000001 → Quiero reservar una sala → la sala 3 mñana ala 1 asta las 3 → Sí (modelo simulado)",
+        "pide confirmar «Sala 3, martes 10 de noviembre, de 13:00 a 15:00» con «Sí» y «Corregir»; tras «Sí» sigue la reserva", [
+          [(r.respuesta ?? "").startsWith("Entendí: Sala 3, martes 10 de noviembre, de 13:00 a 15:00. ¿Es correcto?"), "pide confirmar con los datos correctos"],
+          [JSON.stringify(r.flujo?.opciones) === JSON.stringify(["Sí", "Corregir"]) && pendiente(r) === "respaldo", "chips «Sí» y «Corregir»"],
+          [(salidas[3].respuesta ?? "").includes("Revisé la Sala 3 para el martes 10 de noviembre de 13:00 a 15:00") || (salidas[3].flujo?.opciones ?? []).includes("Ver otras salas"),
+            "tras «Sí» revisa la sala con esos datos"],
+          [conv?.respaldo == null, "la confirmación queda cerrada"],
+        ]));
+    }
+
+    // C-39: el modelo simulado devuelve una sala que no está en el texto: se descarta y el flujo sigue como siempre.
+    {
+      const inventada: Fuente = async () => ({ sala: "sala-7", dia: null, inicio: "13:00", fin: "15:00" });
+      const { repo, salidas } = await guion(sid(6), ["C-10000001", "Quiero reservar un laboratorio el martes de 1 a 3 pm"], inventada);
+      const r = salidas[1];
+      const conv = await repo.leerConversacion(sid(6));
+      filas.push(fila("C-39", "Respaldo con sala que no está en el texto", "C-10000001 → Quiero reservar un laboratorio el martes de 1 a 3 pm (modelo devuelve sala-7)",
+        "descarta sala-7; no pide confirmación; sigue preguntando las personas", [
+          [conv?.datos.sala === null, "no aplica sala-7"],
+          [!(r.respuesta ?? "").includes("Entendí") && pendiente(r) === "personas", "sigue el flujo normal"],
+        ]));
+    }
+
+    // C-40 a C-44 (7.0.9): fallos vistos en el chat el 8-11-2026 (carné repetido, "Ver otras salas" sin personas,
+    // sala por número, aforo temprano y frase de reserva sin verbo).
+    const ccc = (n: number) => `ccccccc${n}-cccc-4ccc-8ccc-ccccccccccc${n}`;
+    // C-40: con la sesión identificada y una reserva abierta, escribir el carné otra vez saluda y cierra el flujo.
+    {
+      const { repo, salidas } = await guion(ccc(0), ["C-10000001", "Quiero reservar una sala", "mañana", "C-10000001"]);
+      const final = salidas[3];
+      filas.push(fila("C-40", "Carné repetido saluda de nuevo", "C-10000001 → Quiero reservar una sala → mañana → C-10000001",
+        "saludo con el nombre y sin flujo abierto", [
+          [(final.respuesta ?? "").includes("Laura Valentina Gómez Rojas"), "saluda con el nombre"],
+          [!final.flujo?.pendiente, "sin pregunta pendiente"],
+          [(await repo.leerConversacion(ccc(0))) === null, "conversación anterior cerrada"],
+        ]));
+    }
+    // C-41: "Ver otras salas" sin personas pregunta las personas y luego ofrece solo salas que alcanzan.
+    {
+      const { repo, salidas } = await guion(ccc(1), ["C-10000001", "de 2 a 4 pm en la sala 6 mañana", "Ver otras salas", "5"]);
+      const chips = salidas[3].flujo?.opciones ?? [];
+      const salas = await repo.salas();
+      const caben = chips.every((c) => (salas.find((x) => x._id === `sala-${c.replace("Usar Sala ", "")}`)?.capacidad ?? 0) >= 5);
+      filas.push(fila("C-41", "Ver otras salas pide personas primero", "C-10000001 → de 2 a 4 pm en la sala 6 mañana → Ver otras salas → 5",
+        "aviso de sala ocupada; luego pregunta personas; luego hasta 3 salas que alcanzan, con puestos", [
+          [JSON.stringify(salidas[1].flujo?.opciones) === JSON.stringify(["Ver otras salas", "Escalar al monitor"]), "la frase sin verbo es una reserva"],
+          [pendiente(salidas[2]) === "personas", "pregunta personas antes de ofrecer"],
+          [pendiente(salidas[3]) === "sala" && chips.length > 0 && chips.length <= 3 && caben, `salas que alcanzan ${JSON.stringify(chips)}`],
+          [(salidas[3].respuesta ?? "").includes("puestos"), "muestra puestos y equipos"],
+        ]));
+    }
+    // C-42: eligiendo sala, "quiero la 11" y "11" sirven; "5" cuando se preguntan personas no es una sala.
+    {
+      const { salidas } = await guion(ccc(2), ["C-10000001", "de 2 a 4 pm en la sala 6 mañana", "Ver otras salas", "5", "quiero la 11"]);
+      const otro = await guion(ccc(3), ["C-10000001", "de 2 a 4 pm en la sala 6 mañana", "Ver otras salas", "5", "11"]);
+      filas.push(fila("C-42", "Elegir sala por número", "… → Ver otras salas → 5 → «quiero la 11» / «11»",
+        "las dos formas fijan la Sala 11 y proponen confirmar", [
+          [(salidas[4].respuesta ?? "").includes("Sala 11") && pendiente(salidas[4]) === "confirmar", "«quiero la 11» elige la Sala 11"],
+          [(otro.salidas[4].respuesta ?? "").includes("Sala 11") && pendiente(otro.salidas[4]) === "confirmar", "«11» elige la Sala 11"],
+        ]));
+    }
+    // C-43: aforo temprano. La Sala 3 (15 puestos, 3 equipos) no alcanza para 5 estudiantes: ofrece otras con la cifra.
+    {
+      const { salidas } = await guion(ccc(4), ["C-10000001", "Quiero la sala 3 mañana de 2 a 4 pm", "5"]);
+      const r = salidas[2].respuesta ?? "";
+      filas.push(fila("C-43", "Aforo temprano", "C-10000001 → Quiero la sala 3 mañana de 2 a 4 pm → 5",
+        "dice puestos y equipos de la Sala 3 y ofrece otras salas, sin pedir otro horario", [
+          [r.includes("La Sala 3 tiene 15 puestos y 3 equipos operativos"), "cifra concreta"],
+          [pendiente(salidas[2]) === "sala" && (salidas[2].flujo?.opciones ?? []).length > 0, "pide elegir sala, conserva el horario"],
+        ]));
+    }
+    // C-44: frase con sala y horario sin pregunta después del saludo: es una reserva, no una consulta de disponibilidad.
+    {
+      const { salidas } = await guion(ccc(5), ["C-10000001", "la sala 8 mañana de 10 a 12"]);
+      filas.push(fila("C-44", "Sala y horario sin verbo", "C-10000001 → la sala 8 mañana de 10 a 12",
+        "revisa la Sala 8 y pregunta personas", [
+          [(salidas[1].respuesta ?? "").includes("Revisé la Sala 8") && pendiente(salidas[1]) === "personas", "reserva con validación temprana"],
+        ]));
+    }
   } finally {
     liberarReloj();
   }

@@ -1,5 +1,5 @@
 // Extractores deterministas del chat de reservas (sin modelo).
-// Orden obligatorio en `extraer`: carné → fecha → horario → sala → (quitar esos fragmentos) → números.
+// Orden obligatorio en `extraer`: carné → fecha → sala → horario → números (cada fragmento leído se quita del texto).
 import { aHora, aMin, diaSemana, sumarDias } from "./reloj.js";
 
 // Minúsculas y sin tildes, para reconocer las frases.
@@ -72,6 +72,13 @@ export function fechas(t: string, hoy: string): string[] {
   return out.sort();
 }
 
+// Frases de franja que equivalen a am/pm: "de la noche" y "de la tarde" son pm; "de la mañana" es am.
+// Se aplica una sola vez al texto, para que los fragmentos que se quitan después coincidan con él.
+const normalizarHorario = (n: string): string =>
+  n.replace(/\b([ap])\.?\s?m\b\.?/g, "$1m")
+    .replace(/\bde la (noche|tarde)\b/g, "pm")
+    .replace(/\bde la manana\b/g, "am");
+
 // ── Horario ──────────────────────────────────────────────────────────────
 // Horas sin am/pm: 7–11 mañana, 12 mediodía, 1–6 tarde (+12), 13–22 tal cual.
 // Con am/pm se respeta el sufijo; si la hora de inicio no lo trae, usa el del final.
@@ -91,8 +98,10 @@ function a24(h: number, min: number, sufijo: string | undefined): string | null 
 const HORA = "(\\d{1,2})(?:(?::|\\.|h)(\\d{2})|\\s*y\\s*(media|cuarto))?";
 // Sufijo am/pm opcional (después de "a. m." normalizado a "am").
 const SUFIJO = "(?:\\s*(am|pm))?";
+// Prefijos del rango: "desde (las) X", "de (la/las) X", "a (la/las) X", "hasta (la/las) X".
+const PREFIJO = "(?:(?:desde|de|a|hasta) (?:las?\\s+)?)?";
 const RE_HORARIO = new RegExp(
-  "(?:desde las |desde |de )?" + HORA + SUFIJO + "\\s*(?:a|hasta|-|–|al)\\s*(?:las?\\s+)?" + HORA + SUFIJO,
+  PREFIJO + HORA + SUFIJO + "\\s*(?:a|hasta|-|–|al)\\s*(?:las?\\s+)?" + HORA + SUFIJO,
 );
 
 function minutosDe(exacto: string | undefined, fraccion: string | undefined): number {
@@ -103,22 +112,28 @@ function minutosDe(exacto: string | undefined, fraccion: string | undefined): nu
 }
 
 function buscarHorario(t: string): Hallazgo<{ inicio: string; fin: string }> | null {
-  // "a. m.", "a.m.", "a m", "p. m.", "pm." → "am" / "pm" antes de buscar.
-  const n = norm(t).replace(/\b([ap])\.?\s?m\b\.?/g, "$1m");
+  const n = normalizarHorario(norm(t));
   const m = n.match(RE_HORARIO);
   if (!m) return null;
   const h1 = Number(m[1]), min1 = minutosDe(m[2], m[3]), suf1 = m[4];
   const h2 = Number(m[5]), min2 = minutosDe(m[6], m[7]), suf2 = m[8];
-  // Am/pm del final aplica al inicio si el inicio no lo trae ("de 1 a 3 pm").
-  const inicio = a24(h1, min1, suf1 ?? suf2);
-  let fin = a24(h2, min2, suf2);
-  if (!inicio || !fin) return null;
-  // Fin sin am/pm que queda antes del inicio: se suman 12 h si cae en 07:00–22:00 y después del inicio.
-  if (!suf2 && aMin(fin) <= aMin(inicio)) {
-    const pm = aMin(fin) + 12 * 60;
-    if (pm >= 7 * 60 && pm <= 22 * 60 && pm > aMin(inicio)) fin = aHora(pm);
+  // El am/pm del final se aplica también al inicio ("7 a 9 pm" = 19:00–21:00). Si ese rango no es válido,
+  // el inicio se toma con su propio sufijo ("11 a 1 pm" = 11:00–13:00).
+  let primero: { inicio: string; fin: string } | null = null;
+  for (const suf of new Set([suf1 ?? suf2, suf1])) {
+    const inicio = a24(h1, min1, suf);
+    let fin = a24(h2, min2, suf2);
+    if (!inicio || !fin) continue;
+    // Fin sin am/pm que queda antes del inicio: se suman 12 h si cae en 07:00–22:00 y después del inicio.
+    if (!suf2 && aMin(fin) <= aMin(inicio)) {
+      const pm = aMin(fin) + 12 * 60;
+      if (pm >= 7 * 60 && pm <= 22 * 60 && pm > aMin(inicio)) fin = aHora(pm);
+    }
+    primero ??= { inicio, fin };
+    if (aMin(fin) > aMin(inicio)) return { valor: { inicio, fin }, texto: m[0] };
   }
-  return { valor: { inicio, fin }, texto: m[0] };
+  // Ningún candidato es válido: se devuelve el primero para que el motor diga qué falla (fin antes del inicio).
+  return primero ? { valor: primero, texto: m[0] } : null;
 }
 
 export function horario(t: string): { inicio: string; fin: string } | null {
@@ -205,17 +220,17 @@ export type Extraido = {
 export function extraer(texto: string, opts: { hoy: string; pendiente: string | null }): Extraido {
   // 1) carné
   const c = carne(texto);
-  let r = norm(texto);
+  let r = normalizarHorario(norm(texto));
   if (c) r = r.replace(/\b[cd]-?\d{8}\b/, " ");
   // 2) fecha
   const f = buscarFecha(r, opts.hoy);
   if (f) r = r.replace(f.texto, " ");
-  // 3) horario
-  const h = buscarHorario(r);
-  if (h) r = r.replace(h.texto, " ");
-  // 4) sala
+  // 3) sala: antes del horario, para que su número no se lea como una hora ("sala 6 de 2 a 4" → 14:00–16:00)
   const s = buscarSala(r);
   if (s) r = r.replace(s.texto, " ");
+  // 4) horario
+  const h = buscarHorario(r);
+  if (h) r = r.replace(h.texto, " ");
   // 5) números, sobre el texto ya sin esos fragmentos
   return {
     carne: c,

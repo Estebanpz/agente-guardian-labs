@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { chat } from "./proveedor.js";
 import { esIntentoDeElusion } from "./guardia.js";
-import { sala } from "../tools/extraer.js";
+import { horario, sala } from "../tools/extraer.js";
 
 // Salas 1 a 16 (las de reservas).
 const SALAS = Array.from({ length: 16 }, (_, i) => `sala-${i + 1}`) as [string, ...string[]];
@@ -83,6 +83,10 @@ export function rutaRapida(texto: string): TipoIntencion | null {
   if (/\b(reservar|separar|apartar|agendar|programar)\b/.test(t)) return "solicitud_reserva";
   if (/\bnecesit\w*\b.{0,25}\bsalas?\b/.test(t)) return "solicitud_reserva";
   if (/\b(quiero|necesito)\s+(la\s+|una\s+|un\s+)?(sala|laboratorio)s?\b/.test(t)) return "solicitud_reserva";
+  // Sala con número y rango de horas, sin pregunta ("de 2 a 4 pm en la sala 6 mañana"): es una reserva (7.0.9).
+  if (sala(texto) && horario(texto) && !/[?¿]|\b(disponib\w*|libres?|ocupad\w*|hay|esta|estan)\b/.test(t)) {
+    return "solicitud_reserva";
+  }
   if (/^ver (disponibilidad|todas)\b/.test(t.trim())) return "consulta_disponibilidad"; // chips de saludo y de lista // chip "Ver todas (día)" de la lista de salas
   if (/\b(disponibilidad|disponibles?|libres?|agenda)\b/.test(t) && /\b(sala|salas|laboratorio)\b/.test(t)) {
     return "consulta_disponibilidad";
