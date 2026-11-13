@@ -123,6 +123,7 @@ export const Conversacion = z.object({
   validado: z.string().nullish(),               // última combinación fecha|horario|sala revisada (7.0.6)
   respaldo: z.array(z.string()).nullish(),      // campos que vinieron del modelo y esperan confirmación (7.0.8)
   ofrecer: z.boolean().nullish(),               // "Ver otras salas" sin personas: ofrecer salas al saberlas (7.0.9)
+  duracion_min: z.number().int().nullish(),     // duración pedida en una consulta de disponibilidad (plan de rango horario)
   actualizado: z.date(),
 });
 export type Conversacion = z.infer<typeof Conversacion>;

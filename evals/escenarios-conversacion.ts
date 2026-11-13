@@ -9,6 +9,9 @@ import { crearMemoria } from "../agent/store/memoria.js";
 import type { Repositorio } from "../agent/store/repositorio.js";
 import { fijarReloj, liberarReloj } from "../agent/tools/reloj.js";
 import type { Fuente } from "../agent/llm/respaldo.js";
+import { readFileSync } from "node:fs";
+import type { DecisionReserva, ReservaDoc } from "../agent/tools/esquemas-reservas.js";
+const VERSION_REGLAS = JSON.parse(readFileSync(new URL("../agent/rules/reglas.json", import.meta.url), "utf-8")).version as string;
 
 export type FilaConv = { id: string; tipo: string; entrada: string; esperado: string; observado: string; ok: boolean };
 
@@ -151,7 +154,7 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
         "C-10000001 → ¿Qué disponibilidad hay en la sala 6 mañana? → ¿Qué salas hay disponibles mañana? → ¿Qué salas tienen cupo?",
         "ocupada 13:00–15:00 y libres 07:00–13:00, 15:00–22:00; lista de salas desde la base con «y N salas más»; estado de las 16 salas", [
           [texto.includes("Ocupada: 13:00–15:00") && texto.includes("Libre: 07:00–13:00, 15:00–22:00"), "ocupada y libres como se espera"],
-          [lista.includes("Salas con 2 horas libres") && lista.includes("• Sala") && lista.includes("salas más")
+          [lista.includes("Salas con 30 minutos libres seguidas") && lista.includes("• Sala") && lista.includes("salas más")
             && !lista.includes("aforo") && !lista.includes("franja"), "lista de salas desde la base, con «y N salas más»"],
           [estado.includes("Equipos operativos") && estado.includes("de 16") && estado.includes("Sala 12") && estado.includes("Sala 9")
             && !estado.includes("aforo") && !estado.includes("franja"), "estado de las salas desde la base (conflictos y datos desconocidos)"],
@@ -437,13 +440,13 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
           [(sinTilde.salidas[1].respuesta ?? "").includes("Sesión cerrada"), "«cerrar sesion» sin tilde también cierra"],
         ]));
     }
-    // C-27 (7.0.6): a las 20:23 no hay salas con 2 horas libres hoy. La oferta de mañana se guarda en la sesión;
+    // C-27 (7.0.6): a las 20:23 no hay salas con 2 horas libres hoy (pedido por duración). La oferta de mañana se guarda en la sesión;
     // "Sí, quiero la sala 1" reserva mañana, no hoy. "Sí, revisar mañana" muestra mañana.
     fijarReloj("2026-11-09", "20:23");
     {
-      const { repo, salidas } = await guion(sid(1), ["C-10000001", "¿Qué salas hay disponibles hoy?", "Sí, quiero la sala 1"]);
+      const { repo, salidas } = await guion(sid(1), ["C-10000001", "¿Qué salas tienen 2 horas libres hoy?", "Sí, quiero la sala 1"]);
       const conv = await repo.leerConversacion(sid(1));
-      const otra = await guion(sid(2), ["C-10000001", "¿Qué salas hay disponibles hoy?", "Sí, revisar mañana"]);
+      const otra = await guion(sid(2), ["C-10000001", "¿Qué salas tienen 2 horas libres hoy?", "Sí, revisar mañana"]);
       filas.push(fila("C-27", "Oferta de mañana a las 20:23", "C-10000001 → ¿Qué salas hay disponibles hoy? → Sí, quiero la sala 1",
         "ofrece «Sí, revisar mañana»; «Sí, quiero la sala 1» reserva el martes 10 de noviembre, nunca hereda hoy", [
           [JSON.stringify(salidas[1].flujo?.opciones) === JSON.stringify(["Sí, revisar mañana"]), "chip «Sí, revisar mañana»"],
@@ -487,6 +490,7 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
         "R15 con «Ese horario de hoy ya pasó (son las 20:23)»; vuelve a pedir el horario, no las personas", [
           [(r.respuesta ?? "").startsWith("Ese horario de hoy ya pasó (son las 20:23)"), "mensaje de horario pasado"],
           [pendiente(r) === "horario" && !(r.respuesta ?? "").includes("¿Cuántas personas"), "vuelve a pedir el horario, no las personas"],
+          [JSON.stringify(r.flujo?.opciones) === JSON.stringify(["Revisar mañana"]), "chip «Revisar mañana» (09:00–11:00 no cabe hoy)"],
         ]));
     }
 
@@ -625,6 +629,77 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
         "revisa la Sala 8 y pregunta personas", [
           [(salidas[1].respuesta ?? "").includes("Revisé la Sala 8") && pendiente(salidas[1]) === "personas", "reserva con validación temprana"],
         ]));
+    }
+    // C-45 (plan de rango horario): "10AM hasta las 3 de la tarde" con fecha, personas y rango sin tope de duración.
+    {
+      const { repo, salidas } = await guion(sid(3), ["D-20000001", "Quiero una sala para 25 estudiantes el 14 de noviembre de 10AM hasta las 3 de la tarde"]);
+      const r = salidas[1];
+      const conv = await repo.leerConversacion(sid(3));
+      filas.push(fila("C-45", "Rango largo sin tope (docente)", "D-20000001 → Quiero una sala para 25 estudiantes el 14 de noviembre de 10AM hasta las 3 de la tarde",
+        "sin R15; conserva 2026-11-14, 10:00–15:00 y 25 personas; pide el siguiente dato (equipos)", [
+          [!/no puedo separar|abren de|hora de fin|ya pasó/i.test(r.respuesta ?? ""), "sin causa de R15"],
+          [conv?.datos.fecha === "2026-11-14" && conv?.datos.inicio === "10:00" && conv?.datos.fin === "15:00" && conv?.datos.personas === 25, "conserva fecha, horario y personas"],
+          [pendiente(r) === "equipos", `pide el siguiente dato: ${pendiente(r)}`],
+        ]));
+    }
+
+    // C-46: 8 PM a 11 PM. R15 por cierre de la sala con el chip del ajuste mínimo; al tocarlo sigue la reserva.
+    {
+      const { salidas } = await guion(sid(4), ["C-10000001", "Quiero la sala 3 mañana de 8 PM a 11 PM", "20:00 a 22:00"]);
+      const causa = salidas[1];
+      const sigue = salidas[2];
+      filas.push(fila("C-46", "Cierre después de las 22:00", "C-10000001 → Quiero la sala 3 mañana de 8 PM a 11 PM → 20:00 a 22:00",
+        "R15 «las salas abren de 07:00 a 22:00» con el chip «20:00 a 22:00»; al tocarlo revisa la Sala 3 y sigue la reserva", [
+          [(causa.respuesta ?? "").includes("Las salas abren de 07:00 a 22:00"), "causa concreta"],
+          [JSON.stringify(causa.flujo?.opciones) === JSON.stringify(["20:00 a 22:00"]), `chip ${JSON.stringify(causa.flujo?.opciones)}`],
+          [(sigue.respuesta ?? "").includes("Revisé la Sala 3") || pendiente(sigue) === "personas", "sigue la reserva con el rango ajustado"],
+        ]));
+    }
+
+    // C-47: disponibilidad por duración: salas con 5 horas libres seguidas, nada más.
+    {
+      const { salidas } = await guion(sid(5), ["C-10000001", "¿Qué salas tienen 5 horas libres el martes?"]);
+      const texto = salidas[1].respuesta ?? "";
+      const lineas = texto.split("\n").filter((l) => l.startsWith("• "));
+      const minutos = (r: string) => { const [a, b] = r.split("–").map((h) => { const [x, y] = h.split(":").map(Number); return x * 60 + y; }); return b - a; };
+      const todasLargas = lineas.length > 0 && lineas.every((l) => l.split(": ")[1].split(", ").every((r) => minutos(r) >= 300));
+      filas.push(fila("C-47", "Disponibilidad por duración", "C-10000001 → ¿Qué salas tienen 5 horas libres el martes?",
+        "solo salas con un hueco continuo de al menos 5 horas; texto «5 horas libres seguidas»", [
+          [texto.includes("Salas con 5 horas libres seguidas el martes 10 de noviembre"), "texto con 5 horas libres seguidas"],
+          [todasLargas, "cada sala listada tiene al menos un hueco de 5 horas"],
+        ]));
+    }
+
+    // C-48: ningún día con esas condiciones (choques creados en la prueba). Ofrece el día más cercano y lo revisa.
+    {
+      const repo = crearMemoria("2026-11-09");
+      const decisionProgramar = (): DecisionReserva => ({
+        decision: "programar", estado: "confirmado", accion: "programar_reserva", reglas_aplicadas: ["R25"],
+        sala_asignada: null, alternativas: [], conflictos: [], faltantes: [], notificar: [], fuentes: [],
+        version_reglas: VERSION_REGLAS, traza: [],
+      });
+      const bloque = (codigo: string, sala: string): ReservaDoc => ({
+        codigo, sala, fecha: "2026-11-10", inicio: "10:00", fin: "14:00", inicio_min: 600, fin_min: 840,
+        tipo: "estudiantes", carne: "C-10000001", rol: "estudiante", personas: 5, equipos: 5, computo_alto: false,
+        materia: null, estado: "programada", reglas_aplicadas: ["R25"], traza: [], version_reglas: VERSION_REGLAS,
+        creada: new Date(), origen: "chat",
+      });
+      for (const s2 of await repo.salas()) {
+        await repo.crearReservaAtomica("2026-11-10", s2._id, () => decisionProgramar(), (c) => bloque(c, s2._id));
+      }
+      configurarParaPruebas({ repo, interpretar: clasificadorFijo });
+      const S48 = sid(6);
+      const salidas: Salida[] = [];
+      for (const t of ["C-10000001", "¿Qué salas tienen disponibilidad el martes de 10 a 14?", "Sí, revisar el 11 de noviembre"]) {
+        salidas.push(await mensaje(t, { sesion: S48 }) as Salida);
+      }
+      filas.push(fila("C-48", "Día más cercano con salas", "C-10000001 → ¿Qué salas tienen disponibilidad el martes de 10 a 14? → Sí, revisar el 11 de noviembre",
+        "sin salas el martes de 10:00 a 14:00; ofrece «Sí, revisar el 11 de noviembre»; al tocarlo lista las salas de ese día", [
+          [(salidas[1].respuesta ?? "").includes("El día más cercano con salas libres es el miércoles 11 de noviembre"), "ofrece el día más cercano"],
+          [JSON.stringify(salidas[1].flujo?.opciones) === JSON.stringify(["Sí, revisar el 11 de noviembre"]), "chip con el día"],
+          [(salidas[2].respuesta ?? "").includes("Para el miércoles 11 de noviembre de 10:00 a 14:00, estas salas cumplen"), "revisa el día con el mismo rango"],
+        ]));
+      configurarParaPruebas({ repo: crearMemoria("2026-11-09"), interpretar: clasificadorFijo });
     }
   } finally {
     liberarReloj();

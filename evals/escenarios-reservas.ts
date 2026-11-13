@@ -5,6 +5,8 @@ import { evaluarRegistro, evaluarReserva, type Contexto } from "../agent/tools/r
 import { ahora, fijarReloj, liberarReloj } from "../agent/tools/reloj.js";
 import { crearMemoria } from "../agent/store/memoria.js";
 import type { Repositorio } from "../agent/store/repositorio.js";
+import { readFileSync } from "node:fs";
+const VERSION_REGLAS = JSON.parse(readFileSync(new URL("../agent/rules/reglas.json", import.meta.url), "utf-8")).version as string;
 
 export type FilaRes = { id: string; tipo: string; entrada: string; regla: string; esperado: string; observado: string; ok: boolean };
 
@@ -50,6 +52,10 @@ export const CASOS: Caso[] = [
   { id: "RS-04a", tipo: "Límite horario", regla: "R25", s: sol({ carne: "C-10000001", sala: "sala-4", inicio: "07:00", fin: "09:00", personas: 5 }),
     esp: { decision: "programar", reglas: ["R25"], sala: "sala-4" } },
   { id: "RS-04b", tipo: "Fuera de horario", regla: "R15", s: sol({ carne: "C-10000001", sala: "sala-4", inicio: "21:00", fin: "22:30", personas: 5 }),
+    esp: { decision: "negar", reglas: ["R15"] } },
+  { id: "RS-21", tipo: "Jornada completa (sin tope de duración)", regla: "R25", s: sol({ carne: "C-10000001", sala: "sala-4", inicio: "07:00", fin: "22:00", personas: 5 }),
+    esp: { decision: "programar", reglas: ["R25"], sala: "sala-4" } },
+  { id: "RS-22", tipo: "Menos de 30 minutos", regla: "R15", s: sol({ carne: "C-10000001", sala: "sala-4", inicio: "21:45", fin: "22:00", personas: 5 }),
     esp: { decision: "negar", reglas: ["R15"] } },
   { id: "RS-05", tipo: "Desconocido (equipos)", regla: "R19", s: sol({ carne: "D-20000001", sala: "sala-12", inicio: "10:00", fin: "12:00", personas: 14, equipos: 14, computo_alto: false, materia: "Redes" }),
     esp: { decision: "escalar", reglas: ["R19"], notificar: ["monitor", "mantenimiento"], estado: "desconocido" } },
@@ -157,7 +163,7 @@ export async function correrEscenariosReservas(): Promise<FilaRes[]> {
         codigo, sala: "sala-4", fecha: FECHA, inicio: "16:00", fin: "18:00", inicio_min: 960, fin_min: 1080,
         tipo: "estudiantes", carne: "C-10000001", rol: "estudiante", personas: 5, equipos: 5,
         computo_alto: false, materia: null, estado: "programada", reglas_aplicadas: ["R25"], traza: [],
-        version_reglas: "2.0.0", creada: new Date(), origen: "chat",
+        version_reglas: VERSION_REGLAS, creada: new Date(), origen: "chat",
       });
       const primera = await repo.crearReservaAtomica(FECHA, "sala-4", revalidar, construir);
       const segunda = await repo.crearReservaAtomica(FECHA, "sala-4", revalidar, construir);

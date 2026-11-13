@@ -209,9 +209,29 @@ export function cancelar(t: string): boolean {
   return /\b(cancelar|cancela|olvidalo|empezar de nuevo)\b/.test(n) || n === "salir";
 }
 
+// ── Duración pedida sin rango (plan de rango horario, 3.1) ───────────────
+// "por 5 horas", "hora y media", "3 horas y media", "media hora", "90 minutos", "5 h". Solo se usa cuando el texto
+// no trae un rango de horas: "a las 3" y "3 de la tarde" son horas del día, no duración.
+function duracionDe(r: string): number | null {
+  const valor = (x: string): number => (x === "una" || x === "un" ? 1 : valorNum(x));
+  let m = r.match(new RegExp(`\\b${NUM}\\s+horas?\\s+y\\s+media\\b`));
+  if (m) return valor(m[1]) * 60 + 30;
+  if (/\bhora\s+y\s+media\b/.test(r)) return 90;
+  m = r.match(new RegExp(`\\b${NUM}\\s+horas?\\b`));
+  if (m) return valor(m[1]) * 60;
+  if (/\bmedia\s+hora\b/.test(r)) return 30;
+  if (/\buna\s+hora\b/.test(r)) return 60;
+  m = r.match(new RegExp(`\\b${NUM}\\s+minutos?\\b`));
+  if (m) return valor(m[1]);
+  m = r.match(new RegExp(`\\b${NUM}\\s+h\\b`));
+  if (m) return valor(m[1]) * 60;
+  return null;
+}
+
 // ── Extracción completa de un mensaje ────────────────────────────────────
 export type Extraido = {
   carne: string | null; fecha: string | null; inicio: string | null; fin: string | null;
+  duracion_min: number | null;
   sala: string | null; personas: number | null; equipos: number | null;
   computo_alto: boolean | null; materia: string | null;
   confirmacion: "si" | "no" | null; cancelar: boolean;
@@ -237,6 +257,7 @@ export function extraer(texto: string, opts: { hoy: string; pendiente: string | 
     fecha: f?.valor ?? null,
     inicio: h?.valor.inicio ?? null,
     fin: h?.valor.fin ?? null,
+    duracion_min: h ? null : duracionDe(r),
     sala: s?.valor ?? null,
     personas: personas(r, opts.pendiente),
     equipos: equipos(r, opts.pendiente),

@@ -4,6 +4,8 @@ import { MongoClient, type Db } from "mongodb";
 import type { DecisionReserva, ReservaDoc } from "../agent/tools/esquemas-reservas.js";
 import { crearRepositorioMongo } from "../agent/store/mongo.js";
 import { sembrar } from "../agent/store/sembrar.js";
+import { readFileSync } from "node:fs";
+const VERSION_REGLAS = JSON.parse(readFileSync(new URL("../agent/rules/reglas.json", import.meta.url), "utf-8")).version as string;
 
 try { process.loadEnvFile(); } catch { /* sin .env */ }
 
@@ -36,14 +38,14 @@ const decision = (d: "programar" | "negar"): DecisionReserva => ({
   reglas_aplicadas: [d === "programar" ? "R25" : "R22"],
   sala_asignada: d === "programar" ? SALA : null,
   alternativas: [], conflictos: [], faltantes: [], notificar: [], fuentes: [],
-  version_reglas: "2.0.0", traza: [],
+  version_reglas: VERSION_REGLAS, traza: [],
 });
 // Reserva de prueba 16:00–18:00 en sala-4.
 const construir = (codigo: string): ReservaDoc => ({
   codigo, sala: SALA, fecha: FECHA, inicio: "16:00", fin: "18:00", inicio_min: 960, fin_min: 1080,
   tipo: "estudiantes", carne: "C-10000001", rol: "estudiante", personas: 5, equipos: 5,
   computo_alto: false, materia: null, estado: "programada", reglas_aplicadas: ["R25"], traza: [],
-  version_reglas: "2.0.0", creada: new Date(), origen: "chat",
+  version_reglas: VERSION_REGLAS, creada: new Date(), origen: "chat",
 });
 const revalidar = (actuales: ReservaDoc[]) =>
   actuales.some((r) => r.inicio_min < 1080 && r.fin_min > 960) ? decision("negar") : decision("programar");

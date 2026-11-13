@@ -174,3 +174,37 @@ Motivo: la variante Clara de Stitch (`docs/plan/diseno-chat/variante-1.html`) fu
 | Pantalla: historial del día (solo la conversación actual), saludo con nombre y apellido, cuatro accesos rápidos, burbujas, insignia de intención, chips con punto, entrada en píldora con botón redondo. Sin texto inventado de la maqueta (sin «Reserva Segura», «Validado» ni historial de ejemplo). | Diseño aprobado con datos reales. | `web/src/pages/Chat.jsx`, `web/src/styles/chat.css` | revisión en el navegador (1440 px y 375 px sin desbordamiento) |
 | «Mis reservas» aparece deshabilitado con «Próximamente». | La función no existe todavía. | `web/src/pages/Chat.jsx` | — |
 | «Ejemplos para probar» y «Cómo funciona» quedan plegados en la columna de historial. | Conservar la guía sin ocupar la pantalla. | `web/src/pages/Chat.jsx` | — |
+
+## Rangos de horario personalizados y R15 sin tope de duración (sección 7.0.12, 12-11-2026)
+
+Motivo: el chat rechazaba como «más de 4 horas» una reserva de 10:00 a 15:00 pedida por un docente. El tope de 4 h
+era un supuesto del equipo, no una decisión de la entrevista al monitor, y las sugerencias de horario eran fijas
+(«08:00 a 10:00», «14:00 a 16:00») y de 2 h.
+
+**Antes:** R15 negaba cualquier reserva de más de 4 horas («duracion_max_min»: 240); reglas 2.0.0; la pregunta de
+horario ofrecía los chips fijos de 2 h y el ejemplo «de 13:00 a 15:00»; la disponibilidad sin criterios buscaba
+huecos de 2 h; la oferta de otro día era solo «mañana».
+
+**Después:** R15 sin tope (cualquier rango de 07:00 a 22:00, mínimo 30 minutos, hasta 30 días); reglas 2.1.0; la
+pregunta no trae chips y pide el rango; si R15 falla por el horario, el chip es el ajuste mínimo del rango que
+escribió la persona; la disponibilidad busca huecos continuos de la duración pedida y, si el día no tiene salas,
+ofrece el día más cercano con los mismos criterios.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| `reglas.json` 2.1.0: `duracion_max_min: null`; R15 con descripción, fuente y `vigente_desde` 2026-11-12. | Quitar el tope de 4 h, que era un supuesto. | `agent/rules/reglas.json` | RS-21, RS-22 |
+| `causaR15` salta el tope cuando es `null`; la versión sale de `reglas.json` (sin «2.0.0» fijo en el código ni en las pruebas). | Versión única y tope configurable. | `agent/tools/reservas.ts`, `agent/conversacion.ts`, `evals/escenarios-reservas.ts`, `evals/mongo.ts` | `evals/reservas.ts`, `evals/conversacion.ts` |
+| Chips del ajuste mínimo cuando R15 falla por el horario: `07:00 a …`, `… a 22:00`, `07:00 a 22:00`, `… a …` con 30 min, `… a` con la tarde, o «Revisar mañana» si hoy ya no cabe. | Decir qué cambiar sin pedir todo otra vez. | `agent/conversacion.ts` (`chipsHorarioR15`) | C-30, C-46 |
+| La pregunta de horario no trae chips fijos; con solo la hora de inicio pide la final. | Que la persona escriba su rango. | `agent/conversacion.ts` (`preguntaPara`) | C-45 |
+| Extractor `duracion_min`: «por 5 horas», «hora y media», «3 horas y media», «media hora», «90 minutos», «5 h»; no cuenta «a las 3» ni «3 de la tarde». | Duración pedida sin rango. | `agent/tools/extraer.ts` | `evals/extraer.ts` |
+| Disponibilidad por duración N (rango, o duración pedida, o 30 min): huecos continuos de N; «Salas con 5 horas libres seguidas …». | Responder a lo que se pidió. | `agent/conversacion.ts` (`disponibilidadTurno`, `salasQueCumplen`) | C-04, C-47 |
+| Día más cercano (hasta 30 días) cuando el día no tiene salas; `oferta_manana` pasa a `oferta_dia`, con la fecha ofrecida y la duración guardadas (`duracion_min` en la conversación). | Ofrecer otro día sin perder los criterios. | `agent/conversacion.ts`, `agent/tools/esquemas-reservas.ts`, `agent/store/mongo.ts` | C-27, C-48 |
+| R24 (ninguna sala en ese horario): ofrece el día más cercano con el mismo rango y personas, como chip «Revisar el …». | Plan, 4. | `agent/conversacion.ts` (`responder`) | — (sin fila nueva) |
+| Chips «Revisar mañana» y «Revisar el {día}» cambian la fecha y conservan el horario pedido. | El horario que ya escribió la persona no se vuelve a pedir. | `agent/conversacion.ts` (`turnoReserva`) | C-30, C-48 |
+| Pruebas nuevas: C-45 (10AM a 3 de la tarde, sin R15), C-46 (8 PM a 11 PM con chip «20:00 a 22:00»), C-47 (5 horas libres), C-48 (día más cercano con choques creados en la prueba), RS-21 (jornada completa), RS-22 (menos de 30 minutos). C-04 y C-27 se ajustaron a la nueva duración por defecto (30 min) y a la pregunta «2 horas». | Cubrir las reglas nuevas. | `evals/escenarios-conversacion.ts`, `evals/escenarios-reservas.ts`, `evals/extraer.ts` | `npm run pruebas`, `npm run matriz` (88/88) |
+
+Prueba manual en el navegador (C-45): D-20000001 → «Quiero una sala para 25 estudiantes el 14 de noviembre de 10AM
+hasta las 3 de la tarde». Respuesta: «¿Cuántos computadores necesita?» con el chip «El mismo número de estudiantes».
+Ya no aparece «La reserva dura más de 4 horas».
+
+RS-04b (21:00–22:30) sigue negado: termina después de las 22:00.

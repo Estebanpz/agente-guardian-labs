@@ -1,8 +1,9 @@
-# Guardian Labs: agente lógico local para el ingreso a los laboratorios
+# Guardian Labs: agente lógico local para el ingreso y la reserva de salas de los laboratorios
 
 Prototipo académico del curso **Inteligencia Artificial** (Ingeniería de Sistemas, UniEspinal, 2026B), Fase 2 del
 *Taller-proyecto de agente lógico local*. El agente ayuda al **monitor** de los laboratorios de sistemas a decidir si
-una persona puede ingresar, qué equipo usar y cómo registrar su asistencia.
+una persona puede ingresar, qué equipo usar y cómo registrar su asistencia. También atiende **reservas de salas por chat**
+(identifica primero a la persona por su carné) y le muestra al monitor la agenda del día y los avisos que necesitan una persona.
 
 **Autores:** Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel.
 
@@ -58,23 +59,39 @@ Arranca la API (`http://127.0.0.1:3000`) y la interfaz (`http://localhost:5173`)
 
 | Vista | Para qué |
 |---|---|
-| **Laboratorios** | Formulario de solicitud y casos de demostración (normal, desconocido, contradicción, combinado) |
-| **Chat** | Texto libre del monitor (incluye fuera de alcance, intento de eludir reglas y datos prohibidos) |
-| **Salas** | Aforo y estado de los equipos según inventario y mantenimiento |
+| **Laboratorios** | Formulario de ingreso y casos de demostración (normal, desconocido, contradicción, combinado) con las reglas R1–R13 |
+| **Chat** | Conversación con carné primero: saludo por nombre, reservas, disponibilidad, ocupación por fecha y avisos al monitor |
+| **Salas** | Vista del monitor: 16 salas por fecha, indicadores, filtros, agenda 07:00–22:00, detalle de cada sala y avisos |
 
 ### Capturas
 
-**Laboratorios:** caso combinado E-006. El motor aplica R13 (dato desconocido y fuentes en conflicto a la vez) y escala.
+Tomadas el 9 de noviembre de 2026 con `npm run app`, MongoDB local y datos sintéticos.
 
-![Vista Laboratorios con el caso E-006](docs/capturas/interfaz-laboratorios.png)
+**Laboratorios:** E-001 se permite por R10 y R11, con equipo sugerido y traza de reglas.
 
-**Chat:** una pregunta fuera de alcance y una solicitud de reserva, que no es función de este agente.
+![Vista Laboratorios con el caso E-001](docs/readme/laboratorios-permitir.jpg)
 
-![Vista Chat](docs/capturas/interfaz-chat.png)
+**Chat:** el agente pide el carné, saluda con nombre, programa y jornada, y revisa la sala antes de pedir más datos.
 
-**Salas:** aforo y estado de los equipos; PC-07 aparece en conflicto entre inventario y mantenimiento.
+![Chat con identidad y validación temprana](docs/readme/chat-identidad-validacion.jpg)
 
-![Vista Salas](docs/capturas/interfaz-salas.png)
+**Reserva confirmada:** RS-0011 queda en la base de demostración y el agente olvida el carné al terminar.
+
+![Reserva confirmada en el chat](docs/readme/chat-sala-separada.jpg)
+
+**Sala ocupada:** un docente pide la misma sala; el agente dice quién la tiene (carné enmascarado) y, si elige escalar, crea un aviso para el monitor.
+
+![Escalamiento al monitor desde el chat](docs/readme/chat-escalar-monitor.jpg)
+
+**Salas del monitor:** indicadores, filtros y agenda del día.
+
+![Vista Salas del monitor](docs/readme/salas-hoy.jpg)
+
+**Detalle de una sala** y **avisos del monitor** (la barra lateral indica la base y el modelo en uso):
+
+![Detalle de la Sala 8](docs/readme/salas-detalle.jpg)
+
+![Avisos del monitor y base MongoDB local](docs/readme/salas-avisos-base.jpg)
 
 ### Comandos
 
@@ -84,18 +101,24 @@ Arranca la API (`http://127.0.0.1:3000`) y la interfaz (`http://localhost:5173`)
 | `npm run serve` | Solo la API |
 | `npm run dev -- E-006` | Evalúa un caso por consola |
 | `npm run dev -- "Soy E-001, sala 1, ¿puede entrar?"` | Texto libre por consola |
-| `npm run pruebas` | Matriz P-01 a P-10, regresión P-08, R12, privacidad e intención |
+| `npm run pruebas` | Motor, regresión, R12, privacidad, ayuda, intención, reservas, extractores, conversación, semilla y API del monitor |
+| `npm run matriz` | Genera `docs/matriz-pruebas.md` (82 de 82 el 8-nov-2026) |
+| `npm run seed` | Carga los datos sintéticos en la base del `.env` |
+| `npm run prueba:mongo` | Comprueba reservas, conflictos, avisos y sesiones contra MongoDB |
 | `npm run e2e` | Pruebas de punta a punta P-06 y P-07 con el modelo |
 | `npm run typecheck` | Verificación de tipos (TypeScript estricto) |
 
 ## Reservas por chat
 
-El chat también gestiona reservas de salas. Para una reserva, el agente pide los datos paso a paso:
+El chat también gestiona reservas de salas. Toda conversación empieza por el **carné** (C- o D- y 8 dígitos):
 
-1. carné del solicitante;
-2. fecha y horario;
-3. número de personas;
-4. si la persona es docente: equipos requeridos, si se necesita alto cómputo y la materia.
+1. con un carné vigente, el agente guarda la sesión (30 minutos) y saluda con nombre, programa y jornada;
+2. la persona escribe la sala, la fecha y el horario en lenguaje natural («la sala 8 mañana de 10 a 12», «de 5:30 a 7:30»);
+3. el agente revisa de una vez el horario (R15), si la sala está ocupada y el aforo, antes de pedir más datos;
+4. pide las personas y, si es docente, los equipos, el alto cómputo y el espacio académico (entre sus propios espacios);
+5. muestra la tarjeta de la reserva y pide confirmación; al terminar, olvida el carné.
+
+Si la sala está ocupada ofrece «Ver otras salas» o «Escalar al monitor». Escalar crea un aviso para el monitor sin reserva.
 
 Con esos datos, el **motor de reglas decide**; el modelo local solo conversa y redacta la respuesta. Si todas
 las reglas se cumplen, la reserva se confirma y queda registrada en la base de demostración. Si una regla niega
@@ -104,22 +127,18 @@ la reserva, el chat lo explica y pide otro horario o sala; los conflictos se esc
 | ID | Efecto | Descripción |
 |---|---|---|
 | R14 | `pedir_datos` | Falta un dato obligatorio de la solicitud de reserva: pedirlo, no concluir. |
-| R15 | `negar` | Fecha u horario fuera de lo permitido (07:00–22:00, 30 min a 4 h, hasta 30 días): negar y pedir otro horario. |
+| R15 | `negar` | Fecha u horario fuera de lo permitido (07:00–22:00, mínimo 30 minutos, hasta 30 días): negar y pedir otro horario. Sin tope de duración desde las reglas 2.1.0 (12-11-2026). |
 | R16 | `negar` | Carné no vigente en carnetización: negar la reserva y remitir a carnetización. |
 | R17 | `escalar_monitor` | Carné que no aparece en carnetización o con vigencia desconocida: no concluir y escalar al monitor. |
 | R18 | `negar` | La sala pedida no alcanza para las personas o los equipos requeridos: negar esa sala y sugerir otras. |
 | R19 | `escalar_monitor` | Los equipos operativos solo alcanzan si se cuentan equipos con estado desconocido o en conflicto: no concluir y escalar. |
 | R20 | `escalar_monitor` | Un docente pide una sala ya separada por estudiantes en ese horario: informar quién la tiene, escalar al monitor para que acuerden y sugerir salas libres. |
-| R21 | `escalar_coordinacion` | Un docente pide una sala ya separada por otro docente en ese horario: escalar a coordinación y sugerir salas libres. |
+| R21 | `escalar_monitor` | Un docente pide una sala ya separada por otro docente en ese horario: escalar al monitor, que lo remitirá a coordinación si hace falta, y sugerir salas libres. |
 | R22 | `negar` | Un estudiante pide una sala ya separada en ese horario: negar esa sala y sugerir salas libres. |
 | R23 | `negar` | Se necesita alto cómputo y la sala pedida no lo es: negar esa sala y sugerir salas de alto cómputo. |
 | R24 | `negar` | Ninguna sala cumple las condiciones en ese horario: negar y pedir otro horario o menos personas. |
 | R25 | `programar` | Ninguna regla bloquea: separar la sala en la base de demostración tras la confirmación. |
 | R26 | `registrar_usuario` | Carné vigente en carnetización y aún no registrado: registrar al usuario sin pedir más datos personales. |
-
-**Chat con una reserva confirmada:**
-
-![Chat con una reserva confirmada en la base de demostración](docs/capturas/reserva-confirmada.png)
 
 Las reservas son simuladas sobre datos sintéticos; el prototipo no reserva salas reales.
 
@@ -136,10 +155,12 @@ Las reservas son simuladas sobre datos sintéticos; el prototipo no reserva sala
 
 ## Base de datos
 
-La base de demostración usa **MongoDB Atlas** en el plan **Free**. La cadena de conexión (`MONGODB_URI`) va solo
+Desde el 8 de noviembre de 2026 la base de demostración corre en **MongoDB local** (Community Server 8.0 con replica set
+`rs0`). MongoDB Atlas sigue siendo una opción: solo cambia `MONGODB_URI` en `.env`. La cadena de conexión va únicamente
 en `.env`, que no se sube al repositorio; nunca debe aparecer en el código, en la documentación ni en los commits.
+La interfaz y `GET /salud` informan el tipo de base (`local`, `atlas`, `remota` o `memoria`), nunca la URI.
 
-Cargar los datos sintéticos en Atlas:
+Cargar los datos sintéticos (16 salas, 306 equipos, 17 carnés, 7 usuarios y 3 reservas):
 
 ```sh
 npm run seed
@@ -151,14 +172,16 @@ Restaurar la demostración desde cero:
 npm run seed -- --reset --si
 ```
 
-> **Advertencia:** `--reset` borra reservas, notificaciones, conversaciones, bloqueos y contadores. Úsalo solo
+> **Advertencia:** `--reset` borra reservas, notificaciones, conversaciones, sesiones, bloqueos y contadores. Úsalo solo
 > cuando quieras empezar de nuevo.
 
-Para correr el prototipo sin red y sin Atlas, usa el repositorio en memoria:
+Para correr el prototipo sin base de datos, usa el repositorio en memoria:
 
 ```sh
 REPOSITORIO=memoria npm run app
 ```
+
+Para usar Atlas en lugar de la base local, sigue `docs/guia-mongodb.md`.
 
 ### MongoDB local con replica set `rs0`
 
@@ -200,10 +223,15 @@ Todas las rutas escuchan solo en `127.0.0.1` (el prototipo no tiene autenticaci�
 
 | Método y ruta | Cuerpo | Respuesta |
 |---|---|---|
-| `GET /salud` | — | `{ ok, proveedor }` |
-| `GET /salas` | — | Salas con aforo, ocupación y estado de cada equipo |
+| `GET /salud` | — | `{ ok, proveedor, repositorio, base }` (sin la URI) |
 | `POST /evaluar` | `{ id_sintetico, laboratorio, franja, tipo_evento }` | `{ decision, explicacion }` |
-| `POST /mensaje` | `{ texto, laboratorio? }` | Decisión, aclaración o rechazo, con la intención detectada |
+| `POST /mensaje` | `{ texto, sesion, laboratorio? }` | Respuesta del chat con la intención, la tarjeta de reserva y la identidad (carné enmascarado) |
+| `GET /salas?fecha=` | — | 16 salas con equipos, equipos en revisión y reservas del día (carné enmascarado) |
+| `GET /salas/laboratorios` | — | Aforo y estado de los equipos de la vista Laboratorios |
+| `GET /disponibilidad` | consulta | Huecos libres por sala y fecha |
+| `GET /reservas`, `GET /reservas/dias?mes=`, `GET /reservas/:codigo` | — | Reservas, días con reservas y detalle de una reserva |
+| `GET /notificaciones` | — | Avisos para el monitor |
+| `PATCH /notificaciones/:id` | `{ estado: "atendida" }` | Marca un aviso como atendido |
 
 Ejemplo:
 
@@ -233,6 +261,7 @@ Una entrada que no cumple el esquema devuelve `400` con el detalle de los campos
 
 ## Flujo de una solicitud en texto libre
 
+0. **Identidad:** sin carné en la sesión, el agente lo pide antes de atender; con un carné vigente saluda con una plantilla y recuerda la sesión 30 minutos.
 1. **Datos prohibidos:** si el texto trae cédula, correo o teléfono, se rechaza sin llamar al modelo y sin guardar el texto.
 2. **Guardia:** patrones de manipulación ("ignora las reglas", "tu prompt"…) se marcan sin consultar al modelo.
 3. **Interpretación:** el modelo devuelve JSON estructurado con la intención y los datos candidatos.
@@ -241,7 +270,7 @@ Una entrada que no cumple el esquema devuelve `400` con el detalle de los campos
 6. **Explicación:** el modelo redacta la explicación sin cambiar la decisión.
 7. **Registro:** se guarda en `logs/evaluaciones.jsonl`.
 
-## Reglas (versión 2.0.0: R1–R13 más R14–R26)
+## Reglas (versión 2.1.0: R1–R13 más R14–R26)
 
 Las reglas R1–R13 se describen aquí; las reglas R14–R26 de las reservas por chat están en la sección
 [Reservas por chat](#reservas-por-chat).
@@ -296,21 +325,30 @@ agrega la comparación con el modelo local.
 | P-10 | E-007 | Negar por R4 |
 | P-11 | E-012 | Accesibilidad (R8): con puesto accesible libre sugiere PC-03; sin puestos accesibles libres, escala |
 
+## Pruebas automáticas
+
+`npm run matriz` genera `docs/matriz-pruebas.md`: el 8 de noviembre de 2026 pasaron **82 de 82** pruebas (16 de ingreso y
+seguridad, 21 de reservas, 44 de conversación y 1 de identidad) con las reglas 2.0.0 y `ollama:llama3.2:3b`.
+
 ## Estructura
 
 ```
 agente-guardian-labs/
 ├── agent/
-│   ├── channels/http.ts      API Express
+│   ├── channels/             API Express (http.ts) y arranque (servir.ts)
 │   ├── orquestador.ts        ciclo completo de una solicitud
-│   ├── llm/                  proveedor, intérprete, guardia y redactor
-│   ├── tools/                esquemas, motor, privacidad y salas
-│   ├── rules/reglas.json     base de reglas versionada
+│   ├── conversacion.ts       flujo de reserva por pasos y contexto
+│   ├── sesion.ts             identidad, saludo por plantilla y cierre de sesión
+│   ├── llm/                  proveedor, intérprete, guardia, redactor y respaldo
+│   ├── tools/                esquemas, motor, reservas, extractores, privacidad y monitor
+│   ├── store/                repositorio MongoDB (local o Atlas) y en memoria
+│   ├── rules/reglas.json     base de reglas versionada (R1–R26)
 │   └── instructions.md       reglas permanentes del agente
-├── data/                     casos, equipos y salas sintéticos
-├── evals/                    pruebas automáticas
+├── data/                     casos, equipos, salas, carnetización y programas sintéticos
+├── evals/                    pruebas automáticas y matriz
+├── docs/                     matriz, guías, bitácora de cambios y capturas del README
 ├── logs/                     registro local (no se sube al repositorio)
-└── web/                      interfaz React + Bootstrap
+└── web/                      interfaz React + Bootstrap (Laboratorios, Chat y Salas)
 ```
 
 ## Solución de errores
@@ -330,6 +368,9 @@ agente-guardian-labs/
 - El modelo de 3B a veces redacta con imprecisiones; por eso la interfaz siempre muestra la traza.
 - La guardia por patrones se puede evadir; es una primera capa, y el motor decide igual.
 - No hay autenticación: la API escucha solo en `127.0.0.1`.
+- Por pedido del docente, el chat muestra nombre, programa y jornada de la persona identificada; todos son sintéticos y el carné se olvida al terminar la reserva.
+- La interfaz todavía deja visible en la burbuja y en el historial un dato prohibido que escribe el usuario (el agente sí lo bloquea).
+- La condición del taller pide MySQL local; el prototipo usa MongoDB local.
 
 ## Créditos y licencias de terceros
 

@@ -2,12 +2,12 @@
 
 | Dato | Valor |
 |---|---|
-| Fecha de ejecución | 8/11/2026, 10:52:45 p. m. |
-| Versión de las reglas | 2.0.0 |
+| Fecha de ejecución | 12/11/2026, 8:35:54 p. m. |
+| Versión de las reglas | 2.1.0 |
 | Proveedor y modelo | ollama:llama3.2:3b |
 | Versión de Ollama | 0.34.2 |
 | Node.js | v22.23.4 |
-| Resultado | **82 de 82 pruebas pasaron** |
+| Resultado | **88 de 88 pruebas pasaron** |
 
 Generado con `npm run matriz`. Las pruebas del motor son deterministas: la misma entrada y versión de reglas
 producen la misma decisión. P-06, P-07, S-01 y S-02 pasan por el modelo local.
@@ -36,6 +36,8 @@ producen la misma decisión. P-06, P-07, S-01 y S-02 pasan por el modelo local.
 | RS-03 | Límite capacidad | RS-03 | R25 | programar [R25] · sala-4 | programar [R25] · sala-4 · confirmado | ✅ |
 | RS-04a | Límite horario | RS-04a | R25 | programar [R25] · sala-4 | programar [R25] · sala-4 · confirmado | ✅ |
 | RS-04b | Fuera de horario | RS-04b | R15 | negar [R15] | negar [R15] · falso | ✅ |
+| RS-21 | Jornada completa (sin tope de duración) | RS-21 | R25 | programar [R25] · sala-4 | programar [R25] · sala-4 · confirmado | ✅ |
+| RS-22 | Menos de 30 minutos | RS-22 | R15 | negar [R15] | negar [R15] · falso | ✅ |
 | RS-05 | Desconocido (equipos) | RS-05 | R19 | escalar [R19] · notificar monitor, mantenimiento · desconocido | escalar [R19] · notificar monitor, mantenimiento · desconocido | ✅ |
 | RS-06 | Contradicción (equipos) | RS-06 | R19 | escalar [R19] · contradictorio | escalar [R19] · notificar monitor, mantenimiento · contradictorio | ✅ |
 | RS-07 | Docente vs. estudiantes | RS-07 | R20 | escalar [R20] · notificar monitor · alternativas sala-8, sala-10, sala-7 | escalar [R20] · notificar monitor · contradictorio | ✅ |
@@ -83,7 +85,7 @@ producen la misma decisión. P-06, P-07, S-01 y S-02 pasan por el modelo local.
 | C-27 | Oferta de mañana a las 20:23 | C-10000001 → ¿Qué salas hay disponibles hoy? → Sí, quiero la sala 1 | Conversación | ofrece «Sí, revisar mañana»; «Sí, quiero la sala 1» reserva el martes 10 de noviembre, nunca hereda hoy | chip «Sí, revisar mañana»; fecha mañana y sala 1; la fecha no es la de hoy; «Sí, revisar mañana» muestra mañana | ✅ |
 | C-28 | Separador «hasta la» | C-10000001 → Quiero reservar una sala → mañana → de 11AM hasta la 1PM | Conversación | entiende 11:00–13:00 a la primera y pregunta las personas | horario 11:00–13:00; pregunta las personas | ✅ |
 | C-29 | Sala ocupada nombrada con fecha y horario | C-10000001 → Quiero reservar la sala 6 mañana de 2 a 4 pm | Conversación | avisa en ese turno (13:00–15:00 ocupada) con «Ver otras salas» y «Escalar al monitor»; no pide personas | avisa en ese turno; no pide personas; chips ["Ver otras salas","Escalar al monitor"] | ✅ |
-| C-30 | Horario de hoy ya pasado (R15) | C-10000001 → Quiero reservar una sala para hoy de 9 a 11 (son las 20:23) | Conversación | R15 con «Ese horario de hoy ya pasó (son las 20:23)»; vuelve a pedir el horario, no las personas | mensaje de horario pasado; vuelve a pedir el horario, no las personas | ✅ |
+| C-30 | Horario de hoy ya pasado (R15) | C-10000001 → Quiero reservar una sala para hoy de 9 a 11 (son las 20:23) | Conversación | R15 con «Ese horario de hoy ya pasó (son las 20:23)»; vuelve a pedir el horario, no las personas | mensaje de horario pasado; vuelve a pedir el horario, no las personas; chip «Revisar mañana» (09:00–11:00 no cabe hoy) | ✅ |
 | C-31 | Sala libre nombrada | C-10000001 → Quiero reservar la sala 13 mañana de 2 a 4 pm | Conversación | confirma que la sala está libre y sigue con las personas | confirma que está libre; sigue con las personas | ✅ |
 | C-34 | Sugerencia: sala 6 de 2 a 4 pm | D-20000001 → Necesito la sala 6 mañana de 2 a 4 pm | Conversación | sala ocupada: chips «Ver otras salas» y «Escalar al monitor» | chips ["Ver otras salas","Escalar al monitor"] | ✅ |
 | C-35 | Sugerencia: sala 1 de 11AM hasta la 1PM | C-10000001 → Quiero la sala 1 mañana de 11AM hasta la 1PM | Conversación | sala libre a la primera: revisa la Sala 1 de 11:00 a 13:00 y pregunta las personas | revisa la Sala 1 de 11:00 a 13:00; pregunta las personas | ✅ |
@@ -96,6 +98,10 @@ producen la misma decisión. P-06, P-07, S-01 y S-02 pasan por el modelo local.
 | C-42 | Elegir sala por número | … → Ver otras salas → 5 → «quiero la 11» / «11» | Conversación | las dos formas fijan la Sala 11 y proponen confirmar | «quiero la 11» elige la Sala 11; «11» elige la Sala 11 | ✅ |
 | C-43 | Aforo temprano | C-10000001 → Quiero la sala 3 mañana de 2 a 4 pm → 5 | Conversación | dice puestos y equipos de la Sala 3 y ofrece otras salas, sin pedir otro horario | cifra concreta; pide elegir sala, conserva el horario | ✅ |
 | C-44 | Sala y horario sin verbo | C-10000001 → la sala 8 mañana de 10 a 12 | Conversación | revisa la Sala 8 y pregunta personas | reserva con validación temprana | ✅ |
+| C-45 | Rango largo sin tope (docente) | D-20000001 → Quiero una sala para 25 estudiantes el 14 de noviembre de 10AM hasta las 3 de la tarde | Conversación | sin R15; conserva 2026-11-14, 10:00–15:00 y 25 personas; pide el siguiente dato (equipos) | sin causa de R15; conserva fecha, horario y personas; pide el siguiente dato: equipos | ✅ |
+| C-46 | Cierre después de las 22:00 | C-10000001 → Quiero la sala 3 mañana de 8 PM a 11 PM → 20:00 a 22:00 | Conversación | R15 «las salas abren de 07:00 a 22:00» con el chip «20:00 a 22:00»; al tocarlo revisa la Sala 3 y sigue la reserva | causa concreta; chip ["20:00 a 22:00"]; sigue la reserva con el rango ajustado | ✅ |
+| C-47 | Disponibilidad por duración | C-10000001 → ¿Qué salas tienen 5 horas libres el martes? | Conversación | solo salas con un hueco continuo de al menos 5 horas; texto «5 horas libres seguidas» | texto con 5 horas libres seguidas; cada sala listada tiene al menos un hueco de 5 horas | ✅ |
+| C-48 | Día más cercano con salas | C-10000001 → ¿Qué salas tienen disponibilidad el martes de 10 a 14? → Sí, revisar el 11 de noviembre | Conversación | sin salas el martes de 10:00 a 14:00; ofrece «Sí, revisar el 11 de noviembre»; al tocarlo lista las salas de ese día | ofrece el día más cercano; chip con el día; revisa el día con el mismo rango | ✅ |
 
 ## Fallos encontrados durante el desarrollo y correcciones
 

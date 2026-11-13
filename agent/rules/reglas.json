@@ -1,11 +1,11 @@
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "parametros": {
     "tolerancia_asistencia_min": 15,
     "horario_abre": "07:00",
     "horario_cierra": "22:00",
     "duracion_min_min": 30,
-    "duracion_max_min": 240,
+    "duracion_max_min": null,
     "dias_adelante_max": 30
   },
   "reglas": [
@@ -155,9 +155,9 @@
       "especificidad": 1,
       "tipo": "bloqueante",
       "efecto": "negar",
-      "descripcion": "Fecha u horario fuera de lo permitido (07:00–22:00, 30 min a 4 h, hasta 30 días): negar y pedir otro horario.",
-      "fuente": "Entrevista al monitor, 27-10-2026, pregunta 2b; duración y plazo: supuesto del equipo",
-      "vigente_desde": "2026-11-04"
+      "descripcion": "Fecha u horario fuera de lo permitido (07:00–22:00, mínimo 30 minutos, hasta 30 días): negar y pedir otro horario.",
+      "fuente": "Entrevista al monitor, 27-10-2026, pregunta 2b; plazo de 30 días: supuesto del equipo; sin tope de duración: decisión del equipo del 12-11-2026 (antes 4 h, supuesto)",
+      "vigente_desde": "2026-11-12"
     },
     {
       "id": "R16",

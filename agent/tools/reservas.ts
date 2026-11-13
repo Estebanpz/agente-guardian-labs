@@ -14,7 +14,7 @@ const base = JSON.parse(
   version: string;
   parametros: {
     horario_abre: string; horario_cierra: string;
-    duracion_min_min: number; duracion_max_min: number; dias_adelante_max: number;
+    duracion_min_min: number; duracion_max_min: number | null; dias_adelante_max: number;
   };
   reglas: Regla[];
 };
@@ -35,7 +35,7 @@ type Accion = DecisionReserva["accion"];
 type Notificar = DecisionReserva["notificar"][number];
 
 const FUENTES = [
-  "reglas.json 2.0.0", "carnetizacion (simulada)", "salas y equipos (sintéticos)", "reservas (base de demostración)",
+  `reglas.json ${base.version}`, "carnetizacion (simulada)", "salas y equipos (sintéticos)", "reservas (base de demostración)",
 ];
 
 const descripcionDe = (id: string): string => base.reglas.find((r) => r.id === id)?.descripcion ?? id;
@@ -133,7 +133,8 @@ export function causaR15(fecha: string, inicio: string, fin: string, hoy: { fech
   }
   if (f <= i) return { campo: "horario", motivo: "la hora de fin debe ser posterior a la de inicio" };
   if (dur < P.duracion_min_min) return { campo: "horario", motivo: `la reserva dura menos de ${P.duracion_min_min} minutos` };
-  if (dur > P.duracion_max_min) return { campo: "horario", motivo: `la reserva dura más de ${P.duracion_max_min / 60} horas` };
+  // Sin tope de duración (reglas 2.1.0): solo se revisa si el parámetro tiene valor.
+  if (P.duracion_max_min !== null && dur > P.duracion_max_min) return { campo: "horario", motivo: `la reserva dura más de ${P.duracion_max_min / 60} horas` };
   return null;
 }
 

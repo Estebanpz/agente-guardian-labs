@@ -69,6 +69,18 @@ const CASOS: Caso[] = [
   { entrada: "no, cancela", esperado: { confirmacion: "no", cancelar: true } },
   { entrada: "dale", esperado: { confirmacion: "si" } },
   { entrada: "cancelar", esperado: { cancelar: true } },
+  // Duración sin rango (plan de rango horario, 3.1).
+  { entrada: "por 5 horas", esperado: { duracion_min: 300 } },
+  { entrada: "hora y media", esperado: { duracion_min: 90 } },
+  { entrada: "3 horas y media", esperado: { duracion_min: 210 } },
+  { entrada: "media hora", esperado: { duracion_min: 30 } },
+  { entrada: "90 minutos", esperado: { duracion_min: 90 } },
+  { entrada: "5 h", esperado: { duracion_min: 300 } },
+  { entrada: "una hora", esperado: { duracion_min: 60 } },
+  // Horas del día, no duración.
+  { entrada: "a las 3", esperado: { duracion_min: null } },
+  { entrada: "3 de la tarde", esperado: { duracion_min: null } },
+  { entrada: "de 3 a 5", esperado: { duracion_min: null, inicio: "15:00", fin: "17:00" } },
 ];
 
 let fallos = 0;

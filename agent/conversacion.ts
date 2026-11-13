@@ -32,7 +32,7 @@ const VACIA = (): SolicitudReserva => ({
 
 // Motivos en español para cada regla (sin códigos técnicos).
 const MOTIVO: Record<string, string> = {
-  R15: "la fecha u horario no están permitidos (salas de 07:00 a 22:00, de 30 minutos a 4 horas y hasta 30 días)",
+  R15: "la fecha u horario no están permitidos (salas de 07:00 a 22:00, mínimo 30 minutos y hasta 30 días)",
   R17: "el carné no aparece en carnetización o su vigencia es desconocida",
   R18: "la sala no alcanza para las personas o los equipos",
   R19: "hay equipos con estado desconocido o en conflicto",
@@ -53,8 +53,33 @@ const fechaLarga = (fecha: string): string =>
 
 const nombreSala = (salas: SalaDoc[], id: string): string => salas.find((s) => s._id === id)?.nombre ?? id;
 
+// Chips del ajuste mínimo cuando R15 falla por el horario (plan de rango horario, 2): el rango que escribió la
+// persona, corregido. Si hoy ya no cabe, "Revisar mañana" conserva el mismo rango.
+function chipsHorarioR15(inicio: string, fin: string, hoy: { fecha: string; minutos: number }, fecha: string): string[] {
+  const i = aMin(inicio);
+  const f = aMin(fin);
+  const dur = f - i;
+  const rango = (a: number, b: number) => `${aHora(a)} a ${aHora(b)}`;
+  const abre = aMin("07:00");
+  const cierra = aMin("22:00");
+  if (fecha === hoy.fecha && i <= hoy.minutos) {
+    const ini = (Math.floor(hoy.minutos / 30) + 1) * 30; // siguiente media hora
+    const d = dur > 0 ? dur : 30;
+    return ini + d <= cierra ? [rango(ini, ini + d)] : ["Revisar mañana"];
+  }
+  if (i < abre && f > cierra) return ["07:00 a 22:00"];
+  if (i < abre) return f > abre ? [rango(abre, f)] : [];
+  if (f > cierra) return i < cierra ? [rango(i, cierra)] : [];
+  if (f <= i) {
+    const g = f + 720; // "de 3 a 1" → 15:00 a 13:00 no sirve; se prueba con la tarde
+    return g <= cierra && g > i ? [rango(i, g)] : [];
+  }
+  if (dur < 30) return i + 30 <= cierra ? [rango(i, i + 30)] : [];
+  return [];
+}
+
 // Pregunta y chips de cada campo pendiente (textos exactos de la tabla 7.3).
-function preguntaPara(pendiente: string, docente: boolean): { texto: string; opciones: string[] } {
+function preguntaPara(pendiente: string, docente: boolean, datos?: SolicitudReserva): { texto: string; opciones: string[] } {
   switch (pendiente) {
     case "carne":
       return {
@@ -66,9 +91,11 @@ function preguntaPara(pendiente: string, docente: boolean): { texto: string; opc
     case "fecha":
       return { texto: "¿Para qué día? Por ejemplo: mañana, el jueves o 2026-11-12.", opciones: ["Hoy", "Mañana"] };
     case "horario":
+      // Sin chips: el horario lo escribe la persona. Con solo la hora de inicio, se pide la final (plan, 2).
+      if (datos?.inicio && !datos.fin) return { texto: `¿Hasta qué hora? Empiezas a las ${datos.inicio}.`, opciones: [] };
       return {
-        texto: "¿De qué hora a qué hora? Las salas abren de 07:00 a 22:00. Por ejemplo: de 13:00 a 15:00.",
-        opciones: ["08:00 a 10:00", "14:00 a 16:00"],
+        texto: "¿De qué hora a qué hora? Las salas abren de 07:00 a 22:00. Escribe el rango que necesites, por ejemplo: de 10:00 a 15:00.",
+        opciones: [],
       };
     case "personas":
       return { texto: docente ? "¿Cuántos estudiantes tiene el grupo?" : "¿Cuántas personas son?", opciones: [] };
@@ -312,10 +339,14 @@ async function responder(
         prefijo + "Tu carné está vencido en carnetización: no puedo separar la sala. Remítete a carnetización.",
         [], { reserva: d });
     }
+    // R24 (ninguna sala en ese horario): el día más cercano con el mismo rango y personas (plan, 4).
+    const dia = d.reglas_aplicadas.includes("R24") && sol.fecha && sol.inicio && sol.fin
+      ? await diaMasCercano({ ...sol, sala: null }, aMin(sol.fin) - aMin(sol.inicio), sol.fecha, repo) : null;
     // El flujo sigue abierto. Si el problema es la sala (aforo, choque o alto cómputo) y hay otras libres,
     // se conservan fecha y horario y solo se pide otra sala (7.0.9); si no, se pide otro horario.
+    // Con un día ofrecido (R24) también se conserva el horario para revisar esa fecha.
     const deSala = ["R18", "R22", "R23"].includes(d.reglas_aplicadas[0]) && d.alternativas.length > 0;
-    if (!deSala) {
+    if (!deSala && !dia) {
       conv.datos.inicio = null;
       conv.datos.fin = null;
     }
@@ -325,8 +356,12 @@ async function responder(
     conv.pendiente = deSala ? "sala" : "horario";
     conv.intentos = 0;
     await guardar(repo, conv);
-    const opciones = d.alternativas.map((a) => `Usar Sala ${a.slice(5)}`);
-    return { ...abierto(conv, prefijo + textoNegar(d, sol, ctx), opciones), reserva: d,
+    const opciones = [
+      ...d.alternativas.map((a) => `Usar Sala ${a.slice(5)}`),
+      ...(dia ? [chipRevisar(dia, ahora().fecha)] : []),
+    ];
+    const extra = dia ? ` El día más cercano con una sala libre en ese horario es el ${fechaLarga(dia)}.` : "";
+    return { ...abierto(conv, prefijo + textoNegar(d, sol, ctx) + extra, opciones), reserva: d,
       solicitud: resumenDe(sol, ctx.salas, sol.sala) };
   }
   // pedir_datos: no debería llegar aquí (faltante lo resuelve antes), pero se pide el primer faltante.
@@ -432,15 +467,17 @@ async function revisarTemprano(conv: Conversacion, repo: Repositorio): Promise<{
   const h = ahora();
   const causa = causaR15(d.fecha!, d.inicio!, d.fin!, { fecha: h.fecha, minutos: h.minutos });
   if (causa) {
-    d.inicio = null;
-    d.fin = null;
+    const chips = causa.campo === "horario" && d.inicio && d.fin
+      ? chipsHorarioR15(d.inicio, d.fin, { fecha: h.fecha, minutos: h.minutos }, d.fecha!) : [];
+    const conservaRango = chips.includes("Revisar mañana");
+    if (!conservaRango) { d.inicio = null; d.fin = null; }
     if (causa.campo === "fecha") d.fecha = null;
     conv.validado = null;
     conv.propuesta = null;
     conv.pendiente = causa.campo;
     await guardar(repo, conv);
-    const p = preguntaPara(causa.campo, docenteDe(d));
-    return { corte: abierto(conv, `${capitalizar(causa.motivo)}. ${p.texto}`, p.opciones) };
+    const p = preguntaPara(causa.campo, docenteDe(d), d);
+    return { corte: abierto(conv, `${capitalizar(causa.motivo)}. ${p.texto}`, chips.length ? chips : p.opciones) };
   }
   // Sala ocupada: mientras no elija "Ver otras salas" o "Escalar al monitor", se repite el aviso.
   if (conv.pendiente === "ocupada" && clave === conv.validado && d.sala) {
@@ -583,6 +620,11 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   const h = ahora();
   const t = norm(texto);
   const pendientePrevio = conv.pendiente;
+  // Chips "Revisar mañana" y "Revisar el {día}": cambian la fecha y conservan el horario pedido.
+  if (/^revisar\b/.test(t)) {
+    const f = extraer(texto, { hoy: h.fecha, pendiente: null }).fecha;
+    if (f) { conv.datos.fecha = f; conv.validado = null; conv.propuesta = null; }
+  }
   // Respaldo del modelo pendiente de confirmar (7.0.8): "Sí" lo acepta; cualquier otra respuesta lo descarta.
   if (conv.pendiente === "respaldo") {
     if (!/^(si|es correcto|correcto)\b/.test(t)) for (const c of conv.respaldo ?? []) limpiarCampo(conv.datos, c);
@@ -751,7 +793,7 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
     await guardar(repo, conv);
     const p = f === "materia" && espacios.length
       ? { texto: "¿Para cuál espacio académico la requieres?", opciones: espacios }
-      : preguntaPara(f, docenteDe(conv.datos));
+      : preguntaPara(f, docenteDe(conv.datos), conv.datos);
     const aviso = temprano.ok ? `${temprano.ok}Ahora, ${minusculaInicial(p.texto)}` : p.texto;
     return abierto(conv, prefijo + aviso, p.opciones);
   }
@@ -802,10 +844,10 @@ async function turnoRegistro(conv: Conversacion, texto: string, repo: Repositori
   return cerrado("registro_usuario", `Ya estás registrado como ${rol}. ¿Quieres reservar una sala?`, ["Reservar una sala"]);
 }
 
-// Disponibilidad: sin flujo. Con sala, la agenda del día; sin sala, las salas con un hueco de 2 h.
-// Contexto de una consulta de disponibilidad: 30 min (TTL de la colección). Sin carné ni sala.
+// Disponibilidad: sin flujo. Contexto de la consulta (30 min, TTL): criterios, duración pedida y, si hay oferta,
+// el día ofrecido en datos.fecha (pendiente "oferta_dia"). Sin carné ni sala.
 async function guardarContextoDisponibilidad(
-  repo: Repositorio, sesion: string, datos: SolicitudReserva, pendiente: string | null = null,
+  repo: Repositorio, sesion: string, datos: SolicitudReserva, pendiente: string | null = null, duracion: number | null = null,
 ): Promise<void> {
   await repo.guardarConversacion({
     _id: sesion, flujo: "disponibilidad", pendiente,
@@ -813,12 +855,67 @@ async function guardarContextoDisponibilidad(
       ...VACIA(), fecha: datos.fecha, inicio: datos.inicio, fin: datos.fin,
       personas: datos.personas, equipos: datos.equipos, computo_alto: datos.computo_alto,
     },
+    duracion_min: duracion,
     intentos: 0, propuesta: null, actualizado: new Date(),
   });
 }
 
-// Disponibilidad (sección 7.0.3): responde con los criterios que trae el texto (fecha, horario, personas,
-// equipos, alto cómputo) usando candidatas(); sin criterios, lista las salas con 2 horas libres.
+const MESES_TXT = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+// "11 de noviembre" (para chips y frases cortas).
+const diaCorto = (f: string): string => `${Number(f.slice(8))} de ${MESES_TXT[Number(f.slice(5, 7)) - 1]}`;
+// Chip para revisar otro día: "Revisar mañana" o "Revisar el 11 de noviembre".
+const chipRevisar = (f: string, hoyFecha: string): string =>
+  (f === sumarDias(hoyFecha, 1) ? "Revisar mañana" : `Revisar el ${diaCorto(f)}`);
+
+// Duración legible: "30 minutos", "1 hora", "1 hora y media", "5 horas", "3 horas y media".
+function duracionTexto(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (!h) return `${m} minutos`;
+  const horas = h === 1 ? "1 hora" : `${h} horas`;
+  if (!m) return horas;
+  return m === 30 ? `${horas} y media` : `${horas} y ${m} minutos`;
+}
+
+// Duración de la consulta: el rango si lo trae; si no, la duración pedida; si no, 30 minutos.
+const duracionPedida = (ext: Extraido): number =>
+  ext.inicio && ext.fin ? aMin(ext.fin) - aMin(ext.inicio) : (ext.duracion_min ?? 30);
+
+// Salas que cumplen la solicitud de disponibilidad en un día: candidatas() con los criterios y, si no hay rango,
+// un hueco continuo de N minutos (plan de rango horario, 3.2).
+function salasQueCumplen(c: SolicitudReserva, N: number, ctx: Contexto, fecha: string, desde: number): SalaDoc[] {
+  const cumplen = candidatas({ ...c, fecha, sala: null }, ctx);
+  if (c.inicio && c.fin) return cumplen;
+  return cumplen.filter((s) => rangosDesde(disponibilidad(s, fecha, ctx.reservasDelDia, ctx).libres, desde, N).length > 0);
+}
+
+// Día más cercano después de `desde` (hasta 30 días desde hoy) con salas que cumplan la solicitud. null si no hay.
+async function diaMasCercano(c: SolicitudReserva, N: number, desde: string, repo: Repositorio): Promise<string | null> {
+  const tope = sumarDias(ahora().fecha, 30);
+  for (let k = 1; k <= 30; k++) {
+    const f = sumarDias(desde, k);
+    if (f > tope) break;
+    const ctx = await contextoPara(repo, null, f);
+    if (salasQueCumplen(c, N, ctx, f, 0).length) return f;
+  }
+  return null;
+}
+
+// Texto que reproduce los criterios guardados, para revisar otra fecha con los mismos datos.
+function textoCriterios(d: SolicitudReserva, duracion: number | null): string {
+  const rango = d.inicio && d.fin;
+  return [
+    "salas",
+    d.fecha ?? "",
+    rango ? `de ${d.inicio} a ${d.fin}` : "",
+    d.personas !== null ? `para ${d.personas} personas` : "",
+    d.computo_alto ? "alto cómputo" : "",
+    !rango && duracion ? `por ${duracion} minutos` : "",
+  ].filter(Boolean).join(" ");
+}
+
+// Disponibilidad (sección 7.0.3 y plan de rango horario, 3.2): criterios del texto (fecha, horario o duración,
+// personas, alto cómputo). Si el día no tiene salas, ofrece el día más cercano que sí las tenga.
 async function disponibilidadTurno(texto: string, sesion: string, repo: Repositorio): Promise<RespuestaChat> {
   const h = ahora();
   const ext = extraer(texto, { hoy: h.fecha, pendiente: null });
@@ -827,11 +924,12 @@ async function disponibilidadTurno(texto: string, sesion: string, repo: Reposito
   const desde = fecha === h.fecha ? h.minutos : 0;
   const ctx = await contextoPara(repo, null, fecha);
   const reservas = ctx.reservasDelDia;
+  const N = duracionPedida(ext);
   const criterios: SolicitudReserva = {
     carne: null, fecha, inicio: ext.inicio, fin: ext.fin, sala: null,
     personas: ext.personas, equipos: ext.equipos, computo_alto: ext.computo_alto, materia: null,
   };
-  await guardarContextoDisponibilidad(repo, sesion, criterios);
+  await guardarContextoDisponibilidad(repo, sesion, criterios, null, ext.inicio && ext.fin ? null : ext.duracion_min);
 
   if (ext.sala) {
     const sala = ctx.salas.find((s) => s._id === ext.sala);
@@ -854,19 +952,33 @@ async function disponibilidadTurno(texto: string, sesion: string, repo: Reposito
   }
 
   const hayCriterios = ext.inicio !== null || ext.personas !== null || ext.computo_alto === true;
+  const diaTxt = `${fechaLarga(fecha)}${ext.inicio && ext.fin ? ` de ${ext.inicio} a ${ext.fin}` : ""}`;
+  const cuandoLista = fecha === h.fecha
+    ? `hoy (${fechaLarga(fecha)}) a partir de las ${aHora(desde)}`
+    : `el ${fechaLarga(fecha)}`;
+  const cumplen = salasQueCumplen(criterios, N, ctx, fecha, desde);
+
+  if (!cumplen.length) {
+    // Pidió alto cómputo y ninguna sala de alto cumple: se ofrecen las estándar que cumplen el resto.
+    const alto = criterios.computo_alto === true;
+    const estandar = hayCriterios && alto
+      ? salasQueCumplen({ ...criterios, computo_alto: false }, N, ctx, fecha, desde).filter((s) => s.computo === "estandar").slice(0, 6)
+      : [];
+    const extra = estandar.length ? `\nSalas estándar que sí cumplen: ${estandar.map((s) => etiquetaSala(s)).join(", ")}.` : "";
+    const base = hayCriterios
+      ? `Ninguna sala cumple esas condiciones el ${diaTxt}.${extra}`
+      : `No hay salas con ${duracionTexto(N)} libres seguidas ${cuandoLista}.`;
+    const dia = await diaMasCercano(criterios, N, fecha, repo);
+    if (!dia) return cerrado("consulta_disponibilidad", base, estandar.map((s) => `Reservar ${etiquetaSala(s)}`));
+    // Oferta del día más cercano: guarda los criterios y el día ofrecido; "Sí" lo revisa con los mismos datos.
+    await guardarContextoDisponibilidad(repo, sesion, { ...criterios, fecha: dia }, "oferta_dia", ext.inicio && ext.fin ? null : N);
+    const opcion = dia === sumarDias(h.fecha, 1) ? "Sí, revisar mañana" : `Sí, revisar el ${diaCorto(dia)}`;
+    return cerrado("consulta_disponibilidad",
+      `${base} El día más cercano con salas libres es el ${fechaLarga(dia)}. ¿Lo reviso?`, [opcion]);
+  }
+
   if (hayCriterios) {
     const alto = criterios.computo_alto === true;
-    const diaTxt = `${fechaLarga(fecha)}${ext.inicio && ext.fin ? ` de ${ext.inicio} a ${ext.fin}` : ""}`;
-    const cumplen = candidatas(criterios, ctx);
-    if (!cumplen.length) {
-      // Pidió alto cómputo y ninguna sala de alto cumple: se ofrecen las estándar que cumplen el resto.
-      const estandar = alto
-        ? candidatas({ ...criterios, computo_alto: false }, ctx).filter((s) => s.computo === "estandar").slice(0, 6)
-        : [];
-      const extra = estandar.length ? `\nSalas estándar que sí cumplen: ${estandar.map((s) => etiquetaSala(s)).join(", ")}.` : "";
-      return cerrado("consulta_disponibilidad", `Ninguna sala cumple esas condiciones el ${diaTxt}.${extra}`,
-        estandar.map((s) => `Reservar ${etiquetaSala(s)}`));
-    }
     const mostradas = cumplen.slice(0, 6);
     const resto = cumplen.length - mostradas.length;
     const criterioTxt = `${diaTxt}${ext.personas !== null ? `, ${ext.personas} personas` : ""}${alto ? ", alto cómputo" : ""}`;
@@ -877,34 +989,21 @@ async function disponibilidadTurno(texto: string, sesion: string, repo: Reposito
       mostradas.map((s) => `Reservar ${etiquetaSala(s)}`));
   }
 
-  // Sin criterios: salas con un hueco libre de 2 horas o más, leídas de la base.
+  // Sin otros criterios: salas con un hueco continuo de N minutos, leídas de la base.
   const todas = /\btodas\b/.test(norm(texto));
   const conHueco = ctx.salas
     .slice()
     .sort((a, b) => Number(a._id.slice(5)) - Number(b._id.slice(5)))
-    .map((s) => ({ s, rangos: rangosDesde(disponibilidad(s, fecha, reservas, ctx).libres, desde, 120) }))
+    .map((s) => ({ s, rangos: rangosDesde(disponibilidad(s, fecha, reservas, ctx).libres, desde, N) }))
     .filter((x) => x.rangos.length > 0);
   // Por defecto se muestran 6; el resto se anuncia y se ofrece "Ver todas (día)" (no se corta en silencio).
   // El chip lleva el día: "Ver todas" sin fecha volvería a preguntar por hoy aunque la lista fuera de mañana.
   const etiquetaDia = fecha === h.fecha ? "hoy" : fecha === sumarDias(h.fecha, 1) ? "mañana" : fecha;
   const mostradas = todas ? conHueco : conHueco.slice(0, 6);
   const resto = conHueco.length - mostradas.length;
-  const cuandoLista = fecha === h.fecha
-    ? `hoy (${fechaLarga(fecha)}) a partir de las ${aHora(desde)}`
-    : `el ${fechaLarga(fecha)}`;
-  if (!conHueco.length) {
-    // Oferta de mañana (7.0.6): queda guardada en el contexto; "Sí" revisa mañana y nunca hereda la fecha de hoy.
-    if (fecha === h.fecha) {
-      await guardarContextoDisponibilidad(repo, sesion, criterios, "oferta_manana");
-      return cerrado("consulta_disponibilidad",
-        `No hay salas con 2 horas libres ${cuandoLista}. ¿Quieres que revise mañana (${fechaLarga(sumarDias(h.fecha, 1))})?`,
-        ["Sí, revisar mañana"]);
-    }
-    return cerrado("consulta_disponibilidad", `No hay salas con 2 horas libres ${cuandoLista}.`);
-  }
   const lineas = mostradas.map((x) => `• ${x.s.nombre}: ${x.rangos.join(", ")}`);
   const mas = resto > 0 ? `\ny ${resto} salas más.` : "";
-  return cerrado("consulta_disponibilidad", `Salas con 2 horas libres ${cuandoLista}:\n${lineas.join("\n")}${mas}`,
+  return cerrado("consulta_disponibilidad", `Salas con ${duracionTexto(N)} libres seguidas ${cuandoLista}:\n${lineas.join("\n")}${mas}`,
     [...mostradas.map((x) => `Reservar ${x.s.nombre}`), ...(resto > 0 ? [`Ver todas (${etiquetaDia})`] : [])]);
 }
 
@@ -986,7 +1085,8 @@ export async function ocupacionTurno(texto: string, sesion: string | undefined, 
 }
 
 // Un mensaje dentro de un flujo abierto (o "cancelar" para abortarlo).
-// Respuesta a la oferta "¿Quieres que revise mañana?" (7.0.6, punto 1). Nunca hereda la fecha de hoy.
+// Respuesta a la oferta de día (7.0.6 y plan de rango horario, 4): "Sí" revisa el día ofrecido con los mismos
+// criterios guardados; nunca hereda la fecha de hoy.
 async function respuestaOferta(texto: string, sesion: string, repo: Repositorio): Promise<RespuestaChat | null> {
   const t = norm(texto).trim();
   const ext = extraer(texto, { hoy: ahora().fecha, pendiente: null });
@@ -998,7 +1098,9 @@ async function respuestaOferta(texto: string, sesion: string, repo: Repositorio)
     return cerrado("consulta_disponibilidad", "De acuerdo. ¿Quieres revisar otro día u horario?");
   }
   if (/^(si|claro|vale|dale|ok|okay|bueno|revisa|quiero)\b/.test(t) || /\brevis\w*/.test(t)) {
-    return disponibilidadTurno(ext.fecha ? texto : `${texto} mañana`, sesion, repo);
+    const previo = await repo.leerConversacion(sesion);
+    const texto2 = previo ? textoCriterios(previo.datos, previo.duracion_min ?? null) : texto;
+    return disponibilidadTurno(texto2, sesion, repo);
   }
   // Otra cosa: la oferta se cierra y el mensaje sigue su curso normal.
   await repo.borrarConversacion(sesion);
@@ -1009,7 +1111,7 @@ export async function continuar(texto: string, sesion: string, repo: Repositorio
   const conv = await repo.leerConversacion(sesion);
   // El contexto de una disponibilidad no es un flujo abierto, salvo la oferta de mañana.
   if (conv?.flujo === "disponibilidad") {
-    return conv.pendiente === "oferta_manana" ? respuestaOferta(texto, sesion, repo) : null;
+    return conv.pendiente === "oferta_dia" ? respuestaOferta(texto, sesion, repo) : null;
   }
   if (!conv) return null;
   if (esCancelar(texto)) {
@@ -1037,7 +1139,7 @@ export async function iniciar(
   // gana; lo que falta se toma de la disponibilidad reciente de la sesión.
   const previo = await repo.leerConversacion(sesion);
   const usado = previo && previo.flujo === "disponibilidad" ? previo.datos : null;
-  const oferta = previo?.flujo === "disponibilidad" && previo.pendiente === "oferta_manana";
+  const oferta = previo?.flujo === "disponibilidad" && previo.pendiente === "oferta_dia";
   const datos = VACIA();
   datos.carne = (await repo.leerSesion(sesion))?.carne ?? null;
   aplicar(datos, extraer(texto, { hoy: ahora().fecha, pendiente: null }));
@@ -1048,7 +1150,8 @@ export async function iniciar(
     const inicioFinal = datos.inicio ?? usado.inicio;
     const yaPaso = inicioFinal !== null && aMin(inicioFinal) <= h.minutos;
     if (oferta) {
-      if (datos.fecha === null) { datos.fecha = sumarDias(h.fecha, 1); tomados.push("fecha"); }
+      // La oferta fija el día ofrecido (no hereda la fecha de hoy).
+      if (datos.fecha === null && usado?.fecha) { datos.fecha = usado.fecha; tomados.push("fecha"); }
     } else if (datos.fecha === null && usado.fecha !== null && !(usado.fecha === h.fecha && yaPaso)) {
       datos.fecha = usado.fecha; tomados.push("fecha");
     }
