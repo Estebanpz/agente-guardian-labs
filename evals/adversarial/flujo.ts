@@ -96,10 +96,13 @@ try {
       `${String(s[1].respuesta).slice(0,140)}`, /está libre|confirmo|RS-\d{4}/.test(s[1].respuesta ?? ""));
   }
 
-  // F-10: "ayer".
+  // F-10: "ayer" se reconoce para rechazarlo (14-11-2026): antes no se entendía y la solicitud seguía como si no
+  // hubiera fecha.
   {
-    const e = extraer("reserva la sala 4 ayer de 10 a 12", { hoy: "2026-11-09", pendiente: null });
-    anotar("F-10", "fecha/ayer", `"ayer"`, "no se interpreta como fecha reservable", `fecha=${e.fecha}`, false);
+    nuevoEntorno();
+    const s = await hablar(uuid(7), ["C-10000001", "reserva la sala 4 ayer de 10 a 12"]);
+    anotar("F-10", "fecha/ayer", `"ayer"`, "se reconoce y se rechaza como fecha pasada (no se reserva)",
+      `${String(s[1].respuesta).slice(0,140)}`, !/ya pasó/i.test(s[1].respuesta ?? ""));
   }
 } finally {
   liberarReloj();

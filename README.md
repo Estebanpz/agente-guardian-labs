@@ -172,6 +172,9 @@ Las reservas son simuladas sobre datos sintéticos; el prototipo no reserva sala
 | `MODELO_VERCEL` | vacío | Modelo principal del Gateway (comparación) |
 | `MODELOS_RESPALDO` | vacío | Modelos de respaldo del Gateway, separados por coma |
 | `MODELO_TIEMPO_MS` | `120000` | Tiempo máximo de espera de una respuesta del modelo |
+| `MODELO_MAX_TOKENS` | `200` | Tope de tokens generados por respuesta |
+| `MODELO_KEEP_ALIVE` | `1h` | Cuánto se mantiene cargado el modelo local (evita releer el prompt desde cero) |
+| `MODELO_HILOS` | vacío (lo decide Ollama) | Hilos de CPU para el modelo local; el mismo valor en la app y las pruebas, o Ollama recarga el modelo |
 | `SESION_SECRETO` | aleatorio al arrancar | Firma de los tokens de sesión (32+ caracteres). Nunca se sube al repositorio |
 | `PORT` | `3000` | Puerto de la API |
 

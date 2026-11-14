@@ -868,6 +868,35 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
         ]));
       configurarParaPruebas({ repo: crearMemoria("2026-11-09"), interpretar: clasificadorFijo });
     }
+    {
+      // C-64 (14-11-2026): la fecha se revisa apenas llega. Un día pasado se rechaza en el momento y el ejemplo de
+      // la pregunta se calcula con el reloj (antes decía siempre 2026-11-12).
+      fijarReloj("2026-11-14", "10:00");
+      const sid64 = "abcdef64-aaaa-4aaa-8aaa-aaaaaaaaaa64";
+      const ayer = await guion(sid64, ["C-10000001", "Quiero reservar una sala", "La necesito para ayer"]);
+      const sabado = await guion(sid64.replace("64", "65"), ["C-10000001", "Quiero reservar una sala", "para el sábado 13 de noviembre"]);
+      const futuro = await guion(sid64.replace("64", "66"), ["C-10000001", "Quiero reservar una sala", "para el sábado 21 de noviembre"]);
+      const rAyer = ayer.salidas[2];
+      const rSabado = sabado.salidas[2];
+      const rFuturo = futuro.salidas[2];
+      filas.push(fila("C-64", "Fecha pasada en el flujo de reserva",
+        "C-10000001 → Quiero reservar una sala → La necesito para ayer · para el sábado 13 de noviembre", 
+        "«Esa fecha ya pasó» en el mismo turno, sigue pidiendo la fecha y el ejemplo es una fecha futura; una fecha futura sí se acepta", [
+          [(rAyer.respuesta ?? "").startsWith("Esa fecha ya pasó") && pendiente(rAyer) === "fecha", "«ayer» se rechaza y vuelve a pedir la fecha"],
+          [(rSabado.respuesta ?? "").startsWith("Esa fecha ya pasó") && pendiente(rSabado) === "fecha", "«el sábado 13 de noviembre» se rechaza como pasado"],
+          [!(rAyer.respuesta ?? "").includes("2026-11-12") && (rAyer.respuesta ?? "").includes("2026-11-16"), "el ejemplo usa una fecha futura calculada, no una fija"],
+          [pendiente(rFuturo) === "horario", "«el sábado 21 de noviembre» se acepta y pide el horario"],
+        ]));
+      // C-65: el cierre después de las 22:00 explica el límite una sola vez y no repite la pregunta completa.
+      const fuera = await guion(sid64.replace("64", "67"), ["C-10000001", "Quiero reservar una sala", "mañana", "de 22:01 hasta las 22:30"]);
+      const rFuera = fuera.salidas[3];
+      filas.push(fila("C-65", "Cierre después de las 22:00", "C-10000001 → Quiero reservar una sala → mañana → de 22:01 hasta las 22:30",
+        "«Las salas abren de 07:00 a 22:00» y pide un rango dentro de ese horario, sin repetir la pregunta del horario", [
+          [(rFuera.respuesta ?? "").startsWith("Las salas abren de 07:00 a 22:00"), "empieza por el límite de las salas"],
+          [(rFuera.respuesta ?? "").includes("elige un rango dentro de ese horario") && !(rFuera.respuesta ?? "").includes("¿De qué hora a qué hora?"), "no repite la pregunta completa"],
+          [pendiente(rFuera) === "horario", "vuelve a pedir el horario"],
+        ]));
+    }
   } finally {
     liberarReloj();
   }

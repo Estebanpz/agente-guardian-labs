@@ -1,4 +1,15 @@
-import { interpretar, type TipoIntencion } from "../agent/llm/interprete.js";
+import { interpretar, largoDelPrompt, type TipoIntencion } from "../agent/llm/interprete.js";
+
+// El prompt completo se lee a pocas decenas de tokens por segundo cuando la caché de Ollama está fría (equipo sin
+// GPU). Si crece demasiado, la primera respuesta agota el tiempo del modelo y el chat avisa «el modelo no respondió».
+// Se vigila el tamaño del prompt, que es lo que el código controla.
+const LARGO_MAXIMO = 4_800;
+const largo = largoDelPrompt();
+console.log(`Prompt del intérprete: ${largo} caracteres (máximo ${LARGO_MAXIMO})\n`);
+if (largo > LARGO_MAXIMO) {
+  console.error("❌ el prompt creció demasiado: con la caché fría puede agotar el tiempo del modelo");
+  process.exitCode = 1;
+}
 
 // "no_es_sala": pide reservar algo que no es una sala de sistemas. Pasa si el modelo lo marca fuera de alcance o
 // si dice recurso "otro" (el orquestador responde igual en ambos casos y no abre una reserva).

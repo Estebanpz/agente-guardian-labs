@@ -12,6 +12,15 @@ const RESPALDO = (process.env.MODELOS_RESPALDO ?? "").split(",").map((m) => m.tr
 // Tiempo máximo de una respuesta del modelo. Ahora el modelo interpreta todos los mensajes del chat, así que se
 // espera más que antes; con un modelo local en CPU una respuesta puede tardar decenas de segundos.
 export const TIEMPO_MODELO_MS = Number(process.env.MODELO_TIEMPO_MS ?? 120_000);
+// El modelo local se queda cargado entre mensajes: sin esto Ollama lo descarga a los 5 minutos y el siguiente
+// mensaje vuelve a leer el prompt completo desde cero (con un modelo en CPU eso tarda minutos y agota el tiempo).
+const MANTENER_MODELO = process.env.MODELO_KEEP_ALIVE ?? "1h";
+// Tope de tokens generados. Lo que se pide es un JSON corto; el tope evita que una respuesta desbocada alargue
+// la espera (en CPU se generan pocos tokens por segundo).
+const MAX_TOKENS = Number(process.env.MODELO_MAX_TOKENS ?? 200);
+// Hilos de CPU para el modelo local. Si la variable está vacía no se envía y Ollama usa su valor por defecto.
+const HILOS_CRUDO = (process.env.MODELO_HILOS ?? "").trim();
+const HILOS = HILOS_CRUDO ? Number(HILOS_CRUDO) : null;
 const conLimite: typeof fetch = (input, init) => fetch(input, {
   ...init,
   signal: init?.signal
@@ -47,9 +56,21 @@ export async function chat(mensajes: Mensaje[], schema?: object): Promise<string
   }
   const r = await ollama.chat({
     model: MODELO_OLLAMA,
-    options: { temperature: 0 },
+    options: {
+      temperature: 0,
+      num_predict: MAX_TOKENS,
+      ...(HILOS !== null && Number.isFinite(HILOS) && HILOS > 0 ? { num_thread: HILOS } : {}),
+    },
+    keep_alive: MANTENER_MODELO,
     ...(schema ? { format: schema } : {}),
     messages: mensajes,
   });
   return r.message.content.trim();
 }
+
+// Un corte por tiempo agotado no se reintenta: la persona ya esperó el máximo y otra llamada solo alarga la espera.
+export const esTiempoAgotado = (e: unknown): boolean => {
+  const nombre = (e as { name?: string })?.name ?? "";
+  const mensaje = (e as Error)?.message ?? "";
+  return nombre === "AbortError" || nombre === "TimeoutError" || /abort|timeout|timed out/i.test(mensaje);
+};

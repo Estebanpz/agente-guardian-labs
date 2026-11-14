@@ -17,6 +17,11 @@ const CASOS: Caso[] = [
   // Variantes de fecha y horario.
   { entrada: "hoy", esperado: { fecha: "2026-11-09" } },
   { entrada: "pasado mañana", esperado: { fecha: "2026-11-11" } },
+  // Días pasados (14-11-2026): se reconocen para rechazarlos, no para leerlos como otra cosa.
+  { entrada: "La necesito para ayer", esperado: { fecha: "2026-11-08" } },
+  { entrada: "antier", esperado: { fecha: "2026-11-07" } },
+  // «el sábado 7 de noviembre»: manda el 7, no el próximo sábado (14).
+  { entrada: "para el sábado 7 de noviembre", esperado: { fecha: "2026-11-07", personas: null } },
   { entrada: "10/11", esperado: { fecha: "2026-11-10" } },
   { entrada: "2026-11-20", esperado: { fecha: "2026-11-20" } },
   { entrada: "13:00-15:00", esperado: { inicio: "13:00", fin: "15:00" } },

@@ -8,7 +8,7 @@ import { ahora, aMin, aHora, sumarDias } from "./tools/reloj.js";
 import { pedirRespaldo, validarRespaldo } from "./llm/respaldo.js";
 import { registrar } from "./tools/traza.js";
 import { cancelar as esCancelar, extraer, fechas, type Extraido } from "./tools/extraer.js";
-import { candidatas, causaR15, disponibilidad, enmascarar, evaluarCancelacion, ocupadaPublica, evaluarRegistro, evaluarReserva, horarioLaboratorio, type Contexto } from "./tools/reservas.js";
+import { candidatas, causaFecha, causaR15, disponibilidad, enmascarar, evaluarCancelacion, ocupadaPublica, evaluarRegistro, evaluarReserva, horarioLaboratorio, type Contexto } from "./tools/reservas.js";
 import type { Repositorio } from "./store/repositorio.js";
 
 export type RespuestaChat = {
@@ -89,7 +89,8 @@ function preguntaPara(pendiente: string, docente: boolean, datos?: SolicitudRese
     case "registro":
       return { texto: "Tu carné está vigente pero aún no te has registrado. ¿Te registro ahora?", opciones: ["Sí, registrarme", "No"] };
     case "fecha":
-      return { texto: "¿Para qué día? Por ejemplo: mañana, el jueves o 2026-11-12.", opciones: ["Hoy", "Mañana"] };
+      // La fecha del ejemplo se calcula con el reloj: nunca una fecha fija que envejezca (antes decía 2026-11-12).
+      return { texto: `¿Para qué día? Escribe la fecha, por ejemplo ${sumarDias(ahora().fecha, 2)}, o el día: mañana, el jueves.`, opciones: ["Hoy", "Mañana"] };
     case "horario":
       // Sin chips: el horario lo escribe la persona. Con solo la hora de inicio, se pide la final (plan, 2).
       if (datos?.inicio && !datos.fin) return { texto: `¿Hasta qué hora? Empiezas a las ${datos.inicio}.`, opciones: [] };
@@ -468,12 +469,14 @@ async function ofrecerSalas(conv: Conversacion, repo: Repositorio, causa: string
 // Devuelve `corte` si la respuesta termina aquí, o `ok` con el aviso de sala libre (puede ser "").
 async function revisarTemprano(conv: Conversacion, repo: Repositorio): Promise<{ corte?: RespuestaChat; ok?: string }> {
   const d = conv.datos;
-  const clave = claveHorario(d);
-  if (!clave) return { ok: "" };
   const h = ahora();
-  const causa = causaR15(d.fecha!, d.inicio!, d.fin!, { fecha: h.fecha, minutos: h.minutos });
+  const clave = claveHorario(d);
+  // La fecha se revisa apenas llega: «para ayer» o «el sábado 13» se corrigen en el momento, sin esperar el horario.
+  const fechaMal = d.fecha ? causaFecha(d.fecha, { fecha: h.fecha, minutos: h.minutos }) : null;
+  if (!fechaMal && !clave) return { ok: "" };
+  const causa = fechaMal ?? causaR15(d.fecha!, d.inicio!, d.fin!, { fecha: h.fecha, minutos: h.minutos });
   if (causa) {
-    const chips = causa.campo === "horario" && d.inicio && d.fin
+    const chips = !fechaMal && causa.campo === "horario" && d.inicio && d.fin
       ? chipsHorarioR15(d.inicio, d.fin, { fecha: h.fecha, minutos: h.minutos }, d.fecha!) : [];
     const conservaRango = chips.includes("Revisar mañana");
     if (!conservaRango) { d.inicio = null; d.fin = null; }
@@ -483,7 +486,11 @@ async function revisarTemprano(conv: Conversacion, repo: Repositorio): Promise<{
     conv.pendiente = causa.campo;
     await guardar(repo, conv);
     const p = preguntaPara(causa.campo, docenteDe(d), d);
-    return { corte: abierto(conv, `${capitalizar(causa.motivo)}. ${p.texto}`, chips.length ? chips : p.opciones) };
+    // Fuera de 07:00–22:00 la causa ya dice el horario: no se repite en la pregunta.
+    const texto = causa.campo === "horario" && causa.motivo.startsWith("las salas abren de")
+      ? `${capitalizar(causa.motivo)}: elige un rango dentro de ese horario.`
+      : `${capitalizar(causa.motivo)}. ${p.texto}`;
+    return { corte: abierto(conv, texto, chips.length ? chips : p.opciones) };
   }
   // Sala ocupada: mientras no elija "Ver otras salas" o "Escalar al monitor", se repite el aviso.
   if (conv.pendiente === "ocupada" && clave === conv.validado && d.sala) {
@@ -584,7 +591,8 @@ function necesitaRespaldo(texto: string, ext: Extraido, d: SolicitudReserva, pen
   const salaSinNumero = /\b(sala|salas|laboratorio)\b/.test(n) && !/\b(una|un|otra|cualquier)\s+(sala|salas|laboratorio)\b/.test(n);
   if (salaSinNumero && d.sala === null && ext.sala === null) return true;
   const pistaHora = /\b(hasta|asta|desde|ala|a las?|de \d)\b|\d\s*(am|pm)\b|\d[:.h]\d\d/.test(n);
-  return pistaHora && horarioPendiente(d);
+  // Si el código ya leyó un rango completo, no hay nada que preguntarle al modelo (cada llamada cuesta segundos).
+  return pistaHora && horarioPendiente(d) && !(ext.inicio && ext.fin);
 }
 
 // Pide el respaldo y aplica solo lo que pasa la validación. Devuelve los campos aplicados (vacío si nada).

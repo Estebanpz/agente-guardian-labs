@@ -68,15 +68,18 @@ function buscarFechaTexto(t: string, hoy: string): Hallazgo<string> | null {
   // "mañana" como día, no si va precedido de "la ", "en la " o "por la " ("en la mañana" es la franja).
   m = n.match(/(?<!la |en la |por la )\bmanana\b/);
   if (m) return { valor: sumarDias(hoy, 1), texto: m[0] };
+  // Días ya pasados: se reconocen para poder rechazarlos («esa fecha ya pasó») en vez de no entenderlos.
+  if (/\b(?:antier|anteayer)\b/.test(n)) return { valor: sumarDias(hoy, -2), texto: n.match(/\b(?:antier|anteayer)\b/)![0] };
+  if (/\bayer\b/.test(n)) return { valor: sumarDias(hoy, -1), texto: "ayer" };
+  // "10 de noviembre" (año de hoy). Va antes que el día de la semana: en «el sábado 13 de noviembre» manda el 13.
+  m = n.match(new RegExp(`\\b(\\d{1,2}) de (${Object.keys(MESES).join("|")})\\b`));
+  if (m) return { valor: fmtFecha(Number(hoy.slice(0, 4)), MESES[m[2]], Number(m[1])), texto: m[0] };
   // Día de la semana: la fecha más cercana igual o posterior a hoy.
   m = n.match(new RegExp(`\\b(?:el |este |del )?(${Object.keys(DIAS).join("|")})\\b`));
   if (m) {
     const delta = (DIAS[m[1]] - diaSemana(hoy) + 7) % 7;
     return { valor: sumarDias(hoy, delta), texto: m[0] };
   }
-  // "10 de noviembre" (año de hoy).
-  m = n.match(new RegExp(`\\b(\\d{1,2}) de (${Object.keys(MESES).join("|")})\\b`));
-  if (m) return { valor: fmtFecha(Number(hoy.slice(0, 4)), MESES[m[2]], Number(m[1])), texto: m[0] };
   return null;
 }
 

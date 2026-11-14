@@ -330,3 +330,50 @@ tokens alterados), chat en los tres modos (2 000 mensajes), ReDoS (9 funciones, 
 | «¡Sí, cancelar RS-0011 !» no se reconocía como botón. | Se quitan signos de apertura y cierre con espacios antes de comparar. | `agent/conversacion.ts` |
 | Claves distintas con un surrogate Unicode suelto verificaban la misma huella. | `hashClave` rechaza esas claves y la verificación las niega. | `agent/tools/acceso.ts` |
 
+
+## «El modelo no respondió» y esperas agotadas (14-11-2026)
+
+Motivo: en el chat aparecía «No pude interpretar el mensaje porque el modelo no respondió» después de esperar
+varios minutos, y un mensaje normal podía tardar más de un minuto. No era una caída de Ollama ni de la red.
+
+**Causa:** el prompt del intérprete medía **2 994 tokens** (el sistema más 24 ejemplos guía). Cuando la caché de
+prompt de Ollama está caliente, solo se leen los tokens nuevos del mensaje y la respuesta tarda ~15 s. Pero la caché
+se pierde al descargar el modelo (Ollama lo hace a los 5 minutos sin uso), al reiniciar la API y cada vez que otra
+llamada usa un prompt distinto (el respaldo de reservas). Con la caché fría, Ollama lee el prompt a 20–30 tokens por
+segundo en CPU: **~2 minutos y medio** para 2 994 tokens, más que los 120 s de `MODELO_TIEMPO_MS`. La petición se
+abortaba (`error_modelo`) y, como Ollama seguía procesando la tarea cancelada, los mensajes siguientes esperaban en
+la misma cola y también agotaban el tiempo: de ahí los grupos de fallos seguidos.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| Prompt del intérprete recortado de 2 994 a ~1 500 tokens (sistema más corto y 12 ejemplos guía en lugar de 24, sin perder ninguna regla: reservas que no son salas, cancelar, mis reservas, elusión, escritura informal). Con la caché fría la lectura baja de ~2,5 min a menos de 1 min. | Que la primera respuesta quepa en el tiempo máximo. | `agent/llm/interprete.ts` | `evals/prueba-intencion.ts` (27 frases) |
+| `largoDelPrompt()` y un tope de 4 800 caracteres en `evals/prueba-intencion.ts`: si el prompt vuelve a crecer, la prueba lo dice antes de que falle el chat. | Evitar que el problema regrese. | `agent/llm/interprete.ts`, `evals/prueba-intencion.ts` | `npm run pruebas` |
+| El modelo se mantiene cargado una hora (`MODELO_KEEP_ALIVE`, antes el valor por defecto de Ollama: 5 minutos) y la generación se limita a 200 tokens (`MODELO_MAX_TOKENS`). | No pagar la lectura completa del prompt cada cinco minutos ni esperar una respuesta desbocada. | `agent/llm/proveedor.ts`, `.env.example`, `README.md` | revisión manual |
+| Precalentamiento al arrancar la API: una llamada en segundo plano deja el modelo y la caché de prompt listos para el primer mensaje. Se apaga con `MODELO_PRECALENTAR=0`. | El primer mensaje después de `npm run app` era el que más fallaba. | `agent/channels/servir.ts`, `agent/llm/interprete.ts` | revisión manual |
+| Un fallo que no sea tiempo agotado (respuesta mal formada, 429, corte pasajero) se reintenta una vez con el prompt mínimo, sin ejemplos. La respuesta se lee de forma tolerante si el modelo la envuelve en texto o en un bloque de código. | Recuperar el mensaje sin volver a hacer esperar lo mismo. | `agent/llm/interprete.ts`, `agent/llm/proveedor.ts` | `evals/prueba-intencion.ts` |
+| El error del modelo se registra con su duración (`[llm] … (N ms)`). | Distinguir una caída de una espera agotada. | `agent/llm/interprete.ts` | — |
+
+Medición en el equipo de pruebas (CPU, sin GPU): prompt de 2 994 tokens, caché fría, 2 min 30 s (agotaba el tiempo);
+prompt de 1 500 tokens, caché fría, ~55 s; con la caché caliente, 13–19 s.
+
+## Fechas fuera de rango y horario de cierre (14-11-2026)
+
+Cuatro fallos vistos en el chat de reservas:
+
+1. «¿Para qué día?» mostraba siempre `2026-11-12` como ejemplo, aunque ya fuera otra fecha.
+2. «La necesito para ayer» se respondía «Fuera de alcance»: el extractor no conocía «ayer» y el mensaje no daba
+   ninguna fecha que revisar.
+3. «para el sábado 13 de noviembre» se aceptaba como día válido: la regla del día de la semana corría antes que la
+   fecha explícita y lo convertía en el sábado siguiente. El «13» se colaba además como número de personas.
+4. Un rango como «de 22:01 hasta las 22:30» recibía la pregunta del horario otra vez, sin decir que quedaba fuera de
+   las 22:00.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| El ejemplo de la pregunta se calcula con el reloj (`sumarDias(ahora().fecha, 2)`): nunca vuelve a envejecer. | La fecha fija confundía y parecía inventada. | `agent/conversacion.ts` (`preguntaPara`) | C-64 |
+| El extractor reconoce «ayer», «antier» y «anteayer», y revisa «D de MES» antes que el día de la semana. La fecha explícita manda: «el sábado 13 de noviembre» es el 13, no el próximo sábado. | Reconocer el día pasado para rechazarlo y no aceptar una fecha vencida disfrazada de día de la semana. | `agent/tools/extraer.ts` (`buscarFechaTexto`) | `evals/extraer.ts`, C-64, F-10 |
+| `causaFecha` (fecha pasada o a más de 30 días) se revisa apenas llega la fecha, sin esperar el horario. Al rechazarla se borra también el rango horario, que era de ese día. | «para ayer» se corrige en el mismo turno; antes había que dar la hora para que el motor lo notara. | `agent/tools/reservas.ts`, `agent/conversacion.ts` (`revisarTemprano`) | C-64 |
+| Fuera de 07:00–22:00 la respuesta empieza por el límite y pide un rango dentro de él, sin repetir la pregunta completa. | «de 22:01 a 22:30» debe explicar el límite, no volver a preguntar lo mismo. | `agent/conversacion.ts` (`revisarTemprano`) | C-65 |
+| Prompt del intérprete: 13 ejemplos guía y 4 782 caracteres (tope 4 800). Conserva las cinco frases informales pedidas («Khe puedes hazer?», «kiero resevar la sla 3 pa mñana d 2 a 4», «q salas ay libres oy», «ya no nesecito la resreva del juebes», «xq no me dejas resevar un almuerso»), la reserva con solo datos («Mañana de 3 a 5 en el laboratorio 4, vamos 12»), las reservas propias («tengo alguna reserva pa mñana?») y el registro («es mi primera vez, quiero registrarme»). | El recorte anterior clasificaba esas frases como consulta de disponibilidad y había perdido la regla de `registro_usuario`. | `agent/llm/interprete.ts` | `evals/prueba-intencion.ts` |
+| El respaldo del modelo ya no se pide cuando el extractor leyó un rango completo (`ext.inicio && ext.fin`). | «de 22:01 hasta las 22:30» hacía una llamada al modelo de ~9 s sin necesidad: el código ya había entendido el rango y solo tenía que rechazarlo. | `agent/conversacion.ts` (`necesitaRespaldo`) | C-65 y prueba manual de la API (respuesta en ~0,1 s) |
+| `MODELO_HILOS` fija los hilos de CPU del modelo local (`num_thread`); si está vacío no se envía y Ollama decide. Se documenta en `.env.example` y el README. | Aprovechar los núcleos físicos y usar el mismo valor en la app y las pruebas: si cambia, Ollama recarga el modelo y se pierde la caché del prompt. | `agent/llm/proveedor.ts` | carga de Ollama con `n_threads = 6` en el registro |

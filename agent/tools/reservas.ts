@@ -117,14 +117,22 @@ const alternativas = (s: SolicitudReserva, c: Contexto, sin?: string): string[] 
 // Causa concreta de un incumplimiento de R15 (la misma comprobación que la regla), o null si todo está permitido.
 // `campo` dice qué dato hay que cambiar: la fecha o el horario.
 export type CausaR15 = { campo: "fecha" | "horario"; motivo: string };
-export function causaR15(fecha: string, inicio: string, fin: string, hoy: { fecha: string; minutos: number }): CausaR15 | null {
-  const i = aMin(inicio);
-  const f = aMin(fin);
-  const dur = f - i;
+
+// La fecha sola (sin horario) también se puede revisar: se rechaza apenas llega, sin esperar a que den la hora.
+export function causaFecha(fecha: string, hoy: { fecha: string; minutos: number }): CausaR15 | null {
   if (fecha < hoy.fecha) return { campo: "fecha", motivo: "esa fecha ya pasó" };
   if (fecha > sumarDias(hoy.fecha, P.dias_adelante_max)) {
     return { campo: "fecha", motivo: `solo se puede reservar hasta ${P.dias_adelante_max} días adelante` };
   }
+  return null;
+}
+
+export function causaR15(fecha: string, inicio: string, fin: string, hoy: { fecha: string; minutos: number }): CausaR15 | null {
+  const i = aMin(inicio);
+  const f = aMin(fin);
+  const dur = f - i;
+  const deFecha = causaFecha(fecha, hoy);
+  if (deFecha) return deFecha;
   if (fecha === hoy.fecha && i <= hoy.minutos) {
     return { campo: "horario", motivo: `Ese horario de hoy ya pasó (son las ${aHora(hoy.minutos)})` };
   }
