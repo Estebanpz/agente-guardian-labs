@@ -913,9 +913,9 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
       configurarParaPruebas({ repo: repo66, interpretar: fueraDeAlcance });
       const sid66 = "abcdef66-aaaa-4aaa-8aaa-aaaaaaaaaa66";
       await mensaje("D-20000002", { sesion: sid66 });
-      const r66 = await mensaje("Quiero cancelar una reserva", { sesion: sid66 }) as Salida;
+      const r66 = await mensaje("¿Qué reservas tengo?", { sesion: sid66 }) as Salida;
       filas.push(fila("C-66", "Reservas propias cuando el modelo no entiende",
-        "D-20000002 → Quiero cancelar una reserva (modelo: fuera_de_alcance)",
+        "D-20000002 → ¿Qué reservas tengo? (modelo: fuera_de_alcance)",
         "lista solo RS-0003, con el botón Cancelar RS-0003, en vez de negar", [
           [r66.intencion === "mis_reservas", "responde como mis_reservas"],
           [/RS-0003/.test(r66.respuesta ?? "") && !/RS-0001|RS-0002/.test(r66.respuesta ?? ""), "solo muestra la reserva de Patricia"],
@@ -928,9 +928,9 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
       const r67 = await mensaje("tengo reservas hechas?", { sesion: sid67 }) as Salida;
       filas.push(fila("C-67", "Sin reservas cuando el modelo no entiende",
         "C-10000001 → tengo reservas hechas? (modelo: fuera_de_alcance)",
-        "dice que no tiene reservas desde hoy y ofrece reservar una sala", [
+        "dice que no tiene reservas desde ahora y ofrece reservar una sala", [
           [r67.intencion === "mis_reservas", "responde como mis_reservas"],
-          [(r67.respuesta ?? "").startsWith("No tienes reservas programadas desde hoy"), "lo dice con el texto del vacío"],
+          [(r67.respuesta ?? "").startsWith("No tienes reservas programadas desde ahora"), "lo dice con el texto del vacío"],
           [Boolean(r67.flujo?.opciones.includes("Reservar una sala")), "ofrece «Reservar una sala»"],
         ]));
 
@@ -949,14 +949,101 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
           [!(r69.respuesta ?? "").includes("RS-"), "no lista reservas"],
         ]));
 
-      // C-70 (7.0.22): una reserva de hoy que ya empezó se muestra, pero no se puede cancelar.
+      // C-70 (7.0.22, actualizado en 7.0.23): a las 17:52 una reserva de hoy que ya terminó no se lista y, si se
+      // pide cancelar, se dice que venció (no «ya empezó»).
       fijarReloj("2026-11-10", "17:52");
-      const r70 = await mensaje("Quiero cancelar una reserva", { sesion: sid66 }) as Salida;
-      filas.push(fila("C-70", "Reserva de hoy ya empezada", "D-20000002 → Quiero cancelar una reserva (17:52; RS-0003 fue 10:00-12:00)",
-        "muestra RS-0003 con «(ya empezó)» y sin botón para cancelarla", [
-          [r70.intencion === "mis_reservas" && /RS-0003/.test(r70.respuesta ?? ""), "lista RS-0003"],
-          [(r70.respuesta ?? "").includes("(ya empezó)"), "avisa que ya empezó"],
-          [!r70.flujo?.opciones.includes("Cancelar RS-0003"), "no ofrece cancelarla"],
+      const r70 = await mensaje("Mis reservas", { sesion: sid66 }) as Salida;
+      const r70c = await mensaje("Quiero cancelar una reserva", { sesion: sid66 }) as Salida;
+      filas.push(fila("C-70", "Reserva de hoy ya terminada", "D-20000002 → Mis reservas → Quiero cancelar una reserva (17:52; RS-0003 fue 10:00-12:00)",
+        "no lista RS-0003 y al cancelar dice que venció a las 12:00", [
+          [r70.intencion === "mis_reservas" && (r70.respuesta ?? "").startsWith("No tienes reservas programadas desde ahora"), "la lista vigente queda vacía"],
+          [!r70.flujo?.opciones.includes("Cancelar RS-0003"), "no ofrece cancelar la vencida"],
+          [(r70c.respuesta ?? "").startsWith("Tu reserva RS-0003 ya venció: terminó a las 12:00"), "al cancelar dice que venció"],
+        ]));
+
+      // C-71 a C-75 (7.0.23): RS-0014 de Laura (C-10000001), hoy de 10:30 a 12:30, en tres momentos del día.
+      const repo71 = crearMemoria("2026-11-09");
+      const programar = (): DecisionReserva => ({
+        decision: "programar", estado: "confirmado", accion: "programar_reserva", reglas_aplicadas: ["R25"],
+        sala_asignada: null, alternativas: [], conflictos: [], faltantes: [], notificar: [], fuentes: [],
+        version_reglas: VERSION_REGLAS, traza: [],
+      });
+      const rs71 = await repo71.crearReservaAtomica("2026-11-10", "sala-4", () => programar(), (codigo) => ({
+        codigo, sala: "sala-4", fecha: "2026-11-10", inicio: "10:30", fin: "12:30", inicio_min: 630, fin_min: 750,
+        tipo: "estudiantes", carne: "C-10000001", rol: "estudiante", personas: 5, equipos: 5, computo_alto: false,
+        materia: null, estado: "programada", reglas_aplicadas: ["R25"], traza: [], version_reglas: VERSION_REGLAS,
+        creada: new Date(), origen: "chat",
+      }));
+      const codigo71 = rs71.reserva!.codigo;
+      configurarParaPruebas({ repo: repo71, interpretar: fueraDeAlcance });
+      const sid71 = "abcdef71-aaaa-4aaa-8aaa-aaaaaaaaaa71";
+      await mensaje("C-10000001", { sesion: sid71 });
+
+      // (a) A las 18:10 ya terminó: no aparece en «Mis reservas».
+      fijarReloj("2026-11-10", "18:10");
+      const a71 = await mensaje("Mis reservas", { sesion: sid71 }) as Salida;
+      filas.push(fila("C-71", "Reserva terminada fuera de la lista", "C-10000001 → Mis reservas (18:10; RS de 10:30-12:30)",
+        "no aparece la reserva terminada y se ofrece reservar una sala", [
+          [a71.intencion === "mis_reservas" && (a71.respuesta ?? "").startsWith("No tienes reservas programadas desde ahora"), "la lista vigente queda vacía"],
+          [!(a71.respuesta ?? "").includes(codigo71), "no muestra la reserva vencida"],
+          [Boolean(a71.flujo?.opciones.includes("Reservar una sala")), "ofrece «Reservar una sala»"],
+        ]));
+
+      // (b) A las 18:10, pedir cancelar explica que venció a las 12:30.
+      const b71 = await mensaje("Quiero cancelar una reserva", { sesion: sid71 }) as Salida;
+      filas.push(fila("C-72", "Cancelar una reserva vencida", "C-10000001 → Quiero cancelar una reserva (18:10, modelo: fuera_de_alcance)",
+        "dice que la reserva venció a las 12:30 y no hay nada que cancelar", [
+          [b71.intencion === "cancelar_reserva", "responde como cancelación"],
+          [(b71.respuesta ?? "").startsWith(`Tu reserva ${codigo71} ya venció: terminó a las 12:30`), "usa «venció» y la hora de fin"],
+          [!JSON.stringify(b71.flujo ?? {}).includes("Cancelar"), "no ofrece cancelar"],
+        ]));
+
+      // (c) A las 11:00 está en curso: se ve, se explica y no se ofrece cancelar.
+      fijarReloj("2026-11-10", "11:00");
+      const c71 = await mensaje("Mis reservas", { sesion: sid71 }) as Salida;
+      filas.push(fila("C-73", "Reserva en curso", "C-10000001 → Mis reservas (11:00; RS de 10:30-12:30)",
+        "sale «(en curso)», explica que no se puede cancelar y no ofrece el botón", [
+          [(c71.respuesta ?? "").includes(codigo71) && (c71.respuesta ?? "").includes("(en curso)"), "la marca como en curso"],
+          [(c71.respuesta ?? "").includes("Ninguna se puede cancelar desde el chat porque ya empezó; si necesitas liberarla, habla con el monitor."), "explica por qué y remite al monitor"],
+          [!c71.flujo?.opciones.includes(`Cancelar ${codigo71}`), "no ofrece cancelarla"],
+        ]));
+
+      // (d) A las 09:00 aún no empieza: botón para cancelar.
+      fijarReloj("2026-11-10", "09:00");
+      const d71 = await mensaje("Mis reservas", { sesion: sid71 }) as Salida;
+      filas.push(fila("C-74", "Reserva antes de empezar", "C-10000001 → Mis reservas (09:00; RS de 10:30-12:30)",
+        "sale con el botón «Cancelar RS-…»", [
+          [(d71.respuesta ?? "").includes(codigo71) && !(d71.respuesta ?? "").includes("(en curso)"), "la muestra sin marca"],
+          [Boolean(d71.flujo?.opciones.includes(`Cancelar ${codigo71}`)), "ofrece cancelarla"],
+        ]));
+
+      // (e) «cancelar» a secas, con sesión y sin flujo, va a la cancelación.
+      const e71 = await mensaje("cancelar", { sesion: sid71 }) as Salida;
+      filas.push(fila("C-75", "«cancelar» a secas", "C-10000001 → cancelar (09:00, sin flujo abierto)",
+        "pide confirmar la cancelación de su reserva", [
+          [e71.intencion === "cancelar_reserva" && (e71.respuesta ?? "").startsWith(`¿Cancelo tu reserva ${codigo71}`), "pide confirmar"],
+          [Boolean(e71.flujo?.opciones.includes(`Sí, cancelar ${codigo71}`)), "ofrece «Sí, cancelar»"],
+        ]));
+
+      // (f) «cancelar» con una reserva a medio hacer sigue cancelando la solicitud.
+      fijarReloj("2026-11-09", "08:00");
+      const f71 = await guion("abcdef76-aaaa-4aaa-8aaa-aaaaaaaaaa76", ["C-10000001", "Quiero reservar una sala", "cancelar"]);
+      filas.push(fila("C-76", "«cancelar» dentro de una reserva", "C-10000001 → Quiero reservar una sala → cancelar",
+        "cancela la solicitud en curso y no la reserva", [
+          [f71.salidas[2].intencion === "cancelar" && (f71.salidas[2].respuesta ?? "").startsWith("Cancelé la solicitud"), "cancela la solicitud"],
+          [(await f71.repo.leerConversacion("abcdef76-aaaa-4aaa-8aaa-aaaaaaaaaa76")) === null, "cierra el flujo abierto"],
+        ]));
+
+      // (g) «quiero cancelar esa reserva» con el modelo en fuera_de_alcance: explica que está en curso.
+      configurarParaPruebas({ repo: repo71, interpretar: fueraDeAlcance });
+      fijarReloj("2026-11-10", "11:00");
+      const g71 = await mensaje("quiero cancelar esa reserva", { sesion: sid71 }) as Salida;
+      filas.push(fila("C-77", "Cancelar por el respaldo, reserva en curso", "C-10000001 → quiero cancelar esa reserva (11:00, modelo: fuera_de_alcance)",
+        "explica que está en curso y que solo se cancelan las que no han empezado", [
+          [g71.intencion === "cancelar_reserva", "responde como cancelación"],
+          [(g71.respuesta ?? "").includes(`está en curso (10:30–12:30)`), "nombra la reserva y su horario"],
+          [(g71.respuesta ?? "").includes("desde el chat solo se cancelan reservas que aún no empiezan"), "explica la regla"],
+          [!JSON.stringify(g71.flujo ?? {}).includes("Cancelar"), "no ofrece cancelar"],
         ]));
       configurarParaPruebas({ repo: crearMemoria("2026-11-09"), interpretar: clasificadorFijo });
     }

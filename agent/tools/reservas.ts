@@ -320,7 +320,7 @@ export const ocupadaPublica = (c: { inicio: string; fin: string; tipo: string; p
 // misma ("no_encontrada"), para no revelar reservas de otras personas.
 export type DecisionCancelacion = {
   decision: "cancelar" | "negar";
-  motivo: "titular" | "no_encontrada" | "no_programada" | "ya_empezo";
+  motivo: "titular" | "no_encontrada" | "no_programada" | "ya_empezo" | "vencida";
   reglas_aplicadas: string[];
   version_reglas: string;
 };
@@ -332,6 +332,8 @@ export function evaluarCancelacion(
     ({ decision, motivo, reglas_aplicadas: ["R27"], version_reglas: base.version });
   if (!r || r.carne !== carne) return fin("negar", "no_encontrada");
   if (r.estado !== "programada") return fin("negar", "no_programada");
-  if (r.fecha < hoy.fecha || (r.fecha === hoy.fecha && r.inicio_min <= hoy.minutos)) return fin("negar", "ya_empezo");
+  // Tres casos (7.0.23): ya terminó (vencida), está en curso, o aún no empieza (se puede cancelar).
+  if (r.fecha < hoy.fecha || (r.fecha === hoy.fecha && r.fin_min <= hoy.minutos)) return fin("negar", "vencida");
+  if (r.fecha === hoy.fecha && r.inicio_min <= hoy.minutos) return fin("negar", "ya_empezo");
   return fin("cancelar", "titular");
 }

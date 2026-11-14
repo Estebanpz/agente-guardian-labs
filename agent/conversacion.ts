@@ -1229,19 +1229,27 @@ export async function misReservasTurno(sesion: string, repo: Repositorio): Promi
   if (!carne) return cerrado("mis_reservas", "Para ver tus reservas, primero escríbeme tu carné.");
   const h = ahora();
   const salas = await repo.salas();
+  // Solo vigentes (7.0.23): ni días anteriores ni las de hoy que ya terminaron.
   const propias = (await repo.reservasDeCarne(carne, h.fecha))
+    .filter((r) => r.fecha > h.fecha || (r.fecha === h.fecha && r.fin_min > h.minutos))
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.inicio_min - b.inicio_min);
   if (!propias.length) {
-    return cerrado("mis_reservas", "No tienes reservas programadas desde hoy.", ["Reservar una sala", "Ver disponibilidad"]);
+    return cerrado("mis_reservas", "No tienes reservas programadas desde ahora.", ["Reservar una sala", "Ver disponibilidad"]);
   }
-  const cancelables = propias.filter((r) => evaluarCancelacion(r, carne, h).decision === "cancelar");
+  const decision = (r: ReservaDoc) => evaluarCancelacion(r, carne, h);
+  const cancelables = propias.filter((r) => decision(r).decision === "cancelar");
+  const enCurso = propias.filter((r) => decision(r).motivo === "ya_empezo");
   const mostradas = propias.slice(0, 10);
   const lineas = mostradas.map((r) => {
-    const enCurso = evaluarCancelacion(r, carne, h).decision !== "cancelar" ? " (ya empezó)" : "";
-    return `• ${r.codigo}: ${nombreSala(salas, r.sala)}, ${fechaLarga(r.fecha)}, ${r.inicio} a ${r.fin}${enCurso}`;
+    const marca = decision(r).motivo === "ya_empezo" ? " (en curso)" : "";
+    return `• ${r.codigo}: ${nombreSala(salas, r.sala)}, ${fechaLarga(r.fecha)}, ${r.inicio} a ${r.fin}${marca}`;
   });
   const resto = propias.length > mostradas.length ? `\n…y ${propias.length - mostradas.length} más.` : "";
-  const pie = cancelables.length ? "\n\nPara cancelar una, toca su botón." : "";
+  const pie = cancelables.length
+    ? "\n\nPara cancelar una, toca su botón."
+    : enCurso.length
+      ? "\n\nNinguna se puede cancelar desde el chat porque ya empezó; si necesitas liberarla, habla con el monitor."
+      : "";
   return cerrado("mis_reservas",
     `Tienes ${propias.length} ${propias.length === 1 ? "reserva programada" : "reservas programadas"}:\n${lineas.join("\n")}${resto}${pie}`,
     [...cancelables.slice(0, 6).map((r) => `Cancelar ${r.codigo}`), "Reservar una sala"]);
@@ -1256,6 +1264,11 @@ export async function cancelacionTurno(texto: string, sesion: string, repo: Repo
   const codigo = codigoDe(texto);
   const describir = (r: ReservaDoc) => `${r.codigo}: ${nombreSala(salas, r.sala)}, ${fechaLarga(r.fecha)}, ${r.inicio} a ${r.fin}`;
   const noEncontrada = (c: string) => cerrado("cancelar_reserva", `No encuentro una reserva tuya con el código ${c} que se pueda cancelar.`);
+  // 7.0.23: no confundir «en curso» con «vencida».
+  const enCursoTexto = (r: ReservaDoc) => cerrado("cancelar_reserva",
+    `${r.codigo} está en curso (${r.inicio}–${r.fin}): desde el chat solo se cancelan reservas que aún no empiezan. Si necesitas liberarla, habla con el monitor.`);
+  const vencidaTexto = (r: ReservaDoc) => cerrado("cancelar_reserva",
+    `Tu reserva ${r.codigo} ya venció: terminó a las ${r.fin}, así que no hay nada que cancelar.`);
 
   if (codigo && /^no,? conservar/.test(t)) {
     return cerrado("cancelar_reserva", `Listo, no cancelé nada. Tu reserva ${codigo} sigue programada.`);
@@ -1267,13 +1280,24 @@ export async function cancelacionTurno(texto: string, sesion: string, repo: Repo
       registrar({ intencion: "cancelar_reserva", codigo, reglas: dec.reglas_aplicadas, carne: enmascarar(carne) });
       return cerrado("cancelar_reserva", `Listo. Cancelé tu reserva ${describir(r)}. La sala queda libre en ese horario.`);
     }
-    if (dec.motivo === "ya_empezo") return cerrado("cancelar_reserva", `La reserva ${codigo} ya empezó o ya pasó; no se puede cancelar desde el chat. Consulta con el monitor.`);
+    if (dec.motivo === "ya_empezo" && r) return enCursoTexto(r);
+    if (dec.motivo === "vencida" && r) return vencidaTexto(r);
     return noEncontrada(codigo);
   }
 
+  // Código de una reserva propia que ya no se puede cancelar: se explica su estado, no un «no encuentro» genérico.
+  if (codigo) {
+    const r = await repo.reservaPorCodigo(codigo);
+    if (r && r.carne === carne) {
+      const dec = evaluarCancelacion(r, carne, h);
+      if (dec.motivo === "ya_empezo") return enCursoTexto(r);
+      if (dec.motivo === "vencida") return vencidaTexto(r);
+    }
+  }
+
   // Solo reservas propias, programadas y que aún no empiezan.
-  const propias = (await repo.reservasDeCarne(carne, h.fecha))
-    .filter((r) => evaluarCancelacion(r, carne, h).decision === "cancelar");
+  const todas = await repo.reservasDeCarne(carne, h.fecha);
+  const propias = todas.filter((r) => evaluarCancelacion(r, carne, h).decision === "cancelar");
   let lista = propias;
   if (codigo) {
     lista = propias.filter((r) => r.codigo === codigo);
@@ -1283,6 +1307,11 @@ export async function cancelacionTurno(texto: string, sesion: string, repo: Repo
     if (e.fecha) lista = lista.filter((r) => r.fecha === e.fecha);
     if (e.sala) lista = lista.filter((r) => r.sala === e.sala);
     if (!lista.length) {
+      // Sin cancelables: se explica la reserva en curso o la vencida antes del mensaje genérico.
+      const enCurso = todas.filter((r) => evaluarCancelacion(r, carne, h).motivo === "ya_empezo");
+      if (enCurso.length) return enCursoTexto(enCurso[0]);
+      const vencidas = todas.filter((r) => evaluarCancelacion(r, carne, h).motivo === "vencida");
+      if (!propias.length && vencidas.length) return vencidaTexto(vencidas[vencidas.length - 1]);
       return cerrado("cancelar_reserva", propias.length
         ? "No encuentro una reserva tuya con esos datos. Escribe el código (RS-…) o el día de la reserva."
         : "No tienes reservas programadas que se puedan cancelar.");

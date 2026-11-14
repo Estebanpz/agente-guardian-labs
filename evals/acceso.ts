@@ -7,7 +7,8 @@ const { crearRepositorio } = await import("../agent/store/repositorio.js");
 const { configurarParaPruebas } = await import("../agent/orquestador.js");
 const { crearToken, leerToken, hashClave, verificarClave, reiniciarIntentos } = await import("../agent/tools/acceso.js");
 const { modeloSimulado } = await import("./modelo-simulado.js");
-const { fijarReloj } = await import("../agent/tools/reloj.js");
+const { fijarReloj, aMin } = await import("../agent/tools/reloj.js");
+import type { DecisionReserva } from "../agent/tools/esquemas-reservas.js";
 
 configurarParaPruebas({ interpretar: modeloSimulado });
 fijarReloj("2026-11-09", "10:00");
@@ -161,7 +162,8 @@ try {
   r = await chat("Cancelar RS-0002", uuid(10), TC);
   comprobar(/Sí, cancelar RS-0002/.test(JSON.stringify(r.json)), "el botón «Cancelar RS-0002» pide confirmar");
 
-  // 9b bis) El modelo dice fuera_de_alcance, pero la persona habla de reservas: se valida con sus datos (7.0.22).
+  // 9b bis) El modelo dice fuera_de_alcance, pero la persona habla de reservas: se valida con sus datos (7.0.22)
+  // y, si pide cancelar, se atiende como cancelación (7.0.23).
   const patricia = await login("patricia.soto@docentes.uniespinal.test", D);
   const TP = patricia.json.token;
   const fueraSiempre = async () => ({
@@ -169,14 +171,46 @@ try {
     recurso: null, recurso_texto: null,
   });
   configurarParaPruebas({ interpretar: fueraSiempre });
-  r = await chat("Quiero cancelar una reserva", uuid(15), TP);
+  r = await chat("¿Qué reservas tengo?", uuid(15), TP);
   comprobar(r.json.intencion === "mis_reservas" && /RS-0003/.test(r.json.respuesta)
     && r.json.flujo?.opciones?.includes("Cancelar RS-0003") && !/RS-0001|RS-0002/.test(r.json.respuesta),
     "Patricia: el modelo dice fuera de alcance, pero se listan sus reservas con «Cancelar RS-0003»");
-  r = await chat("Quiero cancelar una reserva", uuid(16));
+  r = await chat("Quiero cancelar una reserva", uuid(16), TP);
+  comprobar(r.json.intencion === "cancelar_reserva" && /¿Cancelo tu reserva RS-0003/.test(r.json.respuesta)
+    && r.json.flujo?.opciones?.includes("Sí, cancelar RS-0003"),
+    "Patricia: «Quiero cancelar una reserva» con fuera de alcance pide confirmar su reserva");
+  r = await chat("Quiero cancelar una reserva", uuid(17));
   comprobar(r.json.intencion === "requiere_login" && /inicia sesión/.test(r.json.respuesta) && !/RS-0003/.test(r.json.respuesta),
     "sin sesión: hablar de reservas pide iniciar sesión y no lista ninguna");
+
+  // 9b ter) Laura: una reserva de hoy que ya terminó (7.0.23). A las 18:10 venció; a las 11:00 está en curso.
+  const programar = (): DecisionReserva => ({
+    decision: "programar", estado: "confirmado", accion: "programar_reserva", reglas_aplicadas: ["R25"],
+    sala_asignada: null, alternativas: [], conflictos: [], faltantes: [], notificar: [], fuentes: [],
+    version_reglas: "2.2.0", traza: [],
+  });
+  const rsLaura = await repo.crearReservaAtomica("2026-11-09", "sala-4", () => programar(), (codigo) => ({
+    codigo, sala: "sala-4", fecha: "2026-11-09", inicio: "10:30", fin: "12:30", inicio_min: aMin("10:30"), fin_min: aMin("12:30"),
+    tipo: "estudiantes", carne: "C-10000001", rol: "estudiante", personas: 5, equipos: 5, computo_alto: false,
+    materia: null, estado: "programada", reglas_aplicadas: ["R25"], traza: [], version_reglas: "2.2.0",
+    creada: new Date(), origen: "chat",
+  }));
+  const codigoLaura = rsLaura.reserva!.codigo;
+  fijarReloj("2026-11-09", "18:10");
+  r = await chat("Quiero cancelar una reserva", uuid(18), TL);
+  comprobar(r.json.intencion === "cancelar_reserva"
+    && (r.json.respuesta ?? "").startsWith(`Tu reserva ${codigoLaura} ya venció: terminó a las 12:30`),
+    "Laura: a las 18:10, cancelar su reserva terminada dice que venció a las 12:30");
+  configurarParaPruebas({ interpretar: fueraSiempre });
+  fijarReloj("2026-11-09", "11:00");
+  r = await chat("quiero cancelar esa reserva", uuid(19), TL);
+  comprobar(r.json.intencion === "cancelar_reserva" && /está en curso \(10:30–12:30\)/.test(r.json.respuesta)
+    && !/Cancelar RS-/.test(JSON.stringify(r.json.flujo)),
+    "Laura: a las 11:00, el respaldo explica que está en curso y no ofrece cancelar");
   configurarParaPruebas({ interpretar: modeloSimulado });
+  fijarReloj("2026-11-09", "10:00");
+  r = await chat("cancelar", uuid(20));
+  comprobar(r.json.intencion === "requiere_login", "sin sesión: «cancelar» a secas pide iniciar sesión");
 
   // 9c) Hallazgos del fuzzing (14-11-2026): carné con marcas combinadas y «cambiar carné».
   const colgado = (p: Promise<R>) => Promise.race([p, new Promise<R>((ok) => setTimeout(() => ok({ status: 0, json: null }), 5000))]);

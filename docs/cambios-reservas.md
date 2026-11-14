@@ -398,3 +398,25 @@ la lista.
 | En el modo visitante, la misma condición pide iniciar sesión en vez de negar; nunca se listan reservas ajenas. | El visitante no tiene identidad y no debe ver datos de nadie. | `agent/orquestador.ts` (`modoPublico`) | `evals/acceso.ts` 9b bis |
 | Con `error_modelo` y sesión, «Mis reservas» se agrega a los botones ofrecidos: funciona sin el modelo. | Salida útil cuando el modelo no responde. | `agent/orquestador.ts` | C-53 |
 | El ejemplo «Quiero cancelar una reserva» → `cancelar_reserva` no se agregó al prompt: 4 782 caracteres más ~79 del ejemplo superan el tope de 4 800. El caso queda cubierto por la validación del código y por el ejemplo existente «Cancela mi reserva RS-0042». | No forzar el tamaño del prompt; el respaldo es determinista. | `agent/llm/interprete.ts` (sin cambio) | C-66 |
+
+## Reservas vencidas, en curso y «cancelar» a secas (sección 7.0.23, 14-11-2026)
+
+Motivo: con Laura (C-10000001) a las 18:10 y una reserva de hoy de 10:30 a 12:30 que ya había terminado, «Quiero
+cancelar una reserva» mostraba la reserva como si siguiera vigente, con «(ya empezó)» y sin explicar nada;
+«cancelar» respondía fuera de alcance; y «quiero cancelar esa reserva» volvía a listar lo mismo. Una reserva de hoy
+que ya terminó no es una reserva que «ya empezó»: no hay nada que cancelar y hay que decirlo.
+
+El estado de la reserva se decide en `evaluarCancelacion` (R27) con tres casos: **aún no empieza** (se puede
+cancelar), **en curso** (empezó y no ha terminado: solo se explica) y **vencida** (ya terminó: no hay nada que
+hacer). El chat usa ese motivo para elegir el texto.
+
+| Cambio | Por qué | Archivos | Prueba |
+|---|---|---|---|
+| `misReservasTurno` no lista las reservas terminadas: ni días anteriores ni las de hoy con `fin_min <= minutos`. Las que empezaron y siguen en curso se marcan «(en curso)». Si quedan reservas pero ninguna se puede cancelar, agrega «Ninguna se puede cancelar desde el chat porque ya empezó; si necesitas liberarla, habla con el monitor.» Si no queda ninguna vigente: «No tienes reservas programadas desde ahora.» | Una reserva vencida no debe aparecer como si se pudiera cancelar; una en curso se ve, pero no se cancela. | `agent/conversacion.ts` (`misReservasTurno`) | C-70, C-71, C-73, C-74 |
+| `cancelacionTurno` distingue los tres casos: si está en curso, nombra el código y el horario («RS-0014 está en curso (10:30–12:30): desde el chat solo se cancelan reservas que aún no empiezan…»); si venció, «Tu reserva RS-0014 ya venció: terminó a las 12:30, así que no hay nada que cancelar.» También al confirmar por botón. | Explicar por qué no se puede cancelar, sin el mensaje genérico ni confundir «en curso» con «vencida». | `agent/conversacion.ts` (`cancelacionTurno`), `agent/tools/reservas.ts` (`evaluarCancelacion`, motivo `vencida`) | C-72, C-73, C-77, `evals/mutacion/reservas.ts` |
+| El respaldo de 7.0.22 usa `cancelacionTurno` cuando el mensaje, además de hablar de reservas, pide cancelar (`cancel…`, `anul…`, `elimin…`, `borr…`, `quit…`); si no, sigue usando `misReservasTurno`. La traza registra `fuera_de_alcance → cancelar_reserva`. | «Quiero cancelar una reserva» debe cancelar o explicar, no solo listar. | `agent/orquestador.ts` | C-72, C-77, `evals/acceso.ts` 9b bis/ter |
+| «cancelar», «cancela», «cancélala», «anular», «cancelar esa»… con sesión y sin una reserva o registro a medio hacer se atienden como `cancelar_reserva` sin depender del modelo. Si hay un flujo abierto, sigue cancelando la solicitud en curso. El visitante sin sesión recibe «inicia sesión». | El modelo no siempre reconoce una orden tan corta, y hoy caía en fuera de alcance. | `agent/orquestador.ts` (`soloCancelar`, `modoPublico`, `mensajeBase`) | C-75, C-76, `evals/acceso.ts` |
+| C-70 actualizada a la regla nueva (17:52: RS-0003 no se lista y al cancelar dice que venció a las 12:00) y C-66 pasa a «¿Qué reservas tengo?» para seguir probando el respaldo de lista. C-71 a C-77 cubren los tres momentos de una reserva de 10:30 a 12:30: 18:10, 11:00 y 09:00, además de «cancelar» a secas, «cancelar» con una solicitud abierta y «quiero cancelar esa reserva» con el modelo en fuera de alcance. | Fijar el comportamiento con reloj fijo, sin depender de la hora real. | `evals/escenarios-conversacion.ts`, `evals/acceso.ts` | `npm run pruebas:rapidas` |
+| Rangos de Stryker de `agent/tools/reservas.ts` actualizados tras el cambio: `evaluarCancelacion` 328-340. | El mutador debe cubrir la función completa. | `stryker.config.json` | `npm run mutacion` |
+
+El prompt del intérprete no cambió (4 782 caracteres): el respaldo determinista cubre la frase del reporte.

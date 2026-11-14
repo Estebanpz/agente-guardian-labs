@@ -18,7 +18,7 @@
     "agent/tools/extraer.ts",
     "agent/tools/reservas.ts:44-44",
     "agent/tools/reservas.ts:315-316",
-    "agent/tools/reservas.ts:328-337"
+    "agent/tools/reservas.ts:328-340"
   ],
   "ignorePatterns": [
     ".env",

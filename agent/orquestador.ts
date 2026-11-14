@@ -34,6 +34,12 @@ const normO = (t: string) => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").t
 // El mensaje habla de reservas propias, aunque el modelo no lo haya entendido (7.0.22): reserva(s), sus faltas
 // habituales o un código RS-0000. «Reservar» no entra: si es otra cosa, lo decide `recurso`.
 const HABLA_DE_RESERVAS = /\breservas?\b|\bresevas?\b|\bresrevas?\b|\bresebas?\b|\brs-?\d{3,4}\b/;
+// Verbos de cancelación (7.0.23): saben si el mensaje pide cancelar aunque el modelo no lo entienda.
+const PIDE_CANCELAR = /\b(cancel\w*|anul\w*|elimin\w*|borr\w*|quit\w*)\b/;
+// «cancelar», «cancela», «cancélala», «anular», «cancelar esa»: sin más datos, es cancelar una reserva.
+const CANCELA_SOLA = /^(cancel\w*|anul\w*|elimin\w*|borr\w*|quit\w*)(\s+(esa|esta|la|mi|las|mis|el|una|unos|unas))?(\s+(reserva|reservas))?$/;
+const soloCancelar = (texto: string): boolean =>
+  CANCELA_SOLA.test(normO(texto).replace(/^[¡¿\s]+|[.!?¡¿,;:\s]+$/g, ""));
 
 // Respuesta de fuera de alcance. Si el modelo entendió que quiere reservar otra cosa, se nombra lo que pidió
 // (solo con palabras que están en el mensaje).
@@ -229,6 +235,8 @@ async function modoPublico(texto: string, sesion: string | undefined, repo: Repo
   if (carneDe(texto)) return requiereLogin("No necesito que escribas tu carné: lo tomo de tu inicio de sesión. ");
   if (esSalida(texto)) return { intencion: "cerrar_sesion", respuesta: "No hay una sesión iniciada.", flujo: null };
   if (esBotonCancelacion(texto)) return requiereLogin();
+  // «cancelar» a secas también pide iniciar sesión (7.0.23).
+  if (soloCancelar(texto)) return requiereLogin();
   const ruta = rutaDeBoton(texto);
   if (ruta === "consulta_salas") return { intencion: "consulta_salas", respuesta: await estadoSalasDeBase(repo), flujo: null };
   if (ruta && SOLO_CON_SESION.includes(ruta)) return requiereLogin();
@@ -405,6 +413,14 @@ async function mensajeBase(
     }
   }
 
+  // «cancelar» a secas, con sesión y sin una reserva o registro a medio hacer (el flujo abierto ya se atendió
+  // arriba): se trata como cancelar una reserva propia (7.0.23).
+  if (sesion && !eludir && soloCancelar(texto)) {
+    const r = await cancelacionTurno(texto, sesion, repo);
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+    return r;
+  }
+
   // Paso 3: botones de la interfaz (texto fijo), sin modelo. Todo texto libre lo interpreta el modelo.
   const ruta = eludir ? null : rutaDeBoton(texto);
   if (ruta === "consulta_salas") {
@@ -488,10 +504,15 @@ async function mensajeBase(
   }
 
   // El modelo no entendió el mensaje, pero la persona identificada habla de sus reservas: antes de negar se miran
-  // las suyas (7.0.22). Solo con sesión; el visitante recibe «inicia sesión» en modoPublico, nunca la lista.
+  // las suyas (7.0.22). Si además pide cancelar, se atiende como cancelación (7.0.23): explica en curso/vencida.
+  // Solo con sesión; el visitante recibe «inicia sesión» en modoPublico, nunca la lista.
   if (sesion && !eludir && c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && HABLA_DE_RESERVAS.test(normO(texto))) {
-    const r = await misReservasTurno(sesion, repo);
-    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta, validacion: "fuera_de_alcance → mis_reservas" });
+    const cancelar = PIDE_CANCELAR.test(normO(texto));
+    const r = cancelar ? await cancelacionTurno(texto, sesion, repo) : await misReservasTurno(sesion, repo);
+    registrar({
+      texto: resumen, intencion: r.intencion, respuesta: r.respuesta,
+      validacion: cancelar ? "fuera_de_alcance → cancelar_reserva" : "fuera_de_alcance → mis_reservas",
+    });
     return r;
   }
 
