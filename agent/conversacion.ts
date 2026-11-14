@@ -1208,6 +1208,30 @@ const codigoDe = (texto: string): string | null => {
   return n >= 1 && n <= 9999 ? `RS-${String(n).padStart(4, "0")}` : null;
 };
 
+// Mis reservas: las del carné de la sesión desde hoy, con un botón para cancelar las que aún se pueden (R27).
+export async function misReservasTurno(sesion: string, repo: Repositorio): Promise<RespuestaChat> {
+  const carne = (await repo.leerSesion(sesion))?.carne ?? null;
+  if (!carne) return cerrado("mis_reservas", "Para ver tus reservas, primero escríbeme tu carné.");
+  const h = ahora();
+  const salas = await repo.salas();
+  const propias = (await repo.reservasDeCarne(carne, h.fecha))
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.inicio_min - b.inicio_min);
+  if (!propias.length) {
+    return cerrado("mis_reservas", "No tienes reservas programadas desde hoy.", ["Reservar una sala", "Ver disponibilidad"]);
+  }
+  const cancelables = propias.filter((r) => evaluarCancelacion(r, carne, h).decision === "cancelar");
+  const mostradas = propias.slice(0, 10);
+  const lineas = mostradas.map((r) => {
+    const enCurso = evaluarCancelacion(r, carne, h).decision !== "cancelar" ? " (ya empezó)" : "";
+    return `• ${r.codigo}: ${nombreSala(salas, r.sala)}, ${fechaLarga(r.fecha)}, ${r.inicio} a ${r.fin}${enCurso}`;
+  });
+  const resto = propias.length > mostradas.length ? `\n…y ${propias.length - mostradas.length} más.` : "";
+  const pie = cancelables.length ? "\n\nPara cancelar una, toca su botón." : "";
+  return cerrado("mis_reservas",
+    `Tienes ${propias.length} ${propias.length === 1 ? "reserva programada" : "reservas programadas"}:\n${lineas.join("\n")}${resto}${pie}`,
+    [...cancelables.slice(0, 6).map((r) => `Cancelar ${r.codigo}`), "Reservar una sala"]);
+}
+
 export async function cancelacionTurno(texto: string, sesion: string, repo: Repositorio): Promise<RespuestaChat> {
   const carne = (await repo.leerSesion(sesion))?.carne ?? null;
   if (!carne) return cerrado("cancelar_reserva", "Para cancelar una reserva, primero escríbeme tu carné.");

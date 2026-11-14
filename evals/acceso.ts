@@ -150,6 +150,17 @@ try {
   r = await chat("cancela RS-0002", uuid(4), TC);
   comprobar(/Sí, cancelar RS-0002/.test(JSON.stringify(r.json)), "Carlos (docente titular) puede cancelar RS-0002");
 
+  // 9b) Mis reservas: solo las propias, con botón para cancelar; sin sesión pide iniciar sesión.
+  r = await chat("Mis reservas", uuid(10), TC);
+  comprobar(r.json.intencion === "mis_reservas" && /RS-0002/.test(r.json.respuesta) && r.json.flujo?.opciones?.includes("Cancelar RS-0002")
+    && !/RS-0001|RS-0003/.test(r.json.respuesta), "Carlos: «Mis reservas» lista solo RS-0002 con su botón Cancelar");
+  r = await chat("Mis reservas", uuid(11), TL);
+  comprobar(r.json.intencion === "mis_reservas" && /No tienes reservas/.test(r.json.respuesta), "Laura sin reservas: lo dice y ofrece reservar");
+  r = await chat("Mis reservas", uuid(12));
+  comprobar(r.json.intencion === "requiere_login", "sin sesión: «Mis reservas» pide iniciar sesión");
+  r = await chat("Cancelar RS-0002", uuid(10), TC);
+  comprobar(/Sí, cancelar RS-0002/.test(JSON.stringify(r.json)), "el botón «Cancelar RS-0002» pide confirmar");
+
   // 10) Misma sesión del navegador, otra persona: no hereda la conversación.
   await chat("Quiero reservar una sala", uuid(5), TL);
   r = await chat("mañana de 2 a 4", uuid(5), TC);

@@ -292,3 +292,11 @@ API del monitor no tenía autorización (ADV-05, ADV-06). Pedido de Esteban: sep
 Las pruebas de flujo (`evals/conversacion.ts`) y la consola siguen usando la identidad por carné escrito: `mensaje()` sin
 `autenticado` conserva ese modo. La API siempre envía `autenticado`. Cuentas y contraseñas: `docs/cuentas-de-prueba.md`.
 
+## Mis reservas desde el chat (sección 7.0.19, 14-11-2026)
+
+Motivo: para cancelar había que saber el código RS de memoria; el botón «Mis reservas» estaba deshabilitado.
+
+| Cambio | Por qué | Archivos | Prueba |
+|---|---|---|---|
+| Intención nueva `mis_reservas` (el modelo la reconoce: «quiero ver mis reservas», «qué reservas tengo») y botón «Mis reservas» (texto fijo, sin modelo). Lista las reservas programadas del carné de la sesión desde hoy, marca las que ya empezaron y ofrece «Cancelar RS-…» para las que aún se pueden cancelar (R27). Sin sesión pide iniciar sesión. | Ver y cancelar las reservas propias sin recordar el código. | `agent/llm/interprete.ts`, `agent/conversacion.ts` (`misReservasTurno`), `agent/orquestador.ts`, `web/src/pages/Chat.jsx` | `evals/acceso.ts` (4 comprobaciones), `evals/prueba-intencion.ts` (2 frases, con Ollama) |
+

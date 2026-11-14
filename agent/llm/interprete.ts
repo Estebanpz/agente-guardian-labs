@@ -10,7 +10,7 @@ const SALAS = Array.from({ length: 16 }, (_, i) => `sala-${i + 1}`) as [string, 
 export const Interpretacion = z.object({
   intencion: z.enum([
     "consulta_ingreso", "consulta_salas", "consulta_disponibilidad", "solicitud_reserva", "cancelar_reserva",
-    "registro_usuario", "ayuda", "fuera_de_alcance", "intento_eludir_reglas",
+    "mis_reservas", "registro_usuario", "ayuda", "fuera_de_alcance", "intento_eludir_reglas",
   ]),
   id_sintetico: z.string().nullable(),
   laboratorio: z.enum(SALAS).nullable(),
@@ -57,6 +57,7 @@ REGLAS PARA PEDIDOS DE RESERVA (reservar, apartar, separar, agendar, programar, 
 - Si da datos de una reserva sin el verbo (sala, fecha, horario, número de personas): es solicitud_reserva con recurso = "sala".
 - Si pide anular o cancelar una reserva de sala que ya hizo (por código RS-0000, por día o "mi reserva"): cancelar_reserva.
   Cancelar otra cosa (una cita, un pedido) es fuera_de_alcance.
+- Si quiere ver, listar o consultar las reservas que ya hizo ("mis reservas", "qué reservas tengo"), sin pedir cancelar: mis_reservas.
 - Si pregunta si hay salas libres o por cuántas horas, sin pedir reservar: consulta_disponibilidad.
 
 INTENCIONES
@@ -65,6 +66,7 @@ INTENCIONES
 - consulta_disponibilidad: agenda o huecos libres de una sala o de las salas en una fecha, un horario o por una cantidad de horas.
 - solicitud_reserva: según las reglas de reserva de arriba.
 - cancelar_reserva: según las reglas de reserva de arriba.
+- mis_reservas: ver o listar sus propias reservas de sala.
 - registro_usuario: quiere registrarse por primera vez.
 - ayuda: saludo, o pregunta quién es el asistente, qué puede hacer o cómo funciona.
 - fuera_de_alcance: cualquier tema que no esté en el ALCANCE.
@@ -106,6 +108,7 @@ const ejemplos: [string, Interpretacion][] = [
   ["¿Qué salas tienen 3 horas libres el lunes?", I("consulta_disponibilidad", { recurso: "sala" })],
   ["Ya no necesito la sala del jueves, anúlala por favor", I("cancelar_reserva", { recurso: "sala" })],
   ["Cancela mi reserva RS-0042", I("cancelar_reserva", { recurso: "sala" })],
+  ["¿Qué reservas tengo esta semana?", I("mis_reservas", { recurso: "sala" })],
   // Escritura informal o con faltas: se clasifica por lo que quiso decir.
   ["Khe puedes hazer?", I("ayuda")],
   ["kiero resevar la sla 3 pa mñana d 2 a 4", I("solicitud_reserva", { laboratorio: "sala-3", recurso: "sala", recurso_texto: "la sla 3" })],
@@ -136,6 +139,7 @@ export function rutaDeBoton(texto: string): TipoIntencion | null {
   if (/^(quiero reservar una sala|reservar una sala|reservar sala)$/.test(t)) return "solicitud_reserva";
   if (/^ver (disponibilidad|todas)\b/.test(t)) return "consulta_disponibilidad";
   if (/^(cual es el estado de las salas|estado de (las )?salas)$/.test(t)) return "consulta_salas";
+  if (/^(ver )?mis reservas$/.test(t)) return "mis_reservas";
   return null;
 }
 

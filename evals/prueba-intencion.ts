@@ -28,6 +28,8 @@ const casos: [string, Esperado][] = [
   // 14-11-2026: cancelar una reserva propia (R27).
   ["Quiero cancelar mi reserva del jueves", "cancelar_reserva"],
   ["Anula la reserva RS-0011, ya no la necesito", "cancelar_reserva"],
+  ["Quiero ver mis reservas", "mis_reservas"],
+  ["ke reservas tengo pa mañana", "mis_reservas"],
   // 14-11-2026: lo que no es función del agente se niega aunque no haya carné.
   ["Necesito plantar un árbol", "fuera_de_alcance"],
   ["¿Me ayudas a hacer la tarea de cálculo?", "fuera_de_alcance"],

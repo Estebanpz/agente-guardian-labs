@@ -12,7 +12,7 @@ import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import { salas } from "../data/salas.js";
 import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
-import { cancelacionTurno, continuar, esBotonCancelacion, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
+import { cancelacionTurno, continuar, misReservasTurno, esBotonCancelacion, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
 import { CHIPS_SALUDO, PEDIR_CARNE, esSalida, esSaludo, saludoPara } from "./sesion.js";
 import { carne as carneDe, extraer, salaInexistente } from "./tools/extraer.js";
 import { enmascarar } from "./tools/reservas.js";
@@ -216,7 +216,7 @@ const SALUDO_PUBLICO = "¡Hola! Soy Guardian Labs. Sin iniciar sesión te inform
 const CHIPS_PUBLICOS = { tipo: "sugerencia", pendiente: null, opciones: ["Ver disponibilidad", "Estado de salas", "Ayuda"] };
 const CIERRE_CON_SESION = "Tu reserva quedó registrada. ¿Necesitas algo más?";
 const CARNES = /\b[CD]-?\d{8}\b/gi;
-const SOLO_CON_SESION = ["solicitud_reserva", "cancelar_reserva", "registro_usuario"];
+const SOLO_CON_SESION = ["solicitud_reserva", "cancelar_reserva", "mis_reservas", "registro_usuario"];
 
 // Visitante: solo informa. Nunca abre una reserva, un registro ni una cancelación.
 async function modoPublico(texto: string, sesion: string | undefined, repo: Repositorio): Promise<RespuestaChat> {
@@ -350,6 +350,12 @@ async function mensajeBase(
 
   // Botones de cancelación de una reserva propia (R27): llevan el código y se comprueban siempre contra el carné
   // de la sesión. Van antes del flujo abierto para que «Sí, cancelar RS-…» no se tome como «cancelar» del flujo.
+  // «Mis reservas» (botón): se atiende aunque haya un flujo abierto, que queda como estaba.
+  if (sesion && !eludir && rutaDeBoton(texto) === "mis_reservas") {
+    const r = await misReservasTurno(sesion, repo);
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+    return r;
+  }
   if (sesion && !eludir && esBotonCancelacion(texto)) {
     const r = await cancelacionTurno(texto, sesion, repo);
     registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
@@ -426,6 +432,12 @@ async function mensajeBase(
     return { intencion: "consulta_salas", respuesta };
   }
 
+  // Ver las reservas propias, con botones para cancelar (R27).
+  if (c.intencion === "mis_reservas" && sesion && !eludir) {
+    const r = await misReservasTurno(sesion, repo);
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+    return r;
+  }
   // Cancelar una reserva propia (R27): solo las del carné de la sesión.
   if (c.intencion === "cancelar_reserva" && sesion && !eludir) {
     const r = await cancelacionTurno(texto, sesion, repo);

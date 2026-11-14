@@ -19,12 +19,12 @@ const SUGERENCIAS = [
   "Mi cédula es 1070612345, ¿puedo reservar?",
 ];
 
-// Accesos rápidos de la pantalla. "Mis reservas" aún no tiene función: se muestra deshabilitado.
+// Accesos rápidos de la pantalla. "Mis reservas" lista las reservas propias con botones para cancelarlas.
 const ACCESOS = [
   { texto: "Reservar sala", ayuda: "Crear solicitud", envia: "Quiero reservar una sala", icono: "bi-calendar-check" },
   { texto: "Ver disponibilidad", ayuda: "Horarios libres", envia: "Ver disponibilidad", icono: "bi-calendar3" },
   { texto: "Estado de salas", ayuda: "Equipos y cupos", envia: "¿Cuál es el estado de las salas?", icono: "bi-grid-3x3-gap" },
-  { texto: "Mis reservas", ayuda: "Próximamente", envia: null, icono: "bi-bookmark" },
+  { texto: "Mis reservas", ayuda: "Ver y cancelar", envia: "Mis reservas", icono: "bi-bookmark" },
 ];
 
 const MAX = 500;
@@ -51,6 +51,7 @@ const ETIQUETAS = {
   saludo: { texto: "Saludo", icono: "bi-person-check" },
   requiere_login: { texto: "Requiere iniciar sesión", icono: "bi-box-arrow-in-right" },
   cancelar_reserva: { texto: "Cancelar reserva", icono: "bi-calendar-x" },
+  mis_reservas: { texto: "Mis reservas", icono: "bi-bookmark" },
 };
 
 // Primer mensaje del agente. La identidad viene del inicio de sesión (14-11-2026), no de un carné escrito.
