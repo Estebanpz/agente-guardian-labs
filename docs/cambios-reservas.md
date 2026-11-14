@@ -310,3 +310,23 @@ Motivo: para cancelar había que saber el código RS de memoria; el botón «Mis
 | El mapa de intentos fallidos crecía sin límite y scrypt síncrono bloqueaba el hilo con muchos correos distintos. | Media | Poda del mapa (tope 10 000), `scrypt` asíncrono en el login, correo normalizado NFKC y límite de 20 logins por minuto por dirección. | `agent/tools/acceso.ts`, `agent/channels/http.ts` | `evals/acceso.ts` |
 | Sesiones y conversaciones en memoria sin vencimiento (respaldo sin Mongo). | Baja | Poda con el mismo TTL de Mongo (1800 s) al escribir. | `agent/store/memoria.ts` | — |
 
+## Pruebas basadas en propiedades y fuzzing (sección 7.0.21, 14-11-2026)
+
+**Propiedades** (`npm run propiedades`, fast-check 4.10.2, `evals/propiedades/`): 43 reglas que deben cumplirse siempre,
+probadas con miles de entradas generadas (privacidad, extractores, acceso, motor de reservas, R27, intérprete y flujo).
+Encontraron 7 fallos reales, ya corregidos; hoy pasan las 43 con las semillas 1, 7, 42 y 20261114.
+
+**Fuzzing** (`npm run fuzz`, `evals/fuzz/`): API (1 500 peticiones con métodos, rutas, cuerpos corruptos, `__proto__` y
+tokens alterados), chat en los tres modos (2 000 mensajes), ReDoS (9 funciones, 118 entradas adversarias de 500 y
+10 000 caracteres) y memoria y fuerza bruta (5 000 mensajes, 12 000 logins). Sus hallazgos están en la sección 7.0.20.
+
+| Hallazgo de las propiedades | Corrección | Archivo |
+|---|---|---|
+| «mi cédula es 20-01-32-62» y «la cédula de mi mamá es 2 9 5 1 1 4» no se detectaban (un trozo se borraba como fecha). | Las fechas solo se borran completas; la palabra clave admite «es», «número» y hasta 30 caracteres antes de 6–12 dígitos. | `agent/tools/privacidad.ts` |
+| Correos válidos como «!@a.aa» o «a@a.a.aa» no se detectaban. | Parte local con cualquier carácter visible (máx. 64) y dominio con varias etiquetas. Con 10 000 caracteres pasó de 587 ms a 14 ms. | `agent/tools/privacidad.ts` |
+| «¿las salas 10 10 10 tienen cupo?» se marcaba como documento. | Los grupos de dígitos se unen solo si los siguientes tienen 3 o más dígitos; el celular con grupos de 2 («328 480 62 14») tiene su propio patrón. | `agent/tools/privacidad.ts` |
+| «soyC-10000002» llegaba completo a la traza. | `enmascararCarnes` sin `\b` inicial. | `agent/tools/privacidad.ts` |
+| El motor programaba una sala inactiva si se pedía por nombre. | Sala inactiva → negar R18 con alternativas. | `agent/tools/reservas.ts` |
+| «¡Sí, cancelar RS-0011 !» no se reconocía como botón. | Se quitan signos de apertura y cierre con espacios antes de comparar. | `agent/conversacion.ts` |
+| Claves distintas con un surrogate Unicode suelto verificaban la misma huella. | `hashClave` rechaza esas claves y la verificación las niega. | `agent/tools/acceso.ts` |
+

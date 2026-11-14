@@ -6,6 +6,8 @@
     "dev": "tsx agent/index.ts",
     "typecheck": "tsc",
     "pruebas": "tsx evals/correr-pruebas.ts && tsx evals/regresion.ts && tsx evals/r12.ts && tsx evals/privacidad.ts && tsx evals/ayuda.ts && tsx evals/prueba-intencion.ts && tsx evals/reservas.ts && tsx evals/extraer.ts && tsx evals/conversacion.ts && tsx evals/semilla.ts && tsx evals/api-monitor.ts && tsx evals/acceso.ts",
+    "pruebas:rapidas": "tsx evals/privacidad.ts && tsx evals/extraer.ts && tsx evals/reservas.ts && tsx evals/acceso.ts && tsx evals/conversacion.ts && tsx evals/api-monitor.ts",
+    "mutacion": "stryker run",
     "e2e": "tsx evals/e2e.ts",
     "serve": "tsx agent/channels/servir.ts",
     "app": "concurrently --kill-others --names api,web -c blue,magenta \"npm run serve\" \"npm --prefix web run dev\"",
@@ -13,7 +15,9 @@
     "seed": "tsx scripts/seed.ts",
     "prueba:mongo": "tsx evals/mongo.ts",
     "contenidos": "tsx analisis/contenidos.ts",
-    "comparar-modelos": "tsx analisis/comparar-modelos.ts"
+    "comparar-modelos": "tsx analisis/comparar-modelos.ts",
+    "propiedades": "tsx evals/propiedades/index.ts",
+    "fuzz": "tsx evals/fuzz/index.ts"
   },
   "keywords": [],
   "author": "Kevin Alexis Ayala Rodriguez y Esteban Páez Leonel",

@@ -355,6 +355,13 @@ agrega la comparación con el modelo local.
 
 ## Pruebas automáticas
 
+| Comando | Qué prueba |
+|---|---|
+| `npm run pruebas` | Batería completa (ingreso, reservas, conversación, privacidad, acceso y API) |
+| `npm run propiedades` | 43 propiedades con fast-check (semilla opcional: `SEMILLA=42 npm run propiedades`) |
+| `npm run fuzz` | Fuzzing de la API, el chat, ReDoS y memoria (semilla e iteraciones opcionales: `SEMILLA=1 ITERACIONES=3000`) |
+| `npm run mutacion` | Pruebas de mutación con Stryker (informe en `reports/mutation/`) |
+
 `npm run matriz` genera `docs/matriz-pruebas.md`: el 8 de noviembre de 2026 pasaron **82 de 82** pruebas (16 de ingreso y
 seguridad, 21 de reservas, 44 de conversación y 1 de identidad) con las reglas 2.0.0 y `ollama:llama3.2:3b`.
 

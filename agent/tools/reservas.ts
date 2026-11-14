@@ -191,7 +191,8 @@ export function evaluarReserva(s: SolicitudReserva, c: Contexto): DecisionReserv
   // Sala pedida.
   if (s.sala) {
     const sala = c.salas.find((x) => x._id === s.sala);
-    if (!sala) {
+    // Una sala inexistente o inactiva no se reserva (propiedades, 14-11-2026: el motor asignaba salas inactivas).
+    if (!sala || !sala.activa) {
       return decidir({ decision: "negar", estado: "falso", accion: "orientar_proceso", reglas: ["R18"], alternativas: alternativas(s, c) });
     }
     const est = estadoSala(sala, c.equipos);

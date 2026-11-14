@@ -1205,7 +1205,7 @@ export async function reanudar(sesion: string, repo: Repositorio, alerta: string
 // Sin estado: los chips llevan el código («Sí, cancelar RS-0011», «No, conservar RS-0011») y cada paso vuelve a
 // comprobar con R27 que la reserva sea del carné de la sesión. Nunca se muestra una reserva de otra persona.
 export const esBotonCancelacion = (texto: string): boolean =>
-  /^(si,? )?cancelar (la reserva )?rs[\s-]?\d{1,5}$|^no,? conservar(la)? rs[\s-]?\d{1,5}$/.test(norm(texto).trim().replace(/[.!¡¿?]+$/g, "").replace(/\s+/g, " "));
+  /^(si,? )?cancelar (la reserva )?rs[\s-]?\d{1,5}$|^no,? conservar(la)? rs[\s-]?\d{1,5}$/.test(norm(texto).replace(/^[¡¿\s]+/, "").replace(/[\s.!¡¿?]+$/, "").replace(/\s+/g, " "));
 
 // ADV-08: "RS-0001", "rs 0001", "RS-1" y "RS-00001" son el mismo código (4 dígitos, ceros a la izquierda).
 const codigoDe = (texto: string): string | null => {

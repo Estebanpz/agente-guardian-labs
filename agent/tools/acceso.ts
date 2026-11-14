@@ -12,11 +12,17 @@ import { escalarCarneDesconocido } from "../conversacion.js";
 const PARAMS = { N: 16384, r: 8, p: 1 } as const;
 const LARGO = 32;
 
+// Un surrogate suelto se convierte en U+FFFD al pasar a bytes: claves distintas darían la misma huella.
+const SURROGATE_SUELTO = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+const bienFormada = (t: string) => !SURROGATE_SUELTO.test(t);
+
 export function hashClave(clave: string, sal: Buffer = randomBytes(16)): string {
+  if (!bienFormada(clave)) throw new Error("La contraseña tiene caracteres Unicode inválidos.");
   return `scrypt$${sal.toString("base64url")}$${scryptSync(clave, sal, LARGO, PARAMS).toString("base64url")}`;
 }
 
 export function verificarClave(clave: string, hash: string): boolean {
+  if (!bienFormada(clave)) return false;
   const [, sal, esperado] = hash.split("$");
   if (!sal || !esperado) return false;
   const calculado = scryptSync(clave, Buffer.from(sal, "base64url"), LARGO, PARAMS);
@@ -27,6 +33,7 @@ export function verificarClave(clave: string, hash: string): boolean {
 // Versión asíncrona para el login: scrypt corre en el pool de libuv y no bloquea el hilo principal (fuzzing).
 const scryptAsync = promisify(scrypt) as (clave: string, sal: Buffer, largo: number, opciones: typeof PARAMS) => Promise<Buffer>;
 export async function verificarClaveAsync(clave: string, hash: string): Promise<boolean> {
+  if (!bienFormada(clave)) return false;
   const [, sal, esperado] = hash.split("$");
   if (!sal || !esperado) return false;
   const calculado = await scryptAsync(clave, Buffer.from(sal, "base64url"), LARGO, PARAMS);
