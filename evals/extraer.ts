@@ -1,5 +1,5 @@
 // Pruebas de los extractores deterministas del chat de reservas (sin modelo).
-import { extraer, fechas, type Extraido } from "../agent/tools/extraer.js";
+import { extraer, fechas, salaInexistente, type Extraido } from "../agent/tools/extraer.js";
 
 const HOY = "2026-11-09"; // lunes
 
@@ -104,6 +104,21 @@ for (const [texto, esperado] of FECHAS) {
   const ok = JSON.stringify(r) === JSON.stringify(esperado);
   if (!ok) fallos++;
   console.log(`${ok ? "✅" : "❌"} fechas("${texto}")${ok ? "" : ` · ${JSON.stringify(r)}`}`);
+}
+// ADV-07 y ADV-09 (14-11-2026): fechas imposibles y salas que no existen.
+const IMPOSIBLES = ["el 31 de febrero", "2026-02-30", "31/04", "2026-13-01"];
+for (const texto of IMPOSIBLES) {
+  const r = extraer(texto, { hoy: HOY, pendiente: null }).fecha;
+  const ok = r === null;
+  if (!ok) fallos++;
+  console.log(`${ok ? "✅" : "❌"} fecha imposible "${texto}" → null${ok ? "" : ` · ${r}`}`);
+}
+const SALAS: [string, number | null][] = [["la sala 99", 99], ["sala 0", 0], ["laboratorio 17", 17], ["sala 16", null], ["sala 3", null], ["a las 99", null]];
+for (const [texto, esperado] of SALAS) {
+  const r = salaInexistente(texto);
+  const ok = r === esperado;
+  if (!ok) fallos++;
+  console.log(`${ok ? "✅" : "❌"} salaInexistente("${texto}") = ${esperado}${ok ? "" : ` · ${r}`}`);
 }
 console.log(fallos === 0 ? "\nTodas pasaron" : `\n${fallos} fallaron`);
 process.exit(fallos === 0 ? 0 : 1);

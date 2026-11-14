@@ -2,7 +2,7 @@ import { z } from "zod";
 import { EntradaEvaluar } from "./tools/esquemas.js";
 import { evaluar } from "./tools/motor.js";
 import { redactar } from "./llm/redactor.js";
-import { interpretar, porRegex, recursoVerificado, rutaDeBoton, type Interpretacion } from "./llm/interprete.js";
+import { interpretar, porRegex, recursoVerificado, rutaDeBoton, validarElusion, type Interpretacion } from "./llm/interprete.js";
 import { esIntentoDeElusion } from "./llm/guardia.js";
 import { datosProhibidos } from "./tools/privacidad.js";
 import { registrar } from "./tools/traza.js";
@@ -12,9 +12,9 @@ import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import { salas } from "../data/salas.js";
 import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
-import { continuar, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
+import { cancelacionTurno, continuar, esBotonCancelacion, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
 import { CHIPS_SALUDO, PEDIR_CARNE, esSalida, esSaludo, saludoPara } from "./sesion.js";
-import { carne as carneDe, extraer } from "./tools/extraer.js";
+import { carne as carneDe, extraer, salaInexistente } from "./tools/extraer.js";
 import { enmascarar } from "./tools/reservas.js";
 import { ahora } from "./tools/reloj.js";
 
@@ -54,7 +54,11 @@ export function configurarParaPruebas(opciones: { repo?: Repositorio; interpreta
   configurarRespaldo(opciones.respaldo ?? null);
 }
 const repoActual = async (): Promise<Repositorio> => inyeccion.repo ?? crearRepositorio();
-const clasificar: Clasificador = (texto) => (inyeccion.interpretar ?? interpretar)(texto);
+// Toda interpretación pasa por la validación del código (también la del modelo inyectado en las pruebas).
+const clasificar: Clasificador = async (texto) => {
+  const c = await (inyeccion.interpretar ?? interpretar)(texto);
+  return c.fallo ? c : { ...validarElusion(c, texto), fallo: c.fallo };
+};
 
 export async function solicitar(datos: unknown, alerta?: string) {
   // Validar contra el esquema.
@@ -118,8 +122,30 @@ async function sinIdentidad(texto: string, sesion: string | undefined, repo: Rep
     if (sesion) await repo.borrarSesion(sesion);
     return { intencion: "cerrar_sesion", respuesta: "Sesión cerrada. Escribe tu carné cuando quieras continuar.", flujo: null };
   }
-  // Una petición sin carné se guarda para continuarla; un saludo o "Soy nuevo" no.
-  const pendiente = sesion && rutaDeBoton(texto) !== "registro_usuario" && !esSaludo(texto) ? texto : null;
+  // Antes de pedir el carné, el modelo lee el mensaje (14-11-2026): lo que está fuera de las funciones del agente
+  // se niega de una vez, sin pedir el carné; la ayuda se responde; solo una petición del dominio pide el carné.
+  // Los botones (texto fijo) y los saludos no necesitan el modelo.
+  let registro = rutaDeBoton(texto) === "registro_usuario";
+  if (!rutaDeBoton(texto) && !esSaludo(texto)) {
+    const c = await clasificar(texto);
+    if (!c.fallo) {
+      if (c.intencion === "intento_eludir_reglas") {
+        return { intencion: "intento_eludir_reglas", respuesta: `${ALERTA_ELUSION}\n\n${PEDIR_CARNE}`, alerta: ALERTA_ELUSION, flujo: CHIP_SOY_NUEVO };
+      }
+      if (c.intencion === "fuera_de_alcance" || c.recurso === "otro") {
+        const fuera = textoFuera(c, texto);
+        return { intencion: "fuera_de_alcance", respuesta: c.recurso === "otro" ? `${fuera} ¿Necesitas una sala?` : fuera, flujo: null };
+      }
+      if (c.intencion === "ayuda") {
+        const temas = temasDe(texto);
+        const ayuda = temas.length ? responderTemas(temas, texto) : AYUDA_GENERAL;
+        return { intencion: "ayuda", respuesta: `${ayuda}\n\nPara empezar, escríbeme tu carné.`, flujo: CHIP_SOY_NUEVO };
+      }
+      if (c.intencion === "registro_usuario") registro = true;
+    }
+  }
+  // Una petición del dominio sin carné se guarda para continuarla; un saludo o "Soy nuevo" no.
+  const pendiente = sesion && !registro && !esSaludo(texto) ? texto : null;
   if (sesion) await repo.guardarSesion({ _id: sesion, carne: null, actualizado: new Date(), pendiente_texto: pendiente });
   return { intencion: "identidad", respuesta: PEDIR_CARNE, flujo: CHIP_SOY_NUEVO };
 }
@@ -219,6 +245,23 @@ export async function mensaje(
     return { intencion: "cerrar_sesion", respuesta: "Sesión cerrada. Escribe tu carné cuando quieras continuar.", flujo: null };
   }
 
+  // Botones de cancelación de una reserva propia (R27): llevan el código y se comprueban siempre contra el carné
+  // de la sesión. Van antes del flujo abierto para que «Sí, cancelar RS-…» no se tome como «cancelar» del flujo.
+  if (sesion && !eludir && esBotonCancelacion(texto)) {
+    const r = await cancelacionTurno(texto, sesion, repo);
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+    return r;
+  }
+
+  // ADV-09: una sala que no existe se dice, en vez de ignorarla y ofrecer otra.
+  const salaMala = eludir ? null : salaInexistente(texto);
+  if (salaMala !== null && sesion) {
+    const aviso = `La Sala ${salaMala} no existe: hay salas de la 1 a la 16.`;
+    const r = (await reanudar(sesion, repo, aviso)) ?? { intencion: "aclaracion", respuesta: `${aviso} ¿Cuál quieres?`, flujo: null };
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+    return r;
+  }
+
   // Paso 2: flujo abierto. La guardia corre antes: con elusión, la alerta y la pregunta, sin cambiar datos.
   if (sesion) {
     if (eludir) {
@@ -278,6 +321,13 @@ export async function mensaje(
     const respuesta = await estadoSalasDeBase(repo);
     registrar({ texto: resumen, intencion: "consulta_salas", respuesta });
     return { intencion: "consulta_salas", respuesta };
+  }
+
+  // Cancelar una reserva propia (R27): solo las del carné de la sesión.
+  if (c.intencion === "cancelar_reserva" && sesion && !eludir) {
+    const r = await cancelacionTurno(texto, sesion, repo);
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+    return r;
   }
 
   // Reservar otra cosa (almuerzo, cancha, auditorio…): el modelo lo entendió; se dice qué no se puede reservar.

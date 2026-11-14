@@ -94,7 +94,21 @@ export function crearMemoria(hoy: string): Repositorio {
     },
 
     async diasConReservas(mes) {
-      return contarDias(reservas.filter((r) => r.fecha.startsWith(`${mes}-`)).map((r) => ({ fecha: r.fecha, estado: r.estado })));
+      return contarDias(reservas.filter((r) => r.fecha.startsWith(`${mes}-`) && r.estado !== "cancelada").map((r) => ({ fecha: r.fecha, estado: r.estado })));
+    },
+
+    async reservasDeCarne(carneId, desde) {
+      return reservas
+        .filter((r) => r.carne === carneId && r.estado === "programada" && r.fecha >= desde)
+        .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.inicio_min - b.inicio_min);
+    },
+
+    async cancelarReserva(codigo, carneId, cuando) {
+      const r = reservas.find((x) => x.codigo === codigo && x.carne === carneId && x.estado === "programada");
+      if (!r) return false;
+      r.estado = "cancelada";
+      r.cancelada_en = cuando;
+      return true;
     },
 
     async reservaPorCodigo(codigo) {

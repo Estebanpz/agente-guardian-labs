@@ -8,13 +8,13 @@ import { ahora, aMin, aHora, sumarDias } from "./tools/reloj.js";
 import { pedirRespaldo, validarRespaldo } from "./llm/respaldo.js";
 import { registrar } from "./tools/traza.js";
 import { cancelar as esCancelar, extraer, fechas, type Extraido } from "./tools/extraer.js";
-import { candidatas, causaR15, disponibilidad, enmascarar, evaluarRegistro, evaluarReserva, horarioLaboratorio, type Contexto } from "./tools/reservas.js";
+import { candidatas, causaR15, disponibilidad, enmascarar, evaluarCancelacion, ocupadaPublica, evaluarRegistro, evaluarReserva, horarioLaboratorio, type Contexto } from "./tools/reservas.js";
 import type { Repositorio } from "./store/repositorio.js";
 
 export type RespuestaChat = {
   intencion: string; respuesta: string;
   flujo: { tipo: string; pendiente: string | null; opciones: string[] } | null;
-  reserva?: DecisionReserva; solicitud?: object; disponibilidad?: object; alerta?: string;
+  reserva?: ReturnType<typeof publica>; solicitud?: object; disponibilidad?: object; alerta?: string;
   // La sesión se cerró tras una reserva: la pantalla quita el saludo con el nombre.
   sesion_olvidada?: boolean;
   // Aviso de cierre (despedida y carné olvidado), que se muestra fuera de la tarjeta de la reserva.
@@ -119,6 +119,12 @@ function abierto(conv: Conversacion, respuesta: string, opciones: string[]): Res
 }
 
 // Respuesta sin flujo abierto. Con chips, el flujo es "sugerencia" (solo botones, sin estado).
+// Lo que la interfaz recibe de una decisión: los choques sin código, carné ni materia de la otra reserva.
+// Los datos de otras personas no salen del servidor (14-11-2026); el monitor los ve en su vista.
+export function publica(d: DecisionReserva) {
+  return { ...d, conflictos: d.conflictos.map((c) => ({ inicio: c.inicio, fin: c.fin, tipo: c.tipo, personas: c.personas })) };
+}
+
 function cerrado(intencion: string, respuesta: string, opciones: string[] = [], extra: Partial<RespuestaChat> = {}): RespuestaChat {
   return {
     intencion, respuesta,
@@ -293,10 +299,10 @@ function textoEscalar(d: DecisionReserva, sol: SolicitudReserva, salas: SalaDoc[
   const quedo = codigo ? ` Quedó registrada como ${codigo}.` : "";
   const c = d.conflictos[0];
   if (regla === "R20" && c) {
-    return `La ${nombre} ya está separada de ${c.inicio} a ${c.fin} por un grupo de estudiantes (${c.personas} personas, carné ${c.carne_enmascarado}). Avisé al monitor para que ustedes acuerden el uso.${libres}${quedo}`;
+    return `La ${nombre} ya está separada de ${c.inicio} a ${c.fin} por un grupo de estudiantes (${c.personas} personas). Avisé al monitor para que ustedes acuerden el uso.${libres}${quedo}`;
   }
   if (regla === "R21" && c) {
-    return `La ${nombre} ya está separada de ${c.inicio} a ${c.fin} por otro docente (carné ${c.carne_enmascarado}). Avisé al monitor, que lo remitirá a coordinación si hace falta.${libres}${quedo}`;
+    return `La ${nombre} ya está separada de ${c.inicio} a ${c.fin} por otro docente. Avisé al monitor, que lo remitirá a coordinación si hace falta.${libres}${quedo}`;
   }
   const quien = regla === "R19" ? "Avisé al monitor y a mantenimiento." : "Avisé al monitor.";
   const aviso = codigo ? `${quien}${quedo}` : "Consulte con el monitor.";
@@ -315,7 +321,7 @@ async function responder(
     const texto = prefijo + propuestaTexto(sol, d.sala_asignada!, ctx.salas);
     return { intencion: "solicitud_reserva", respuesta: texto,
       flujo: { tipo: "reserva", pendiente: "confirmar", opciones: ["Sí, confirmar", "No"] },
-      reserva: d, solicitud: resumenDe(sol, ctx.salas, d.sala_asignada) };
+      reserva: publica(d), solicitud: resumenDe(sol, ctx.salas, d.sala_asignada) };
   }
   if (d.decision === "escalar") {
     let codigo: string | null = null;
@@ -330,14 +336,14 @@ async function responder(
     if (codigo) await repo.borrarSesion(conv._id);
     // El cierre va aparte de la tarjeta: la respuesta de la reserva no lo incluye.
     return cerrado("solicitud_reserva", prefijo + textoEscalar(d, sol, ctx.salas, codigo), [],
-      { reserva: d, solicitud: resumenDe(sol, ctx.salas, sol.sala), sesion_olvidada: codigo ? true : undefined, cierre: codigo ? OLVIDO : undefined });
+      { reserva: publica(d), solicitud: resumenDe(sol, ctx.salas, sol.sala), sesion_olvidada: codigo ? true : undefined, cierre: codigo ? OLVIDO : undefined });
   }
   if (d.decision === "negar") {
     if (d.reglas_aplicadas.includes("R16")) {
       await repo.borrarConversacion(conv._id);
       return cerrado("solicitud_reserva",
         prefijo + "Tu carné está vencido en carnetización: no puedo separar la sala. Remítete a carnetización.",
-        [], { reserva: d });
+        [], { reserva: publica(d) });
     }
     // R24 (ninguna sala en ese horario): el día más cercano con el mismo rango y personas (plan, 4).
     const dia = d.reglas_aplicadas.includes("R24") && sol.fecha && sol.inicio && sol.fin
@@ -361,7 +367,7 @@ async function responder(
       ...(dia ? [chipRevisar(dia, ahora().fecha)] : []),
     ];
     const extra = dia ? ` El día más cercano con una sala libre en ese horario es el ${fechaLarga(dia)}.` : "";
-    return { ...abierto(conv, prefijo + textoNegar(d, sol, ctx) + extra, opciones), reserva: d,
+    return { ...abierto(conv, prefijo + textoNegar(d, sol, ctx) + extra, opciones), reserva: publica(d),
       solicitud: resumenDe(sol, ctx.salas, sol.sala) };
   }
   // pedir_datos: no debería llegar aquí (faltante lo resuelve antes), pero se pide el primer faltante.
@@ -390,7 +396,7 @@ async function confirmar(conv: Conversacion, repo: Repositorio): Promise<Respues
     await repo.borrarConversacion(conv._id);
     await repo.borrarSesion(conv._id);
     const texto = `Listo. Reserva ${res.reserva.codigo} confirmada: ${nombreSala(ctx.salas, sala)}, ${fechaLarga(sol.fecha!)}, ${sol.inicio} a ${sol.fin}. Queda registrada en la base de demostración (datos sintéticos).`;
-    return cerrado("solicitud_reserva", texto, [], { reserva: res.decision, solicitud: resumenDe(sol, ctx.salas, sala), sesion_olvidada: true, cierre: OLVIDO });
+    return cerrado("solicitud_reserva", texto, [], { reserva: publica(res.decision), solicitud: resumenDe(sol, ctx.salas, sala), sesion_olvidada: true, cierre: OLVIDO });
   }
   conv.propuesta = null;
   return responder(conv, res.decision, sol, ctx, repo, "Los datos cambiaron mientras confirmaba. ");
@@ -531,11 +537,10 @@ async function etiquetaDe(repo: Repositorio, salaId: string): Promise<string> {
   return sala ? etiquetaSala(sala) : salaId;
 }
 
-// Aviso de sala ocupada (7.0.7): dice cuándo y quién la tiene, con el carné enmascarado, y ofrece dos chips.
+// Aviso de sala ocupada (7.0.7): dice cuándo y si la tiene un docente o estudiantes, sin datos de la persona.
 function textoOcupada(conv: Conversacion, etiqueta: string, ocupada: ReservaDoc): RespuestaChat {
-  const quien = ocupada.rol === "docente"
-    ? `otro docente (carné ${enmascarar(ocupada.carne)})`
-    : `un grupo de estudiantes (carné ${enmascarar(ocupada.carne)})`;
+  // Sin carné ni nombre de la otra persona: el chat solo dice si es una clase o un grupo de estudiantes.
+  const quien = ocupada.rol === "docente" ? "otro docente" : "un grupo de estudiantes";
   return abierto(conv, `La ${etiqueta} está ocupada de ${ocupada.inicio} a ${ocupada.fin} por ${quien}.`,
     ["Ver otras salas", "Escalar al monitor"]);
 }
@@ -947,7 +952,7 @@ async function disponibilidadTurno(texto: string, sesion: string, repo: Reposito
     ];
     return cerrado("consulta_disponibilidad", `${fechaLarga(fecha)}\n${lineas.join("\n")}`,
       [`Reservar ${sala.nombre}`], {
-        disponibilidad: { sala: sala._id, fecha, ocupadas: d.ocupadas, libres: d.libres, operativos: d.operativos, inciertos: d.inciertos },
+        disponibilidad: { sala: sala._id, fecha, ocupadas: d.ocupadas.map(ocupadaPublica), libres: d.libres, operativos: d.operativos, inciertos: d.inciertos },
       });
   }
 
@@ -1186,4 +1191,70 @@ export async function reanudar(sesion: string, repo: Repositorio, alerta: string
   const pendiente = conv.pendiente ?? "carne";
   const p = preguntaPara(pendiente, docenteDe(conv.datos));
   return abierto(conv, `${alerta}\n\n${p.texto}`, p.opciones);
+}
+
+
+// ── Cancelar una reserva propia (R27, 14-11-2026) ─────────────────────────
+// Sin estado: los chips llevan el código («Sí, cancelar RS-0011», «No, conservar RS-0011») y cada paso vuelve a
+// comprobar con R27 que la reserva sea del carné de la sesión. Nunca se muestra una reserva de otra persona.
+export const esBotonCancelacion = (texto: string): boolean =>
+  /^(si,? )?cancelar (la reserva )?rs[\s-]?\d{1,5}$|^no,? conservar(la)? rs[\s-]?\d{1,5}$/.test(norm(texto).trim().replace(/[.!¡¿?]+$/g, "").replace(/\s+/g, " "));
+
+// ADV-08: "RS-0001", "rs 0001", "RS-1" y "RS-00001" son el mismo código (4 dígitos, ceros a la izquierda).
+const codigoDe = (texto: string): string | null => {
+  const m = texto.match(/\bRS[\s-]?(\d{1,5})\b/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n >= 1 && n <= 9999 ? `RS-${String(n).padStart(4, "0")}` : null;
+};
+
+export async function cancelacionTurno(texto: string, sesion: string, repo: Repositorio): Promise<RespuestaChat> {
+  const carne = (await repo.leerSesion(sesion))?.carne ?? null;
+  if (!carne) return cerrado("cancelar_reserva", "Para cancelar una reserva, primero escríbeme tu carné.");
+  const h = ahora();
+  const salas = await repo.salas();
+  const t = norm(texto).trim();
+  const codigo = codigoDe(texto);
+  const describir = (r: ReservaDoc) => `${r.codigo}: ${nombreSala(salas, r.sala)}, ${fechaLarga(r.fecha)}, ${r.inicio} a ${r.fin}`;
+  const noEncontrada = (c: string) => cerrado("cancelar_reserva", `No encuentro una reserva tuya con el código ${c} que se pueda cancelar.`);
+
+  if (codigo && /^no,? conservar/.test(t)) {
+    return cerrado("cancelar_reserva", `Listo, no cancelé nada. Tu reserva ${codigo} sigue programada.`);
+  }
+  if (codigo && /^si,? cancelar/.test(t)) {
+    const r = await repo.reservaPorCodigo(codigo);
+    const dec = evaluarCancelacion(r, carne, h);
+    if (dec.decision === "cancelar" && r && await repo.cancelarReserva(codigo, carne, new Date())) {
+      registrar({ intencion: "cancelar_reserva", codigo, reglas: dec.reglas_aplicadas, carne: enmascarar(carne) });
+      return cerrado("cancelar_reserva", `Listo. Cancelé tu reserva ${describir(r)}. La sala queda libre en ese horario.`);
+    }
+    if (dec.motivo === "ya_empezo") return cerrado("cancelar_reserva", `La reserva ${codigo} ya empezó o ya pasó; no se puede cancelar desde el chat. Consulta con el monitor.`);
+    return noEncontrada(codigo);
+  }
+
+  // Solo reservas propias, programadas y que aún no empiezan.
+  const propias = (await repo.reservasDeCarne(carne, h.fecha))
+    .filter((r) => evaluarCancelacion(r, carne, h).decision === "cancelar");
+  let lista = propias;
+  if (codigo) {
+    lista = propias.filter((r) => r.codigo === codigo);
+    if (!lista.length) return noEncontrada(codigo);
+  } else {
+    const e = extraer(texto, { hoy: h.fecha, pendiente: null });
+    if (e.fecha) lista = lista.filter((r) => r.fecha === e.fecha);
+    if (e.sala) lista = lista.filter((r) => r.sala === e.sala);
+    if (!lista.length) {
+      return cerrado("cancelar_reserva", propias.length
+        ? "No encuentro una reserva tuya con esos datos. Escribe el código (RS-…) o el día de la reserva."
+        : "No tienes reservas programadas que se puedan cancelar.");
+    }
+  }
+  if (lista.length === 1) {
+    const r = lista[0];
+    return cerrado("cancelar_reserva", `¿Cancelo tu reserva ${describir(r)}?`, [`Sí, cancelar ${r.codigo}`, `No, conservar ${r.codigo}`]);
+  }
+  const mostradas = lista.slice(0, 6);
+  return cerrado("cancelar_reserva",
+    `Tienes ${lista.length} reservas que se pueden cancelar. ¿Cuál?\n${mostradas.map((r) => `• ${describir(r)}`).join("\n")}`,
+    mostradas.map((r) => `Cancelar ${r.codigo}`));
 }

@@ -50,6 +50,10 @@ export interface Repositorio {
   // Calendario del monitor: días del mes (aaaa-mm) con reservas, y una reserva por código (cualquier estado).
   diasConReservas(mes: string): Promise<DiaConReservas[]>;
   reservaPorCodigo(codigo: string): Promise<ReservaDoc | null>;
+  // R27: reservas programadas de un carné desde una fecha (las suyas, para cancelar desde el chat).
+  reservasDeCarne(carne: string, desde: string): Promise<ReservaDoc[]>;
+  // R27: cancela solo si la reserva está programada y es de ese carné (la condición va en la misma escritura).
+  cancelarReserva(codigo: string, carne: string, cuando: Date): Promise<boolean>;
   leerConversacion(id: string): Promise<Conversacion | null>;
   guardarConversacion(c: Conversacion): Promise<void>;
   borrarConversacion(id: string): Promise<void>;

@@ -1,5 +1,5 @@
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "parametros": {
     "tolerancia_asistencia_min": 15,
     "horario_abre": "07:00",
@@ -268,6 +268,16 @@
       "descripcion": "Carné vigente en carnetización y aún no registrado: registrar al usuario sin pedir más datos personales.",
       "fuente": "Requisito del docente del curso (4-11-2026)",
       "vigente_desde": "2026-11-04"
+    },
+    {
+      "id": "R27",
+      "prioridad": 18,
+      "especificidad": 1,
+      "tipo": "recomendacion",
+      "efecto": "cancelar_reserva",
+      "descripcion": "Cancelar una reserva desde el chat solo si está programada, aún no empieza y su carné es el de la sesión identificada (estudiante o docente titular); si no, negar sin revelar datos de la reserva.",
+      "fuente": "Pedido de Esteban, 14-11-2026",
+      "vigente_desde": "2026-11-14"
     }
   ]
 }

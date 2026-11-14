@@ -1,7 +1,7 @@
 // Escenarios del motor de reservas (RS-01 a RS-20), con repositorio en memoria y reloj fijo 2026-11-09 08:00.
 // Lo usan evals/reservas.ts (pruebas) y evals/matriz.ts (matriz esperado vs. observado).
 import type { DecisionReserva, ReservaDoc, SolicitudReserva } from "../agent/tools/esquemas-reservas.js";
-import { evaluarRegistro, evaluarReserva, type Contexto } from "../agent/tools/reservas.js";
+import { evaluarCancelacion, evaluarRegistro, evaluarReserva, type Contexto } from "../agent/tools/reservas.js";
 import { ahora, fijarReloj, liberarReloj } from "../agent/tools/reloj.js";
 import { crearMemoria } from "../agent/store/memoria.js";
 import type { Repositorio } from "../agent/store/repositorio.js";
@@ -171,6 +171,24 @@ export async function correrEscenariosReservas(): Promise<FilaRes[]> {
       filas.push({ id: "RS-19", tipo: "Concurrencia", entrada: "dos reservas iguales", regla: "R22",
         esperado: "1.ª crea RS-0004; 2.ª negar [R22] sin insertar",
         observado: `1.ª ${primera.reserva?.codigo ?? "nada"}; 2.ª ${segunda.decision.decision} [${segunda.decision.reglas_aplicadas.join(", ")}]`, ok });
+    }
+
+    // RS-23 a RS-26 (14-11-2026): R27, cancelación por el titular.
+    {
+      const repo = crearMemoria("2026-11-09");
+      const r2 = await repo.reservaPorCodigo("RS-0002");
+      const hoy = { fecha: "2026-11-09", minutos: 8 * 60 };
+      const casos: [string, string, ReturnType<typeof evaluarCancelacion>, string][] = [
+        ["RS-23", "Titular, antes de empezar", evaluarCancelacion(r2, "D-20000001", hoy), "cancelar titular"],
+        ["RS-24", "Otro carné", evaluarCancelacion(r2, "C-10000001", hoy), "negar no_encontrada"],
+        ["RS-25", "Ya empezó", evaluarCancelacion(r2, "D-20000001", { fecha: "2026-11-10", minutos: 8 * 60 + 30 }), "negar ya_empezo"],
+        ["RS-26", "No existe", evaluarCancelacion(null, "D-20000001", hoy), "negar no_encontrada"],
+      ];
+      for (const [id, tipo, dec, esp] of casos) {
+        const obs = `${dec.decision} ${dec.motivo}`;
+        filas.push({ id, tipo, entrada: "RS-0002", regla: "R27", esperado: `${esp} [R27]`, observado: `${obs} [${dec.reglas_aplicadas.join(", ")}]`,
+          ok: obs === esp && iguales(dec.reglas_aplicadas, ["R27"]) });
+      }
     }
   } finally {
     liberarReloj();

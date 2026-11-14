@@ -5,7 +5,7 @@ import { Fecha, SalaId } from "../tools/esquemas-reservas.js";
 import { mensaje, solicitar } from "../orquestador.js";
 import { proveedorActivo } from "../llm/proveedor.js";
 import { resumenSalas } from "../tools/salas.js";
-import { disponibilidad, enmascarar, type Contexto } from "../tools/reservas.js";
+import { ocupadaPublica, disponibilidad, enmascarar, type Contexto } from "../tools/reservas.js";
 import { ahora, hoyBogota } from "../tools/reloj.js";
 import { crearRepositorio, tipoDeBase } from "../store/repositorio.js";
 import { nombreDe, solicitanteDe } from "../tools/monitor.js";
@@ -93,7 +93,7 @@ app.get("/disponibilidad", async (req, res) => {
     const sala = ctx.salas.find((s) => s._id === v.data.sala);
     if (!sala) return void res.status(404).json({ error: "Sala no encontrada" });
     const d = disponibilidad(sala, fecha, ctx.reservasDelDia, ctx);
-    res.json({ sala: sala._id, fecha, ocupadas: d.ocupadas, libres: d.libres, operativos: d.operativos, inciertos: d.inciertos });
+    res.json({ sala: sala._id, fecha, ocupadas: d.ocupadas.map(ocupadaPublica), libres: d.libres, operativos: d.operativos, inciertos: d.inciertos });
   } catch (e) {
     console.error("[http]", (e as Error).message);
     res.status(500).json({ error: "Error interno" });

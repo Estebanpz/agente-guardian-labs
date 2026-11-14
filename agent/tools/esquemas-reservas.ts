@@ -61,7 +61,8 @@ export const ReservaDoc = z.object({
   carne: Carne, rol: z.enum(["estudiante", "docente"]),
   personas: z.number().int(), equipos: z.number().int(), computo_alto: z.boolean(),
   materia: z.string().nullable(),
-  estado: z.enum(["programada", "escalada"]),
+  estado: z.enum(["programada", "escalada", "cancelada"]),
+  cancelada_en: z.date().nullable().optional(), // R27: cancelación por el titular desde el chat
   reglas_aplicadas: z.array(z.string()), traza: z.array(z.string()),
   version_reglas: z.string(), creada: z.date(), origen: z.enum(["chat", "semilla"]),
   jornada: z.enum(["Mañana", "Noche"]).nullable().optional(), // solo estudiantes (plan de identidad, sección 2)

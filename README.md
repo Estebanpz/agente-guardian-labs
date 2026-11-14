@@ -139,6 +139,7 @@ la reserva, el chat lo explica y pide otro horario o sala; los conflictos se esc
 | R24 | `negar` | Ninguna sala cumple las condiciones en ese horario: negar y pedir otro horario o menos personas. |
 | R25 | `programar` | Ninguna regla bloquea: separar la sala en la base de demostración tras la confirmación. |
 | R26 | `registrar_usuario` | Carné vigente en carnetización y aún no registrado: registrar al usuario sin pedir más datos personales. |
+| R27 | `cancelar_reserva` | Cancelar una reserva desde el chat solo si está programada, aún no empieza y es del carné de la sesión (estudiante o docente titular); si no, negar sin revelar datos de la reserva. |
 
 Las reservas son simuladas sobre datos sintéticos; el prototipo no reserva salas reales.
 

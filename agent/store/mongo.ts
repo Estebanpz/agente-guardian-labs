@@ -30,7 +30,7 @@ const PROY_USUARIO = { _id: 1, rol: 1, registrado: 1 };
 const PROY_RESERVA = {
   _id: 0, codigo: 1, sala: 1, fecha: 1, inicio: 1, fin: 1, inicio_min: 1, fin_min: 1, tipo: 1,
   carne: 1, rol: 1, jornada: 1, personas: 1, equipos: 1, computo_alto: 1, materia: 1, estado: 1,
-  reglas_aplicadas: 1, traza: 1, version_reglas: 1, creada: 1, origen: 1,
+  reglas_aplicadas: 1, traza: 1, version_reglas: 1, creada: 1, origen: 1, cancelada_en: 1,
 };
 const PROY_NOTIFICACION = { _id: 1, para: 1, motivo: 1, regla: 1, reserva_codigo: 1, carne: 1, sala: 1, fecha: 1, horario: 1, estado: 1, creada: 1, atendida_en: 1 };
 // Un aviso se guarda sin _id: lo asigna Mongo. Al leerlo, el id sale como texto.
@@ -184,6 +184,21 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
           { projection: { _id: 0, fecha: 1, estado: 1 } })
         .toArray();
       return contarDias(docs.map((d) => ({ fecha: String(d.fecha), estado: String(d.estado) })));
+    },
+
+    async reservasDeCarne(carneId, desde) {
+      const docs = await db.collection("reservas")
+        .find({ carne: Carne.parse(carneId), estado: "programada", fecha: { $gte: Fecha.parse(desde) } }, { projection: PROY_RESERVA })
+        .sort({ fecha: 1, inicio_min: 1 }).toArray();
+      return docs.map((d) => ReservaDoc.parse(d));
+    },
+
+    async cancelarReserva(codigo, carneId, cuando) {
+      const r = await db.collection("reservas").updateOne(
+        { codigo: z.string().regex(/^RS-\d{4}$/).parse(codigo), carne: Carne.parse(carneId), estado: "programada" },
+        { $set: { estado: "cancelada", cancelada_en: cuando } },
+      );
+      return r.modifiedCount === 1;
     },
 
     async reservaPorCodigo(codigo) {

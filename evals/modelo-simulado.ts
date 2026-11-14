@@ -17,6 +17,7 @@ export async function modeloSimulado(texto: string): Promise<Interpretacion & { 
   const boton = rutaDeBoton(texto);
   if (boton) return base(boton, boton === "solicitud_reserva" ? { recurso: "sala" } : {});
   const t = norm(texto);
+  if (/\b(cancel\w*|anul\w*)\b/.test(t) && /\b(reserva|rs[\s-]?\d{1,5}|sala)\b/.test(t)) return base("cancelar_reserva", { recurso: "sala" });
   const otro = t.match(OTROS);
   if (otro) return base("fuera_de_alcance", { recurso: "otro", recurso_texto: `${otro[1] ?? ""}${otro[2]}`.trim() });
   if (/\b(soy nuevo|primera vez|registrarme|registro)\b/.test(t)) return base("registro_usuario");

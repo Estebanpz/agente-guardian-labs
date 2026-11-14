@@ -228,3 +228,51 @@ El agente respondía con un diccionario en lugar de interpretar. Las pruebas sol
 | Modelo sin respuesta: aviso y botones («Reservar una sala», «Ver disponibilidad», «Estado de salas»), que funcionan sin el modelo. | No dejar a la persona sin salida. | `agent/orquestador.ts` | C-53 |
 | Tiempo de espera del modelo configurable: `MODELO_TIEMPO_MS` (120 000 ms por defecto) para Ollama y el Gateway. La interfaz avisa a los 8 s que sigue pensando. | Cada mensaje pasa por el modelo; con CPU puede tardar decenas de segundos. | `agent/llm/proveedor.ts`, `.env.example`, `web/src/pages/Chat.jsx` | revisión manual |
 | Pruebas del flujo con un **modelo simulado** (`evals/modelo-simulado.ts`) para que sigan siendo deterministas; la calidad del modelo real se mide en `evals/prueba-intencion.ts` con 6 frases nuevas (4 reservas que no son salas y 2 reservas de sala). C-05, C-06, C-13 y C-22 empiezan ahora con el botón «Quiero reservar una sala». | Separar el flujo (determinista) de la interpretación (modelo). | `evals/modelo-simulado.ts`, `evals/escenarios-conversacion.ts`, `evals/prueba-intencion.ts` | `npm run pruebas`, `npm run matriz` |
+
+## Cancelar una reserva propia (R27) y sin datos de otras personas en el chat (sección 7.0.14, 14-11-2026)
+
+Motivo: al decir que una sala estaba ocupada, el chat mostraba el carné (enmascarado) de quien la tenía; y no había
+forma de cancelar una reserva desde el chat.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| El aviso de sala ocupada y los textos de R20/R21 dicen solo «un grupo de estudiantes» u «otro docente», sin carné. La tarjeta de la reserva muestra los choques sin código, carné ni materia; la API del chat (`publica`) ya no los envía. El monitor sigue viéndolos en su vista y en los avisos. | Minimización: los datos de otra persona no salen del servidor hacia quien consulta. | `agent/conversacion.ts`, `web/src/components/TarjetaReserva.jsx` | C-02, C-58 |
+| Regla **R27** (`reglas.json` 2.2.0): cancelar desde el chat solo si la reserva está programada, aún no empieza y su carné es el de la sesión (estudiante o docente titular). Si no es suya o no existe, la respuesta es la misma, para no revelar reservas ajenas. | Pedido de Esteban (14-11-2026). | `agent/rules/reglas.json`, `agent/tools/reservas.ts` (`evaluarCancelacion`) | RS-23 a RS-26 |
+| Intención `cancelar_reserva` en el intérprete. Sin estado: se ubica la reserva propia por código, día o sala; los chips llevan el código («Sí, cancelar RS-…», «No, conservar RS-…») y al confirmar se vuelve a comprobar R27. La escritura es condicional (código + carné + programada): `estado: "cancelada"` y `cancelada_en`. La sala queda libre. | Cancelar sin que otra persona pueda forzarlo escribiendo el botón. | `agent/llm/interprete.ts`, `agent/orquestador.ts`, `agent/conversacion.ts` (`cancelacionTurno`), `agent/store/*.ts`, `agent/tools/esquemas-reservas.ts`, `agent/store/sembrar.ts` | C-54 a C-57 |
+
+## El modelo lee primero, también sin carné (sección 7.0.15, 14-11-2026)
+
+Motivo: «Necesito plantar un árbol» respondía «escríbeme tu carné». El agente pedía el carné antes de leer el mensaje,
+así que no negaba lo que no es de sus funciones. El docente espera que lo fuera de alcance se niegue de una vez.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| Sin carné, el modelo interpreta el mensaje antes de pedirlo. Fuera de alcance (o reservar algo que no es una sala): se niega sin pedir el carné y sin guardar el texto. Ayuda: se responde y al final se pide el carné. Elusión: alerta y carné. Una petición del dominio (reserva, disponibilidad, ocupación, cancelación, registro): se pide el carné y se continúa al identificarse. Botones y saludos siguen sin modelo. Si el modelo no responde, se pide el carné como antes. | Negar lo que no es función del agente desde el primer mensaje. | `agent/orquestador.ts` (`sinIdentidad`) | C-59 a C-62; `evals/prueba-intencion.ts` (2 frases) |
+
+Costo: una petición del dominio escrita antes del carné pasa dos veces por el modelo (al llegar y al continuarla).
+
+## Escritura informal y faltas de ortografía (sección 7.0.16, 14-11-2026)
+
+Motivo: «Khe puedes hazer?» se marcó como intento de eludir reglas. El modelo de 3B no entendió la frase mal escrita y
+la guardia por patrones no tenía nada que ver.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| El prompt del intérprete pide corregir mentalmente faltas, abreviaturas y escritura informal («khe», «hazer», «kiero», «resevar», «sla», «mñana», «xq», «ay», «oy») y clasificar por lo que la persona quiso decir. Dice que una falta de ortografía nunca es elusión y que la elusión requiere una petición explícita. Cinco ejemplos guía nuevos escritos con faltas. | Entender como lo haría un monitor. | `agent/llm/interprete.ts` | `evals/prueba-intencion.ts` (3 frases nuevas, con Ollama) |
+| El código valida la elusión del modelo (`validarElusion`): sin ninguna señal en el texto (reglas, instrucciones, prompt, autorización, permiso, ignorar, olvidar, desactivar, coordinador, profesor…), se trata como ayuda. La guardia por patrones no cambia. | Que un error del modelo no acuse a un estudiante. | `agent/llm/interprete.ts`, `agent/orquestador.ts` (`clasificar`) | C-63 |
+
+Límite: los extractores de fecha y hora (código) no corrigen faltas como «mñana» o «juebes»; esos datos los pide de
+nuevo el flujo, o los propone el respaldo del modelo con confirmación (7.0.8).
+
+## Prompt del intérprete con reglas explícitas y correcciones del informe adversarial (sección 7.0.17, 14-11-2026)
+
+| Cambio | Por qué | Archivos | Prueba |
+|---|---|---|---|
+| El prompt del intérprete se reescribió por secciones: IDIOMA (entrada y salida en español), ALCANCE (las cuatro funciones), CÓMO LEER EL MENSAJE (entender primero, decidir por el significado de la frase y no por palabras sueltas, corregir faltas), REGLAS PARA PEDIDOS DE RESERVA, INTENCIONES, CAMPOS y SEGURIDAD. Las reglas de reserva dicen que decide lo que se reserva y no el verbo: sala → solicitud_reserva; otra cosa → fuera_de_alcance con recurso "otro"; "quiero reservar" sin objeto → solicitud_reserva con recurso null (el asistente pregunta qué); datos sin verbo → reserva de sala; cancelar otra cosa → fuera_de_alcance. Los ejemplos guía se conservan, incluidos los cinco escritos con faltas, como ilustración del razonamiento. | Que el modelo tenga instrucciones claras para los casos de "Quiero reservar" en vez de depender de los ejemplos. | `agent/llm/interprete.ts` | `evals/prueba-intencion.ts` (con Ollama) |
+| ADV-04: filtro de datos prohibidos tolerante a separadores, ofuscación y dígitos en letras, sin bloquear fechas, horas, carnés ni códigos RS. | Una cédula con puntos llegaba a la traza. | `agent/tools/privacidad.ts` | `evals/privacidad.ts` (15 casos nuevos), P-07, P-08 |
+| ADV-07: fechas imposibles se descartan. | "31 de febrero" se guardaba como 2026-02-31. | `agent/tools/extraer.ts` | `evals/extraer.ts` (4 casos) |
+| ADV-08: código de reserva tolerante. | "RS 0001" o "RS-00001" no se reconocían. | `agent/conversacion.ts` (`codigoDe`, `esBotonCancelacion`) | CA-04 |
+| ADV-09: aviso de sala inexistente. | "sala 99" se ignoraba en silencio. | `agent/tools/extraer.ts` (`salaInexistente`), `agent/orquestador.ts` | `evals/extraer.ts` (6 casos) |
+
+Pendiente: ADV-03, ADV-05 y ADV-06 (identidad y endpoints sin autorización) se resuelven con el inicio de sesión por rol.
+

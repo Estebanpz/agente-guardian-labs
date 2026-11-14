@@ -25,6 +25,16 @@ const casos: [string, Esperado][] = [
   ["Quiero agendar una cita médica para mañana", "no_es_sala"],
   ["Necesito la sala 8 mañana de 10 a 12 para 20 estudiantes", "solicitud_reserva"],
   ["De 2 a 4 pm en el laboratorio 6 el jueves, somos 15", "solicitud_reserva"],
+  // 14-11-2026: cancelar una reserva propia (R27).
+  ["Quiero cancelar mi reserva del jueves", "cancelar_reserva"],
+  ["Anula la reserva RS-0011, ya no la necesito", "cancelar_reserva"],
+  // 14-11-2026: lo que no es función del agente se niega aunque no haya carné.
+  ["Necesito plantar un árbol", "fuera_de_alcance"],
+  ["¿Me ayudas a hacer la tarea de cálculo?", "fuera_de_alcance"],
+  // 14-11-2026: escritura informal y faltas de ortografía (frases distintas a los ejemplos guía).
+  ["ke puedes aser x mi", "ayuda"],
+  ["nesesito apartar el laboratorio 5 el bierne d 8 a 10", "solicitud_reserva"],
+  ["ai salas desocupadas mañana en la tarde?", "consulta_disponibilidad"],
 ];
 
 // Dos clases de fallo: "clasificación incorrecta" (el modelo respondió otra intención) y

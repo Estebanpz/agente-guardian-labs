@@ -81,9 +81,9 @@ export default function TarjetaReserva({ resultado, onUsar }) {
           <div className="alert alert-warning py-2 small mb-3">
             <strong><i className="bi bi-exclamation-triangle me-1" />Conflicto:</strong>
             <ul className="mb-0 ps-3">
-              {d.conflictos.map((c) => (
-                <li key={c.codigo}>
-                  {c.codigo}: {c.inicio}–{c.fin}, {c.tipo}, {c.personas} personas, carné {c.carne_enmascarado}
+              {d.conflictos.map((c, i) => (
+                <li key={`${c.inicio}-${i}`}>
+                  {c.inicio}–{c.fin}, {c.tipo === "clase" ? "clase de un docente" : "grupo de estudiantes"}, {c.personas} personas
                 </li>
               ))}
             </ul>

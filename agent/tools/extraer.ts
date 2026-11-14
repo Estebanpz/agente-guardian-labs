@@ -24,6 +24,14 @@ const fmtFecha = (y: number, m: number, d: number): string => `${y}-${pad(m)}-${
 
 type Hallazgo<T> = { valor: T; texto: string };
 
+// ADV-07: una fecha que no existe ("31 de febrero", "2026-13-01") no se normaliza: se descarta y el flujo la pide.
+const existe = (f: string): boolean => {
+  const [y, m, d] = f.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return m >= 1 && m <= 12 && dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+};
+const valida = (h: Hallazgo<string> | null): Hallazgo<string> | null => (h && existe(h.valor) ? h : null);
+
 // ── Carné ────────────────────────────────────────────────────────────────
 export function carne(t: string): string | null {
   const m = norm(t).match(/\b([cd])-?(\d{8})\b/);
@@ -32,6 +40,10 @@ export function carne(t: string): string | null {
 
 // ── Fecha ────────────────────────────────────────────────────────────────
 function buscarFecha(t: string, hoy: string): Hallazgo<string> | null {
+  return valida(buscarFechaTexto(t, hoy));
+}
+
+function buscarFechaTexto(t: string, hoy: string): Hallazgo<string> | null {
   const n = norm(t);
   let m = n.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
   if (m) return { valor: m[0], texto: m[0] };
@@ -144,6 +156,14 @@ export function horario(t: string): { inicio: string; fin: string } | null {
 function buscarSala(t: string): Hallazgo<string> | null {
   const m = norm(t).match(/\b(?:sala|laboratorio)\s*-?\s*(1[0-6]|[1-9])\b/);
   return m ? { valor: `sala-${m[1]}`, texto: m[0] } : null;
+}
+
+// ADV-09: el número de una sala que no existe ("sala 99", "sala 0"); null si no hay o si existe (1 a 16).
+export function salaInexistente(t: string): number | null {
+  const m = norm(t).match(/\b(?:sala|laboratorio)\s*-?\s*(\d{1,3})\b/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n >= 1 && n <= 16 ? null : n;
 }
 
 export function sala(t: string): string | null {
