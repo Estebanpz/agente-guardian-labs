@@ -11,3 +11,6 @@ chat-bot-1.webp
 chat-bot-2.webp
 docs/capturas
 barra-contraida-1024.png
+# Pruebas de mutación (Stryker): sandbox y reportes generados
+.stryker-tmp/
+reports/
