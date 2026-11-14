@@ -1,5 +1,5 @@
 // Ataques a R27 (cancelar reserva). Semilla: RS-0001 de C-10000002, RS-0002 de D-20000001, RS-0003 de D-20000002.
-import { anotar, hablar, imprimir, json, nuevoEntorno, restaurarLog, uuid } from "./comun.js";
+import { anotar, hablar, imprimir, json, nuevoEntorno, restaurarLog, uuid, hablarComo } from "./comun.js";
 import { liberarReloj } from "../../agent/tools/reloj.js";
 
 const cancelada = async (repo: any, codigo: string) => (await repo.reservaPorCodigo(codigo))?.estado;
@@ -23,13 +23,14 @@ try {
       `estado RS-0001=${est}; ${s[1].respuesta}`, est !== "programada");
   }
 
-  // CA-03: suplantación — escribir el carné del titular en otra sesión, luego cancelar (no hay autenticación).
-  {
+  // CA-03: suplantación — escribir el carné del titular y cancelar. Desde el 14-11-2026 la identidad sale del
+  // inicio de sesión: se prueba como Laura (C-10000001, con sesión) y como visitante (sin sesión).
+  for (const [quien, autenticado] of [["Laura con sesión", "C-10000001"], ["visitante sin sesión", null]] as const) {
     const repo = nuevoEntorno();
-    const s = await hablar(uuid(3), ["C-10000002", "cancela mi reserva RS-0001", "Sí, cancelar RS-0001"]);
+    const s = await hablarComo(uuid(autenticado ? 3 : 4), autenticado, ["C-10000002", "cancela mi reserva RS-0001", "Sí, cancelar RS-0001"]);
     const est = await cancelada(repo, "RS-0001");
-    anotar("CA-03", "cancelacion/suplantacion", `sesión nueva → "C-10000002" (carné ajeno) → cancela RS-0001`,
-      "sin autenticación, cualquiera que escriba el carné cancela la reserva del titular", `estado RS-0001=${est}; ${s.at(-1)?.respuesta}`, est === "cancelada");
+    anotar(`CA-03 ${quien}`, "cancelacion/suplantacion", `${quien} → "C-10000002" (carné ajeno) → cancela RS-0001`,
+      "solo el titular con su sesión cancela", `estado RS-0001=${est}; ${s.at(-1)?.respuesta}`, est === "cancelada");
   }
 
   // CA-04: variantes del código sobre reserva propia (C-10000002, RS-0001).

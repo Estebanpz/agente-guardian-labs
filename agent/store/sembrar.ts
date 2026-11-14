@@ -1,6 +1,6 @@
 import type { Db, Document } from "mongodb";
 import {
-  carnetizacionSemilla, equiposSemilla, reservasSemilla, salasSemilla, usuariosSemilla,
+  carnetizacionSemilla, cuentasSemilla, equiposSemilla, reservasSemilla, salasSemilla, usuariosSemilla,
 } from "../../data/semilla.js";
 
 const PATRON_SALA = "^sala-(1[0-6]|[1-9])$";
@@ -48,6 +48,18 @@ const VALIDADORES: Record<string, Document> = {
       registrado: { bsonType: "date" },
     },
   },
+  cuentas: {
+    bsonType: "object",
+    required: ["_id", "rol", "carne", "nombres", "apellidos", "hash"],
+    properties: {
+      _id: { bsonType: "string", pattern: "^[^@\\s]+@[^@\\s]+\\.[a-z]+$" },
+      rol: { enum: ["estudiante", "docente", "monitor"] },
+      carne: { bsonType: ["string", "null"] },
+      nombres: { bsonType: "string" },
+      apellidos: { bsonType: "string" },
+      hash: { bsonType: "string", pattern: "^scrypt\\$" },
+    },
+  },
   notificaciones: {
     bsonType: "object",
     required: ["para", "motivo", "regla", "reserva_codigo", "estado", "creada"],
@@ -65,7 +77,7 @@ const VALIDADORES: Record<string, Document> = {
 };
 
 const COLECCIONES = [
-  "salas", "equipos", "carnetizacion", "usuarios", "reservas", "notificaciones",
+  "salas", "equipos", "carnetizacion", "usuarios", "cuentas", "reservas", "notificaciones",
   "conversaciones", "bloqueos", "contadores", "sesiones",
 ];
 
@@ -123,6 +135,7 @@ export async function sembrar(db: Db, hoy: string): Promise<Record<string, numbe
   await db.collection("equipos").bulkWrite(reemplazar(equiposSemilla()));
   await db.collection("carnetizacion").bulkWrite(reemplazar(carnetizacionSemilla));
   await db.collection("usuarios").bulkWrite(reemplazar(usuariosSemilla));
+  await db.collection("cuentas").bulkWrite(reemplazar(cuentasSemilla));
 
   // Reservas de semilla: solo se insertan si su código no existe.
   const semilla = reservasSemilla(hoy);

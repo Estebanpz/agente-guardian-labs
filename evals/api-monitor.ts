@@ -13,8 +13,14 @@ const comprobar = (ok: boolean, texto: string) => {
   if (!ok) fallos++;
   console.log(`${ok ? "✅" : "❌"} ${texto}`);
 };
+// Las rutas del monitor exigen su sesión (login por rol): se inicia con la cuenta sintética del monitor.
+const login = await fetch(base + "/login", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ correo: "monitor.salas@uniespinal.test", clave: "Monitor2026!" }),
+});
+const TOKEN = ((await login.json()) as { token: string }).token;
 const pedir = async (ruta: string, init?: RequestInit) => {
-  const res = await fetch(base + ruta, init);
+  const res = await fetch(base + ruta, { ...init, headers: { ...(init?.headers as Record<string, string>), Authorization: `Bearer ${TOKEN}` } });
   const texto = await res.text();
   return { status: res.status, texto, json: () => JSON.parse(texto) as any };
 };

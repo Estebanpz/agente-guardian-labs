@@ -11,6 +11,8 @@ import { crearRepositorio, tipoDeBase } from "../store/repositorio.js";
 import { nombreDe, solicitanteDe } from "../tools/monitor.js";
 import type { CarneDoc } from "../tools/esquemas-reservas.js";
 import { casos, descripciones } from "../../data/casos.js";
+import { iniciarSesion, leerToken, revocar, type Quien } from "../tools/acceso.js";
+import type { Rol } from "../tools/esquemas-reservas.js";
 
 export const app = express();
 app.use(express.json({ limit: "10kb" }));
@@ -18,9 +20,58 @@ app.use(express.json({ limit: "10kb" }));
 // CORS mínimo para una interfaz local (React en Vite).
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return void res.sendStatus(204);
   next();
+});
+
+// ── Sesión (login por rol) ────────────────────────────────────────────────
+// Authorization: Bearer <token>. Sin cabecera = visitante; cabecera inválida o vencida = "invalido".
+function quienDe(req: express.Request): Quien | null | "invalido" {
+  const h = req.get("authorization");
+  if (!h) return null;
+  const m = h.match(/^Bearer ([\w-]+\.[\w-]+)$/);
+  return (m && leerToken(m[1])) || "invalido";
+}
+const SIN_SESION = "Inicia sesión para usar esta función.";
+const SESION_VENCIDA = "Tu sesión no es válida o venció; inicia sesión de nuevo.";
+
+// Solo los roles indicados. 401 sin sesión válida, 403 con otro rol.
+const exigir = (...roles: Rol[]): express.RequestHandler => (req, res, next) => {
+  const q = quienDe(req);
+  if (q === "invalido") return void res.status(401).json({ error: SESION_VENCIDA });
+  if (!q) return void res.status(401).json({ error: SIN_SESION });
+  if (!roles.includes(q.rol)) return void res.status(403).json({ error: "Tu rol no tiene acceso a esta función." });
+  res.locals.quien = q;
+  next();
+};
+const soloMonitor = exigir("monitor");
+
+app.post("/login", async (req, res) => {
+  const v = z.object({ correo: z.string().trim().min(3).max(120), clave: z.string().min(1).max(128) }).strict().safeParse(req.body);
+  if (!v.success) return void res.status(400).json({ error: "Escribe tu correo y tu contraseña." });
+  try {
+    const r = await iniciarSesion(v.data.correo, v.data.clave, await crearRepositorio());
+    if (!r.ok) return void res.status(r.status).json({ error: r.error });
+    res.json({ token: r.token, usuario: r.usuario, registrado: r.registrado });
+  } catch (e) {
+    console.error("[http]", (e as Error).message);
+    res.status(500).json({ error: "Error interno" });
+  }
+});
+
+// Cerrar sesión: el token queda revocado aunque no haya vencido.
+app.post("/logout", (req, res) => {
+  const q = quienDe(req);
+  if (q && q !== "invalido") revocar(q);
+  res.json({ ok: true });
+});
+
+// Quién tiene la sesión (la interfaz lo usa al recargar). Sin datos del token más allá de rol y correo.
+app.get("/yo", (req, res) => {
+  const q = quienDe(req);
+  if (!q || q === "invalido") return void res.status(401).json({ error: SESION_VENCIDA });
+  res.json({ correo: q.correo, rol: q.rol, exp: q.exp });
 });
 
 app.get("/salud", async (_req, res) => {
@@ -35,7 +86,7 @@ app.get("/salud", async (_req, res) => {
 });
 
 // Solicitud estructurada: se valida contra el esquema antes de tocar el motor.
-app.post("/evaluar", async (req, res) => {
+app.post("/evaluar", soloMonitor, async (req, res) => {
   const v = EntradaEvaluar.safeParse(req.body);
   if (!v.success) return void res.status(400).json({ error: "Entrada inválida", detalle: v.error.issues });
   try {
@@ -54,8 +105,13 @@ app.post("/mensaje", async (req, res) => {
     sesion: z.uuid().optional(),
   }).safeParse(req.body);
   if (!v.success) return void res.status(400).json({ error: "Falta el campo 'texto' (1 a 500 caracteres)" });
+  // La identidad sale del token: estudiante o docente con carné. Sin sesión (o el monitor) el chat solo informa.
+  const q = quienDe(req);
+  if (q === "invalido") return void res.status(401).json({ error: SESION_VENCIDA });
+  const autenticado = q && q.carne ? q.carne : null;
+  if (autenticado && !v.data.sesion) return void res.status(400).json({ error: "Falta el campo 'sesion' del chat." });
   try {
-    res.json(await mensaje(v.data.texto, { laboratorio: v.data.laboratorio, sesion: v.data.sesion }));
+    res.json(await mensaje(v.data.texto, { laboratorio: v.data.laboratorio, sesion: v.data.sesion, autenticado }));
   } catch (e) {
     console.error("[http]", (e as Error).message);
     res.status(500).json({ error: "Error interno" });
@@ -63,7 +119,7 @@ app.post("/mensaje", async (req, res) => {
 });
 
 // Casos sintéticos con su descripción, para la demostración (solo lectura).
-app.get("/casos", (_req, res) => {
+app.get("/casos", soloMonitor, (_req, res) => {
   res.json(Object.keys(casos).map((id) => ({ id, ...descripciones[id], hechos: casos[id] })));
 });
 
@@ -101,7 +157,7 @@ app.get("/disponibilidad", async (req, res) => {
 });
 
 // Reservas programadas y escaladas de una fecha, con carnés enmascarados.
-app.get("/reservas", async (req, res) => {
+app.get("/reservas", soloMonitor, async (req, res) => {
   const v = z.object({ fecha: Fecha.optional() }).safeParse(req.query);
   if (!v.success) return void res.status(400).json({ error: "Parámetros inválidos: fecha (aaaa-mm-dd)." });
   try {
@@ -116,7 +172,7 @@ app.get("/reservas", async (req, res) => {
 });
 
 // Notificaciones para el monitor o coordinación.
-app.get("/notificaciones", async (req, res) => {
+app.get("/notificaciones", soloMonitor, async (req, res) => {
   const v = z.object({ estado: z.enum(["pendiente", "atendida"]).default("pendiente") }).safeParse(req.query);
   if (!v.success) return void res.status(400).json({ error: "Parámetros inválidos: estado (pendiente o atendida)." });
   try {
@@ -143,7 +199,7 @@ async function carnesDe(carnes: (string | null | undefined)[]): Promise<Map<stri
 
 // Estado de las salas en una fecha (vista Salas del monitor, solo lectura). `fecha` por defecto: hoy en Bogotá.
 // Las reservas del día incluyen las programadas y las escaladas; la disponibilidad solo cuenta las programadas.
-app.get("/salas", async (req, res) => {
+app.get("/salas", soloMonitor, async (req, res) => {
   const v = z.object({ fecha: Fecha.optional() }).safeParse(req.query);
   if (!v.success) return void res.status(400).json({ error: "Parámetros inválidos: fecha (aaaa-mm-dd)." });
   try {
@@ -180,7 +236,7 @@ app.get("/salas", async (req, res) => {
 });
 
 // Días del mes (aaaa-mm) con reservas: calendario del monitor.
-app.get("/reservas/dias", async (req, res) => {
+app.get("/reservas/dias", soloMonitor, async (req, res) => {
   const v = z.object({ mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) }).safeParse(req.query);
   if (!v.success) return void res.status(400).json({ error: "Parámetro inválido: mes (aaaa-mm)." });
   try {
@@ -193,7 +249,7 @@ app.get("/reservas/dias", async (req, res) => {
 });
 
 // Detalle de una reserva (cualquier estado) con los datos de quien reserva y el carné enmascarado.
-app.get("/reservas/:codigo", async (req, res) => {
+app.get("/reservas/:codigo", soloMonitor, async (req, res) => {
   const v = z.string().regex(/^RS-\d{4}$/).safeParse(req.params.codigo);
   if (!v.success) return void res.status(400).json({ error: "Código inválido." });
   try {
@@ -210,7 +266,7 @@ app.get("/reservas/:codigo", async (req, res) => {
 });
 
 // Marca un aviso como atendido. Solo ese cambio: el cuerpo debe ser exactamente { estado: "atendida" }.
-app.patch("/notificaciones/:id", async (req, res) => {
+app.patch("/notificaciones/:id", soloMonitor, async (req, res) => {
   const v = z.object({ estado: z.literal("atendida") }).strict().safeParse(req.body);
   if (!v.success) return void res.status(400).json({ error: "Solo se permite { estado: \"atendida\" }." });
   const id = z.string().regex(/^[\w-]{1,64}$/).safeParse(req.params.id);
@@ -228,6 +284,6 @@ app.patch("/notificaciones/:id", async (req, res) => {
 });
 
 // Estado de salas y equipos de la vista Laboratorios (solo lectura).
-app.get("/salas/laboratorios", (_req, res) => {
+app.get("/salas/laboratorios", soloMonitor, (_req, res) => {
   res.json(resumenSalas());
 });

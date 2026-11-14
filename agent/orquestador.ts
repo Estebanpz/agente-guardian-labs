@@ -203,9 +203,112 @@ async function desvioDelFlujo(texto: string, sesion: string, repo: Repositorio):
   return r ? { ...r, intencion: "fuera_de_alcance" } : null;
 }
 
-export async function mensaje(
+// ── Chat con inicio de sesión (14-11-2026) ────────────────────────────────
+// `autenticado` lo pone la API desde el token: el carné de un estudiante o docente con sesión, o null para un
+// visitante (o el monitor, que no tiene carné). Sin el campo (pruebas de flujo y consola) se usa la identidad por
+// carné escrito de las versiones anteriores.
+type Contexto = { laboratorio?: SalaId; franja?: string; sesion?: string; autenticado?: string | null };
+
+const INICIA_SESION = "Para reservar o cancelar una sala, inicia sesión con tu cuenta de estudiante o docente.";
+const requiereLogin = (antes = ""): RespuestaChat =>
+  ({ intencion: "requiere_login", respuesta: `${antes}${INICIA_SESION}`, flujo: null });
+const SALUDO_PUBLICO = "¡Hola! Soy Guardian Labs. Sin iniciar sesión te informo la disponibilidad, la ocupación y el estado de las salas. " + INICIA_SESION;
+const CHIPS_PUBLICOS = { tipo: "sugerencia", pendiente: null, opciones: ["Ver disponibilidad", "Estado de salas", "Ayuda"] };
+const CIERRE_CON_SESION = "Tu reserva quedó registrada. ¿Necesitas algo más?";
+const CARNES = /\b[CD]-?\d{8}\b/gi;
+const SOLO_CON_SESION = ["solicitud_reserva", "cancelar_reserva", "registro_usuario"];
+
+// Visitante: solo informa. Nunca abre una reserva, un registro ni una cancelación.
+async function modoPublico(texto: string, sesion: string | undefined, repo: Repositorio): Promise<RespuestaChat> {
+  if (esIntentoDeElusion(texto)) return { intencion: "intento_eludir_reglas", respuesta: ALERTA_ELUSION, alerta: ALERTA_ELUSION, flujo: null };
+  if (carneDe(texto)) return requiereLogin("No necesito que escribas tu carné: lo tomo de tu inicio de sesión. ");
+  if (esSalida(texto)) return { intencion: "cerrar_sesion", respuesta: "No hay una sesión iniciada.", flujo: null };
+  if (esBotonCancelacion(texto)) return requiereLogin();
+  const ruta = rutaDeBoton(texto);
+  if (ruta === "consulta_salas") return { intencion: "consulta_salas", respuesta: await estadoSalasDeBase(repo), flujo: null };
+  if (ruta && SOLO_CON_SESION.includes(ruta)) return requiereLogin();
+  if (sesion) {
+    // Solo el contexto de una disponibilidad sigue abierto; un flujo de reserva o registro se cierra.
+    const conv = await repo.leerConversacion(sesion);
+    if (conv && conv.flujo !== "disponibilidad") await repo.borrarConversacion(sesion);
+    else if (conv) {
+      const r = await continuar(texto, sesion, repo);
+      if (r) return r;
+    }
+  }
+  if (ruta === "consulta_disponibilidad" && sesion) return iniciar("disponibilidad", texto, sesion, repo);
+  if (esSaludo(texto)) return { intencion: "saludo", respuesta: SALUDO_PUBLICO, flujo: CHIPS_PUBLICOS };
+
+  const c = await clasificar(texto);
+  if (c.fallo && !temasDe(texto).length) {
+    return { intencion: "error_modelo", respuesta: "No pude interpretar el mensaje porque el modelo no respondió. Intenta de nuevo o usa uno de estos botones.", flujo: CHIPS_PUBLICOS };
+  }
+  if (c.intencion === "intento_eludir_reglas") return { intencion: c.intencion, respuesta: ALERTA_ELUSION, alerta: ALERTA_ELUSION, flujo: null };
+  if (c.recurso === "otro" || c.intencion === "fuera_de_alcance") return { intencion: "fuera_de_alcance", respuesta: textoFuera(c, texto), flujo: null };
+  if (SOLO_CON_SESION.includes(c.intencion)) return requiereLogin();
+  if (c.intencion === "consulta_salas" || c.intencion === "consulta_disponibilidad") {
+    const r = await porFecha(rutaPorFecha(texto, false), texto, sesion, repo);
+    if (r) return r;
+    if (c.intencion === "consulta_salas") return { intencion: "consulta_salas", respuesta: await estadoSalasDeBase(repo), flujo: null };
+    if (sesion) return iniciar("disponibilidad", texto, sesion, repo);
+  }
+  const temas = temasDe(texto);
+  const ayuda = temas.length ? responderTemas(temas, texto) : AYUDA_GENERAL;
+  return { intencion: "ayuda", temas, respuesta: `${ayuda}\n\n${INICIA_SESION}`, flujo: CHIPS_PUBLICOS } as RespuestaChat;
+}
+
+export async function mensaje(texto: string, contexto: Contexto = {}) {
+  if (contexto.autenticado === undefined) return mensajeBase(texto, contexto);
+  // Los datos prohibidos se bloquean antes de todo, con o sin sesión.
+  if (datosProhibidos(texto).length) return mensajeBase(texto, contexto);
+  const sesion = contexto.sesion && z.uuid().safeParse(contexto.sesion).success ? contexto.sesion : undefined;
+  const repo = await repoActual();
+  const resumen = texto.slice(0, 200);
+
+  if (contexto.autenticado === null) {
+    let r = await modoPublico(texto, sesion, repo);
+    // Una oferta de disponibilidad aceptada abriría una reserva: sin sesión no se abre.
+    if (SOLO_CON_SESION.includes(r.intencion)) {
+      if (sesion) await repo.borrarConversacion(sesion);
+      r = requiereLogin();
+    }
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta, sesion: "visitante" });
+    return r;
+  }
+
+  // Con sesión: la identidad es la del token. Un carné ajeno no se atiende (ADV-03); el propio sobra.
+  const propio = contexto.autenticado;
+  if (!sesion) return { intencion: "identidad", respuesta: "Falta la sesión del chat.", flujo: null };
+  const escritos = [...texto.matchAll(CARNES)].map((m) => carneDe(m[0])!);
+  if (escritos.some((c) => c !== propio)) {
+    const respuesta = "Tu identidad viene de tu inicio de sesión: no atiendo solicitudes con el carné de otra persona.";
+    registrar({ texto: "[carné ajeno]", intencion: "identidad", respuesta });
+    return { intencion: "identidad", respuesta, flujo: null };
+  }
+  const limpio = texto.replace(CARNES, " ").replace(/\s+/g, " ").trim();
+  const doc = await repo.leerSesion(sesion);
+  if (doc?.carne !== propio) {
+    // Otra persona en esta sesión del navegador: se cierra la conversación que haya quedado abierta.
+    if (doc) await repo.borrarConversacion(sesion);
+    await repo.guardarSesion({ _id: sesion, carne: propio, actualizado: new Date(), pendiente_texto: null });
+  }
+  if (escritos.length && limpio.replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(Boolean).length <= 2) {
+    return { intencion: "identidad", respuesta: `Ya te identifiqué con tu sesión (${enmascarar(propio)}). ¿En qué te ayudo?`, flujo: { tipo: "sugerencia", pendiente: null, opciones: CHIPS_SALUDO } };
+  }
+  if (esSalida(limpio)) {
+    await repo.borrarSesion(sesion);
+    await repo.borrarConversacion(sesion);
+    return { intencion: "cerrar_sesion", respuesta: "Sesión cerrada. Hasta pronto.", flujo: null };
+  }
+  const r = (await mensajeBase(limpio, contexto)) as RespuestaChat & { cierre?: string; sesion_olvidada?: boolean };
+  // Tras una reserva el flujo olvida el carné; con sesión la identidad sigue en el token.
+  if (r.sesion_olvidada) return { ...r, sesion_olvidada: undefined, cierre: CIERRE_CON_SESION };
+  return r;
+}
+
+async function mensajeBase(
   texto: string,
-  contexto: { laboratorio?: SalaId; franja?: string; sesion?: string } = {},
+  contexto: Contexto = {},
 ) {
   // Paso 1: datos prohibidos. No se llama al modelo ni se guarda el texto.
   const prohibidos = datosProhibidos(texto);

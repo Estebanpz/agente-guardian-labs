@@ -1,8 +1,8 @@
 import type {
-  CarneDoc, Conversacion, DecisionReserva, EquipoDoc, NotificacionDoc, ReservaDoc, SalaDoc, SesionDoc, UsuarioDoc,
+  CarneDoc, Conversacion, CuentaDoc, DecisionReserva, EquipoDoc, NotificacionDoc, ReservaDoc, SalaDoc, SesionDoc, UsuarioDoc,
 } from "../tools/esquemas-reservas.js";
 import {
-  carnetizacionSemilla, equiposSemilla, reservasSemilla, salasSemilla, usuariosSemilla,
+  carnetizacionSemilla, cuentasSemilla, equiposSemilla, reservasSemilla, salasSemilla, usuariosSemilla,
 } from "../../data/semilla.js";
 import { contarDias, type Repositorio } from "./repositorio.js";
 
@@ -13,6 +13,7 @@ export function crearMemoria(hoy: string): Repositorio {
   const equipos: EquipoDoc[] = equiposSemilla();
   const carne = new Map<string, CarneDoc>(carnetizacionSemilla.map((c) => [c._id, c]));
   const usuarios = new Map<string, UsuarioDoc>(usuariosSemilla.map((u) => [u._id, u]));
+  const cuentas = new Map<string, CuentaDoc>(cuentasSemilla.map((c) => [c._id, c]));
   const reservas: ReservaDoc[] = reservasSemilla(hoy);
   const notificaciones: NotificacionDoc[] = [];
   let idAviso = 0;
@@ -40,6 +41,10 @@ export function crearMemoria(hoy: string): Repositorio {
 
     async usuario(id) {
       return usuarios.get(id) ?? null;
+    },
+
+    async cuenta(correo) {
+      return cuentas.get(correo.trim().toLowerCase()) ?? null;
     },
 
     async registrarUsuario(u) {

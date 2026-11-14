@@ -39,7 +39,8 @@ Scripts reproducibles en `evals/adversarial/`. Comando:
 - ADV-07: **corregido.** `buscarFecha` descarta fechas que no existen ("31 de febrero", "2026-13-01"); el flujo pide la fecha de nuevo.
 - ADV-08: **corregido.** El código de reserva se lee con o sin guion, con espacio y con ceros de más o de menos ("RS 0001", "rs0001", "RS-00001", "RS-1" → RS-0001). CA-04 ahora resiste.
 - ADV-09: **corregido.** Una sala fuera de 1–16 recibe "La Sala N no existe: hay salas de la 1 a la 16." y el flujo sigue con su pregunta.
-- ADV-03, ADV-05 y ADV-06: pendientes; se resuelven con el inicio de sesión por rol (estudiante, docente, monitor).
+- ADV-03: **corregido** con el inicio de sesión por rol. La identidad del chat sale del token firmado: un carné escrito no identifica a nadie y el carné de otra persona se rechaza. CA-03 y P-06 se prueban ahora con sesión de otra estudiante y sin sesión; ambos resisten.
+- ADV-05 y ADV-06: **corregidos.** `GET /reservas/:codigo`, `GET/PATCH /notificaciones`, `/salas`, `/reservas`, `/reservas/dias`, `/casos`, `/salas/laboratorios` y `/evaluar` exigen sesión de monitor (401 sin sesión, 403 con otro rol). A-08, A-10, A-13 y A-14 resisten. Pruebas: `evals/acceso.ts`.
 
 ## Correcciones sugeridas
 

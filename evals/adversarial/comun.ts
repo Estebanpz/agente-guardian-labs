@@ -32,6 +32,13 @@ export function nuevoEntorno(hora = "10:00", interpretar: Clasificador = modeloS
   return repo;
 }
 
+// Como lo hace la API desde el 14-11-2026: `autenticado` es el carné del token (o null sin sesión).
+export async function hablarComo(sesion: string, autenticado: string | null, textos: string[]): Promise<Salida[]> {
+  const out: Salida[] = [];
+  for (const t of textos) out.push((await mensaje(t, { sesion, autenticado })) as Salida);
+  return out;
+}
+
 export async function hablar(sesion: string | undefined, textos: string[]): Promise<Salida[]> {
   const out: Salida[] = [];
   for (const t of textos) out.push((await mensaje(t, { sesion })) as Salida);

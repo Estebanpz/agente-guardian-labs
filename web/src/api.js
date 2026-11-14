@@ -1,10 +1,18 @@
-// Cliente de la API del agente (Express detrás del proxy /api).
+// Cliente de la API del agente (Express detrás del proxy /api). Con sesión, cada petición lleva el token.
+import { borrarSesion, leerSesion } from "./sesion.js";
+
 async function pedir(ruta, opciones = {}) {
+  const sesion = leerSesion();
   const res = await fetch(`/api${ruta}`, {
-    headers: { "Content-Type": "application/json" },
     ...opciones,
+    headers: {
+      "Content-Type": "application/json",
+      ...(sesion ? { Authorization: `Bearer ${sesion.token}` } : {}),
+    },
   });
   const datos = await res.json().catch(() => ({}));
+  // Token vencido o revocado: se olvida la sesión y la interfaz vuelve a pedir el inicio de sesión.
+  if (res.status === 401 && sesion && ruta !== "/login") borrarSesion();
   if (!res.ok) throw new Error(datos.error ?? `Error ${res.status}`);
   return datos;
 }
@@ -17,7 +25,11 @@ const consulta = (params) => {
 
 export const api = {
   salud: () => pedir("/salud"),
-  // Vista Laboratorios (ingreso, sala-1 a sala-3).
+  // Inicio y cierre de sesión por rol (estudiante, docente, monitor).
+  login: (correo, clave) => pedir("/login", { method: "POST", body: JSON.stringify({ correo, clave }) }),
+  logout: () => pedir("/logout", { method: "POST" }),
+  yo: () => pedir("/yo"),
+  // Vista Laboratorios (ingreso, sala-1 a sala-3). Solo el monitor.
   laboratorios: () => pedir("/salas/laboratorios"),
   // Reservas: 16 salas con equipos y reservas del día. Las cargas aceptan una señal para cancelarse.
   salas: (signal) => pedir("/salas", { signal }),

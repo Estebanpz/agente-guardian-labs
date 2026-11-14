@@ -1,5 +1,5 @@
 import type {
-  CarneDoc, Conversacion, DecisionReserva, EquipoDoc, NotificacionDoc, ReservaDoc, SalaDoc, SesionDoc, UsuarioDoc,
+  CarneDoc, Conversacion, CuentaDoc, DecisionReserva, EquipoDoc, NotificacionDoc, ReservaDoc, SalaDoc, SesionDoc, UsuarioDoc,
 } from "../tools/esquemas-reservas.js";
 import { crearMemoria } from "./memoria.js";
 import { hoyBogota } from "../tools/reloj.js";
@@ -26,6 +26,7 @@ export interface Repositorio {
   equipos(sala?: string): Promise<EquipoDoc[]>;
   carne(id: string): Promise<CarneDoc | null>;            // carnetización simulada
   usuario(id: string): Promise<UsuarioDoc | null>;
+  cuenta(correo: string): Promise<CuentaDoc | null>;      // login (correo en minúsculas)
   registrarUsuario(u: UsuarioDoc): Promise<"creado" | "existente">;
   reservasDelDia(fecha: string, sala?: string): Promise<ReservaDoc[]>; // solo estado "programada"
   escaladasDelDia(fecha: string): Promise<ReservaDoc[]>;             // solo estado "escalada" (para la API)

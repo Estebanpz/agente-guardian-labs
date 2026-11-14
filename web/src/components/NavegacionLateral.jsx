@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { NavLink } from "react-router";
+import { Link, NavLink, useNavigate } from "react-router";
+import { useSesion } from "../sesion.js";
 
 // Preferencia de la barra (expandida o contraída), recordada en este navegador. Si el almacenamiento no
 // está disponible, la barra arranca expandida.
@@ -23,6 +24,13 @@ const guardarContraida = (v) => {
 // El botón la contrae a iconos para dar más ancho al contenido, y la vuelve a expandir.
 export default function NavegacionLateral({ etiquetaBase, proveedor }) {
   const [contraida, setContraida] = useState(leerContraida);
+  const { usuario, salir } = useSesion();
+  const navegar = useNavigate();
+  const esMonitor = usuario?.rol === "monitor";
+  const cerrar = async () => {
+    await salir();
+    navegar("/ingresar", { replace: true });
+  };
   const conexion = proveedor === false ? "Sin conexión con la API" : proveedor || "Conectando…";
 
   const alternar = () => {
@@ -52,15 +60,19 @@ export default function NavegacionLateral({ etiquetaBase, proveedor }) {
         </button>
       </div>
       <nav id="sa-navegacion" aria-label="Secciones" className="sa-nav">
-        <NavLink to="/" aria-label="Laboratorios" title="Laboratorios">
-          <i className="bi bi-pc-display" aria-hidden="true" /><span className="sa-texto">Laboratorios</span>
-        </NavLink>
+        {esMonitor && (
+          <NavLink to="/" end aria-label="Laboratorios" title="Laboratorios">
+            <i className="bi bi-pc-display" aria-hidden="true" /><span className="sa-texto">Laboratorios</span>
+          </NavLink>
+        )}
         <NavLink to="/chat" aria-label="Chat" title="Chat">
           <i className="bi bi-chat-dots" aria-hidden="true" /><span className="sa-texto">Chat</span>
         </NavLink>
-        <NavLink to="/salas" aria-label="Salas" title="Salas">
-          <i className="bi bi-grid-3x3-gap" aria-hidden="true" /><span className="sa-texto">Salas</span>
-        </NavLink>
+        {esMonitor && (
+          <NavLink to="/salas" aria-label="Salas" title="Salas">
+            <i className="bi bi-grid-3x3-gap" aria-hidden="true" /><span className="sa-texto">Salas</span>
+          </NavLink>
+        )}
       </nav>
       <div className="sa-estado-base">
         <strong title={etiquetaBase}>
@@ -69,6 +81,21 @@ export default function NavegacionLateral({ etiquetaBase, proveedor }) {
         </strong>
         <div className="sa-texto">{conexion}</div>
         <div className="sa-texto">Datos sintéticos de demostración</div>
+      </div>
+      <div className="sa-usuario">
+        {usuario ? (
+          <>
+            <strong title={usuario.correo}>{usuario.nombres.split(" ")[0]} {usuario.apellidos.split(" ")[0]}</strong>
+            <span className="sa-usuario-rol">{usuario.rol}</span>
+            <button type="button" className="sa-usuario-boton" onClick={cerrar} title="Cerrar sesión" aria-label="Cerrar sesión">
+              <i className="bi bi-box-arrow-right" aria-hidden="true" /><span className="sa-texto">Cerrar sesión</span>
+            </button>
+          </>
+        ) : (
+          <Link to="/ingresar" className="sa-usuario-boton" title="Iniciar sesión" aria-label="Iniciar sesión">
+            <i className="bi bi-box-arrow-in-right" aria-hidden="true" /><span className="sa-texto">Iniciar sesión</span>
+          </Link>
+        )}
       </div>
     </aside>
   );

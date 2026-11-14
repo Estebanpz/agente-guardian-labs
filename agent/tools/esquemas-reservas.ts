@@ -42,6 +42,17 @@ export type CarneDoc = z.infer<typeof CarneDoc>;
 export const UsuarioDoc = z.object({ _id: Carne, rol: z.enum(["estudiante", "docente"]), registrado: z.date() });
 export type UsuarioDoc = z.infer<typeof UsuarioDoc>;
 
+// Cuenta de acceso (login). _id = correo sintético en minúsculas. El monitor no tiene carné.
+// hash = "scrypt$<sal>$<clave derivada>" en base64url; la contraseña nunca se guarda.
+export const Rol = z.enum(["estudiante", "docente", "monitor"]);
+export type Rol = z.infer<typeof Rol>;
+export const CuentaDoc = z.object({
+  _id: z.email().toLowerCase(), rol: Rol, carne: Carne.nullable(),
+  nombres: z.string(), apellidos: z.string(),
+  hash: z.string().regex(/^scrypt\$[\w-]{22}\$[\w-]{43}$/),
+});
+export type CuentaDoc = z.infer<typeof CuentaDoc>;
+
 export const SolicitudReserva = z.object({     // lo que el chat junta paso a paso
   carne: Carne.nullable(), fecha: Fecha.nullable(),
   inicio: Hora.nullable(), fin: Hora.nullable(),

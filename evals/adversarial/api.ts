@@ -70,7 +70,8 @@ try {
 
   // A-09: PATCH con estado distinto.
   r = await pedir("PATCH", `/notificaciones/abc`, { estado: "pendiente" });
-  A("A-09", "api/validacion", "PATCH estado:'pendiente'", "400", `${r.status}`, r.status !== 400);
+  // Desde el login por rol (14-11-2026) la autorización va antes que la validación: sin sesión, 401.
+  A("A-09", "api/validacion", "PATCH estado:'pendiente'", "400 o 401", `${r.status}`, r.status !== 400 && r.status !== 401);
 
   // A-10: /reservas/:codigo — ¿expone datos de la reserva ajena?
   r = await pedir("GET", "/reservas/RS-0002");
@@ -80,7 +81,7 @@ try {
 
   // A-11: /reservas/:codigo con id inválido.
   r = await pedir("GET", "/reservas/RS-99999");
-  A("A-11", "api/validacion", "GET /reservas/RS-99999", "400", `${r.status}`, r.status !== 400 && r.status !== 404);
+  A("A-11", "api/validacion", "GET /reservas/RS-99999", "400 o 401", `${r.status}`, ![400, 401, 404].includes(r.status));
 
   // A-12: /disponibilidad expone ocupadas con carné enmascarado y materia.
   r = await pedir("GET", "/disponibilidad?sala=sala-5&fecha=2026-11-10");

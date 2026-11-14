@@ -1,0 +1,149 @@
+
+/* Inicio de sesión por rol (14-11-2026). */
+.gl-ingreso {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  gap: 32px;
+  align-items: center;
+  max-width: 920px;
+  margin: 24px auto;
+}
+
+.gl-ingreso-arte {
+  display: flex;
+  justify-content: center;
+}
+
+.gl-ingreso-form {
+  background: var(--sa-superficie);
+  border: 1px solid var(--sa-borde);
+  border-radius: var(--sa-radio);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+.gl-etiqueta {
+  font-weight: 600;
+  font-size: 14px;
+  margin: 16px 0 6px;
+}
+
+.gl-campo {
+  min-height: 44px;
+  border-color: var(--sa-borde-control);
+  border-radius: 10px;
+}
+
+.gl-clave {
+  position: relative;
+}
+
+.gl-clave .gl-campo {
+  padding-right: 48px;
+}
+
+.gl-ver-clave {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--sa-texto-2);
+}
+
+.gl-error {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #FDECEC;
+  color: var(--sa-error);
+  font-size: 14px;
+}
+
+.gl-entrar {
+  margin-top: 20px;
+  justify-content: center;
+}
+
+.gl-entrar:disabled {
+  opacity: 0.6;
+}
+
+.gl-nota {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--sa-texto-2);
+}
+
+.gl-acceso {
+  max-width: 520px;
+  margin: 48px auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Usuario de la sesión en la barra lateral. */
+.sa-usuario {
+  padding: 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.sa-usuario strong {
+  color: #FFFFFF;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sa-usuario-rol {
+  color: #B9C4E6;
+  text-transform: capitalize;
+}
+
+.sa-usuario-boton {
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(230, 235, 250, 0.35);
+  background: none;
+  color: #E6EBFA;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.sa-usuario-boton:hover {
+  background: var(--sa-lateral-activo);
+  color: #FFFFFF;
+}
+
+.sa-contraida .sa-usuario strong,
+.sa-contraida .sa-usuario-rol {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .gl-ingreso {
+    grid-template-columns: 1fr;
+    margin: 8px auto;
+  }
+
+  .gl-ingreso-arte {
+    display: none;
+  }
+
+  .gl-ingreso-form {
+    padding: 20px;
+  }
+}

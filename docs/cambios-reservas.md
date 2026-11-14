@@ -276,3 +276,19 @@ nuevo el flujo, o los propone el respaldo del modelo con confirmación (7.0.8).
 
 Pendiente: ADV-03, ADV-05 y ADV-06 (identidad y endpoints sin autorización) se resuelven con el inicio de sesión por rol.
 
+## Inicio de sesión por rol: estudiante, docente y monitor (sección 7.0.18, 14-11-2026)
+
+Motivo: el informe adversarial mostró que bastaba escribir un carné para actuar como otra persona (ADV-03) y que la
+API del monitor no tenía autorización (ADV-05, ADV-06). Pedido de Esteban: separar la lógica por rol con un login.
+
+| Cambio | Por qué | Archivos | Prueba |
+|---|---|---|---|
+| Cuentas sintéticas con correo `.test` ligadas a los carnés de la semilla, más un monitor sin carné. Solo se guarda el hash `scrypt` con sal. Colección `cuentas` con su esquema. | Credencial distinta del carné, que es secuencial y público. | `data/semilla.ts`, `agent/tools/esquemas-reservas.ts`, `agent/store/*` | `evals/acceso.ts` |
+| `POST /login`, `POST /logout` y `GET /yo`. Token HMAC-SHA256 de 8 horas con revocación al cerrar sesión; 5 intentos fallidos bloquean el correo 5 minutos; mismo mensaje para correo inexistente y clave errada. Carné vencido (R16) o desconocido (R17, con aviso) no entra; el primer ingreso registra (R26). | Autenticación y defensa básica contra fuerza bruta y enumeración. | `agent/tools/acceso.ts`, `agent/channels/http.ts` | `evals/acceso.ts` (50 comprobaciones) |
+| Rutas del monitor con `exigir("monitor")`: 401 sin sesión y 403 con otro rol. `/disponibilidad`, `/salud` y `/mensaje` siguen públicas. | ADV-05 y ADV-06. | `agent/channels/http.ts` | `evals/acceso.ts`, `evals/api-monitor.ts`, `evals/adversarial/api.ts` |
+| El chat toma la identidad del token (`autenticado`). Sin sesión, solo informa (disponibilidad, ocupación, estado y ayuda) y pide iniciar sesión para reservar, cancelar o registrarse. Con sesión, el carné de otra persona se rechaza y el propio sobra. Al terminar una reserva la sesión sigue. | ADV-03: nadie actúa con un carné que no es el suyo. | `agent/orquestador.ts` (`mensaje`, `modoPublico`) | `evals/acceso.ts`, CA-03, P-06 |
+| Interfaz: página `/ingresar`, sesión en `localStorage` (`guardian.sesion`, se borra al cerrar sesión o si el token vence), Laboratorios y Salas solo para el monitor, usuario y «Cerrar sesión» en la barra lateral, saludo del chat con el nombre de la sesión. | Separar la experiencia por rol. | `web/src/sesion.js`, `web/src/api.js`, `web/src/components/SesionContexto.jsx`, `SoloRol.jsx`, `NavegacionLateral.jsx`, `web/src/pages/Ingresar.jsx`, `Chat.jsx`, `web/src/App.jsx`, `web/src/styles/login.css` | Revisión visual (escritorio y móvil) |
+
+Las pruebas de flujo (`evals/conversacion.ts`) y la consola siguen usando la identidad por carné escrito: `mensaje()` sin
+`autenticado` conserva ese modo. La API siempre envía `autenticado`. Cuentas y contraseñas: `docs/cuentas-de-prueba.md`.
+

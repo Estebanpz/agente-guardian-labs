@@ -1,7 +1,7 @@
 import { MongoClient, ObjectId, type Db, type ClientSession } from "mongodb";
 import { z } from "zod";
 import {
-  CarneDoc, Carne, Conversacion, SesionDoc, DecisionReserva, EquipoDoc, Fecha, NotificacionDoc, ReservaDoc,
+  CarneDoc, Carne, Conversacion, CuentaDoc, SesionDoc, DecisionReserva, EquipoDoc, Fecha, NotificacionDoc, ReservaDoc,
   SalaDoc, SalaId, UsuarioDoc,
 } from "../tools/esquemas-reservas.js";
 import { contarDias, type Repositorio } from "./repositorio.js";
@@ -27,6 +27,7 @@ const PROY_SALA = { _id: 1, nombre: 1, capacidad: 1, computo: 1, activa: 1, fuen
 const PROY_EQUIPO = { _id: 1, sala: 1, inventario: 1, mantenimiento: 1, accesible: 1 };
 const PROY_CARNE = { _id: 1, rol: 1, vigencia: 1, nombres: 1, apellidos: 1, programa: 1, facultad: 1, jornada: 1, espacios: 1 };
 const PROY_USUARIO = { _id: 1, rol: 1, registrado: 1 };
+const PROY_CUENTA = { _id: 1, rol: 1, carne: 1, nombres: 1, apellidos: 1, hash: 1 };
 const PROY_RESERVA = {
   _id: 0, codigo: 1, sala: 1, fecha: 1, inicio: 1, fin: 1, inicio_min: 1, fin_min: 1, tipo: 1,
   carne: 1, rol: 1, jornada: 1, personas: 1, equipos: 1, computo_alto: 1, materia: 1, estado: 1,
@@ -83,6 +84,13 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
       if (!v.success) return null;
       const d = await db.collection("usuarios").findOne(porId(v.data), { projection: PROY_USUARIO });
       return d ? UsuarioDoc.parse(d) : null;
+    },
+
+    async cuenta(correo) {
+      const v = CuentaDoc.shape._id.safeParse(correo.trim());
+      if (!v.success) return null;
+      const d = await db.collection("cuentas").findOne(porId(v.data), { projection: PROY_CUENTA });
+      return d ? CuentaDoc.parse(d) : null;
     },
 
     async registrarUsuario(u) {

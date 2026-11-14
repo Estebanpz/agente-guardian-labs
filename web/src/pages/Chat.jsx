@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router";
 import { api } from "../api.js";
+import { useSesion } from "../sesion.js";
 import TarjetaDecision from "../components/TarjetaDecision.jsx";
 import TarjetaReserva from "../components/TarjetaReserva.jsx";
 import "../styles/chat.css";
 
 // Ejemplos para probar el chat (se muestran plegados en la columna de historial).
 const SUGERENCIAS = [
-  "C-10000001",
-  "D-20000001",
-  "Soy nuevo en el sistema",
   "¿Qué puedes hacer?",
+  "Cancela mi reserva RS-0001",
+  "Quiero reservar un almuerzo",
   "¿Qué disponibilidad hay en la sala 6 mañana?",
   "¿Qué salas están ocupadas el jueves y viernes?",
   "Quiero la sala 1 mañana de 11AM hasta la 1PM",
@@ -48,14 +49,19 @@ const ETIQUETAS = {
   solicitud_reserva: { texto: "Reserva", icono: "bi-calendar-plus" },
   identidad: { texto: "Identidad", icono: "bi-person-badge" },
   saludo: { texto: "Saludo", icono: "bi-person-check" },
+  requiere_login: { texto: "Requiere iniciar sesión", icono: "bi-box-arrow-in-right" },
+  cancelar_reserva: { texto: "Cancelar reserva", icono: "bi-calendar-x" },
 };
 
-// Primer mensaje del agente: la conversación empieza con el carné (plan de identidad, sección 5).
-const mensajeInicial = () => ({
+// Primer mensaje del agente. La identidad viene del inicio de sesión (14-11-2026), no de un carné escrito.
+const puedeReservar = (u) => u?.rol === "estudiante" || u?.rol === "docente";
+const mensajeInicial = (usuario) => ({
   id: "bienvenida",
   de: "agente",
-  r: { intencion: "identidad", respuesta: "¡Hola! Soy Guardian Labs. Para empezar, escríbeme tu carné." },
-  opciones: ["Soy nuevo"],
+  r: puedeReservar(usuario)
+    ? { intencion: "saludo", respuesta: `¡Hola, ${usuario.nombres.split(" ")[0]}! Soy Guardian Labs. Puedo reservar una sala, mostrarte la disponibilidad o cancelar una reserva tuya.` }
+    : { intencion: "ayuda", respuesta: "¡Hola! Soy Guardian Labs. Sin iniciar sesión te informo la disponibilidad, la ocupación y el estado de las salas. Para reservar o cancelar, inicia sesión con tu cuenta de estudiante o docente." },
+  opciones: puedeReservar(usuario) ? ["Reservar una sala", "Ver disponibilidad", "Ayuda"] : ["Ver disponibilidad", "Estado de salas", "Ayuda"],
 });
 
 // Cada carga de la página empieza una sesión nueva: la pantalla arranca vacía, así que el servidor no debe
@@ -102,19 +108,25 @@ function RespuestaAgente({ r, opciones, onElegir, cargando }) {
         <span className="ch-insignia"><i className={`bi ${etiqueta.icono}`} aria-hidden="true" />{etiqueta.texto}</span>
       )}
       <div>{r.respuesta ?? r.explicacion}</div>
+      {r.intencion === "requiere_login" && (
+        <Link to="/ingresar" className="ch-boton ch-boton-primario mt-2 text-decoration-none align-self-start">
+          <i className="bi bi-box-arrow-in-right" aria-hidden="true" />Iniciar sesión
+        </Link>
+      )}
       {opciones.length > 0 && <Chips opciones={opciones} onElegir={onElegir} deshabilitado={cargando} />}
     </div>
   );
 }
 
 export default function Chat() {
-  const [mensajes, setMensajes] = useState(() => [mensajeInicial()]);
+  const { usuario, salir } = useSesion();
+  const navegar = useNavigate();
+  const [mensajes, setMensajes] = useState(() => [mensajeInicial(usuario)]);
   const [texto, setTexto] = useState("");
   const [sesion, setSesion] = useState(nuevaSesion);
   const [flujoActivo, setFlujoActivo] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [espera, setEspera] = useState("");
-  const [identidad, setIdentidad] = useState(null);
   const [inicio, setInicio] = useState(() => new Date());
   const fin = useRef(null);
   const entrada = useRef(null);
@@ -131,6 +143,22 @@ export default function Chat() {
     fin.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes, cargando]);
 
+  // Otra persona inició o cerró sesión: la conversación empieza de nuevo (no se mezcla con la anterior).
+  const correo = usuario?.correo ?? null;
+  const [correoPrevio, setCorreoPrevio] = useState(correo);
+  if (correo !== correoPrevio) {
+    setCorreoPrevio(correo);
+    setSesion(nuevaSesion());
+    setMensajes([mensajeInicial(usuario)]);
+    setFlujoActivo(false);
+    setInicio(new Date());
+  }
+
+  async function cerrarSesion() {
+    await salir();
+    navegar("/ingresar", { replace: true });
+  }
+
   // Las llamadas a la API salen de los manejadores (enviar), no de un efecto.
   async function enviar(t) {
     const limpio = t.trim();
@@ -146,10 +174,9 @@ export default function Chat() {
       const [r] = await Promise.all([api.mensaje(limpio, sesion), new Promise((ok) => setTimeout(ok, 600))]);
       const opciones = r.flujo?.opciones ?? [];
       setFlujoActivo(Boolean(r.flujo?.pendiente) || r.flujo?.tipo === "reserva" || r.flujo?.tipo === "registro");
-      if (r.identidad) setIdentidad(r.identidad);
-      // Sesión cerrada (salir) o olvidada tras una reserva: el saludo vuelve al genérico.
-      if (r.intencion === "cerrar_sesion" || r.sesion_olvidada) setIdentidad(null);
       setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r, opciones }]);
+      // "salir" escrito en el chat cierra también la sesión de la cuenta.
+      if (r.intencion === "cerrar_sesion" && usuario) await cerrarSesion();
     } catch (e) {
       setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r: { error: e.message }, opciones: [] }]);
     } finally {
@@ -160,9 +187,8 @@ export default function Chat() {
 
   function nuevaConversacion() {
     setSesion(nuevaSesion());
-    setMensajes([mensajeInicial()]);
+    setMensajes([mensajeInicial(usuario)]);
     setFlujoActivo(false);
-    setIdentidad(null);
     setInicio(new Date());
     setTexto("");
   }
@@ -171,10 +197,10 @@ export default function Chat() {
   const ultimo = mensajes.length - 1;
   const primeraPregunta = mensajes.find((m) => m.de === "yo")?.texto ?? "Conversación nueva";
 
-  const titulo = identidad ? `Hola, ${nombreVisible(identidad)}. ¿Qué necesitas hoy?` : "Hola. ¿Qué necesitas hoy?";
-  const subtitulo = identidad
-    ? `Carné ${identidad.carne} · ${identidad.programa ?? (identidad.rol === "docente" ? "Docente" : "Estudiante")}`
-    : "Empieza con tu carné (C- o D- y 8 dígitos).";
+  const titulo = usuario ? `Hola, ${nombreVisible(usuario)}. ¿Qué necesitas hoy?` : "Hola. ¿Qué necesitas hoy?";
+  let subtitulo = "Sin sesión: te informo la disponibilidad y el estado de las salas.";
+  if (puedeReservar(usuario)) subtitulo = `Carné ${usuario.carne} · ${usuario.programa ?? "Docente"}`;
+  else if (usuario) subtitulo = "Monitor de salas · en el chat solo consultas; las reservas se gestionan en Salas.";
 
   return (
     <div className="ch-layout">
@@ -202,7 +228,7 @@ export default function Chat() {
         <details className="ch-desplegable">
           <summary>Cómo funciona</summary>
           <ol className="ps-3 mb-0 small text-secondary">
-            <li>Escribe tu carné y te saludo.</li>
+            <li>Inicia sesión y te saludo por tu nombre.</li>
             <li>Bloqueo datos personales (cédula, correo, teléfono).</li>
             <li>Entiendo lo que necesitas.</li>
             <li>Reviso la sala apenas me das fecha y hora.</li>
@@ -212,9 +238,15 @@ export default function Chat() {
           </ol>
         </details>
 
-        <button type="button" className="ch-boton" onClick={() => enviar("salir")} disabled={cargando}>
-          <i className="bi bi-box-arrow-right" aria-hidden="true" />Cerrar sesión
-        </button>
+        {usuario ? (
+          <button type="button" className="ch-boton" onClick={cerrarSesion} disabled={cargando}>
+            <i className="bi bi-box-arrow-right" aria-hidden="true" />Cerrar sesión
+          </button>
+        ) : (
+          <Link to="/ingresar" className="ch-boton text-decoration-none">
+            <i className="bi bi-box-arrow-in-right" aria-hidden="true" />Iniciar sesión
+          </Link>
+        )}
       </aside>
 
       <div className="ch-principal">

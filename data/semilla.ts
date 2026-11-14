@@ -1,6 +1,6 @@
 // Semilla sintética de la base de demostración de reservas (Fase 1).
 // Todos los datos son ficticios. Los equipos de sala-1 a sala-3 vienen de data/equipos.ts.
-import type { CarneDoc, EquipoDoc, ReservaDoc, SalaDoc, UsuarioDoc } from "../agent/tools/esquemas-reservas.js";
+import type { CarneDoc, CuentaDoc, EquipoDoc, ReservaDoc, SalaDoc, UsuarioDoc } from "../agent/tools/esquemas-reservas.js";
 import { equipos } from "./equipos.js";
 import { facultadPorId } from "./programas.js";
 
@@ -95,6 +95,36 @@ export const carnetizacionSemilla: CarneDoc[] = [
   docente("D-20000003", "vigente", "Luis Fernando", "Acosta Beltrán", ECO, ["Sistemas de Información Contable", "Excel Financiero"]),
   docente("D-20000004", "vigente", "Adriana Marcela", "Lozano Ruiz", SOC, ["Estadística Aplicada", "Informática Básica"]),
   docente("D-20000005", "vencido", "Jorge Iván", "Castaño Prieto", ING, ["Electrónica Digital", "Microcontroladores"]),
+];
+
+// Cuentas de acceso sintéticas (login). Solo se guarda el hash scrypt; las contraseñas de prueba están en
+// docs/cuentas-de-prueba.md. Dominio .test: reservado, nunca es un correo real. Nombres desde carnetización.
+const cuenta = (correo: string, rol: CuentaDoc["rol"], carne: string | null, hash: string): CuentaDoc => {
+  const c = carne ? carnetizacionSemilla.find((x) => x._id === carne)! : null;
+  return {
+    _id: correo, rol, carne, hash,
+    nombres: c?.nombres ?? "Sofía", apellidos: c?.apellidos ?? "Martínez Lara",
+  };
+};
+export const cuentasSemilla: CuentaDoc[] = [
+  cuenta("laura.gomez@estudiantes.uniespinal.test", "estudiante", "C-10000001", "scrypt$QPVn5KF_TMiEeW6NeaEqUw$gGgvvDFLzr1V8jvQ6ClbYZmwb367-8O3EdUEf2aJ3vo"),
+  cuenta("juan.torres@estudiantes.uniespinal.test", "estudiante", "C-10000002", "scrypt$v0EwiYszMn22pXnYmn9zuw$2mbtnl-ZSnB_-s2vTN7TLYH9r_exDAB122jglU1cjX4"),
+  cuenta("maria.rincon@estudiantes.uniespinal.test", "estudiante", "C-10000003", "scrypt$aRzdS0Zy-J65DwF2xQsHvw$G3XYE86qOEYYbF7LQzJanQeHf1FkouOiDtka7OFk93s"),
+  cuenta("andres.morales@estudiantes.uniespinal.test", "estudiante", "C-10000004", "scrypt$_u9zLPyQ9hlR0Ymiw1mMPg$bNhccdW2xlnF4j-bWgP2pW4T7riaWxmEQ6lAgb5X2N8"),
+  cuenta("daniela.ortiz@estudiantes.uniespinal.test", "estudiante", "C-10000005", "scrypt$9GDV2l9DKaWZ0W0R7y42sg$nynwIlobA_x1MsQFKTybWKUEwxG-ru3nKF3ZlfHJzcY"),
+  cuenta("santiago.herrera@estudiantes.uniespinal.test", "estudiante", "C-10000006", "scrypt$SJaoLn5xvFr5d2APr_WKNQ$_SwIMf3j_0jcXQuEJywcoAEXVu-QYupBdYWK0V96bOo"),
+  cuenta("valeria.cardenas@estudiantes.uniespinal.test", "estudiante", "C-10000007", "scrypt$k6oZ6tIXRiH7c3vFCak-tA$12WdzwL0OdaD_pAQB6KFKh6pgTQ2q3sZEXd3O8cewOE"),
+  cuenta("sebastian.ramirez@estudiantes.uniespinal.test", "estudiante", "C-10000008", "scrypt$_OlIDO4yINwYKgVRZf2frQ$kUGhgCPWKTdvihWrbJ1YsNhBY-CieYFuoO4qsMxnAGo"),
+  cuenta("natalia.guzman@estudiantes.uniespinal.test", "estudiante", "C-10000009", "scrypt$Xlf-P1VEgdzKBme-70-pfg$RsAx5qvQvpjxKhBPrzFANvZsPyJKM2EvkQp67wfMmaM"),
+  cuenta("miguel.bermudez@estudiantes.uniespinal.test", "estudiante", "C-10000010", "scrypt$tpnoPrL9u5Qa4nh-lwiKUA$xiDdcz68PJcQrwM5XwEROOXDYqefXHFW1mre0GxCPJU"),
+  cuenta("camila.reyes@estudiantes.uniespinal.test", "estudiante", "C-10000011", "scrypt$XT4P_UgemIE27Qml8PstLA$8fBgBSC8Z1XQrbL98euJFTejcy_x-6XjbFYTnjTvJTA"),
+  cuenta("diego.pardo@estudiantes.uniespinal.test", "estudiante", "C-10000012", "scrypt$MkqTe9h8Z9FPNrnGHrlq3w$6d6gt0Upv3rYCgGVygIthS15qW-iARrUbono28kCu58"),
+  cuenta("carlos.medina@docentes.uniespinal.test", "docente", "D-20000001", "scrypt$fKFYufVseOlvyfH4PoJH0Q$F3Y9_Ld2ogJ4gLoEQxd8Ni_1oCROPRLoQC4QLKa1iLk"),
+  cuenta("patricia.soto@docentes.uniespinal.test", "docente", "D-20000002", "scrypt$kPbL2BWSMLWcqc9zF0G8aA$CBVJOB1tZUno-CeiYAWBKI2SgdA2BIfGQ58kWWW2mcs"),
+  cuenta("luis.acosta@docentes.uniespinal.test", "docente", "D-20000003", "scrypt$ms3Pb69NkFGle7E1rsZmsQ$qyAiEi_yjMqAXDreQKptbFNPpCsU5dnuveXRPiLmyMg"),
+  cuenta("adriana.lozano@docentes.uniespinal.test", "docente", "D-20000004", "scrypt$mJ8ZSQlhzgPtALZvkZ6-fg$Vi9udqPgocXWUMtisOzHlrL_bcRH0SW3QJAO5UfDbNU"),
+  cuenta("jorge.castano@docentes.uniespinal.test", "docente", "D-20000005", "scrypt$qP90MyFaJCtg_l2BCu71Bw$nWczfg7-wZvMB53jsozY_anH6T9fyDCMUw7QjNle_8I"),
+  cuenta("monitor.salas@uniespinal.test", "monitor", null, "scrypt$qgMVG-CedTktAqXF9ieuFA$jUZDcV1gVBrR_U6AH1zihM7bW4Fa4YhqrT5RiC3TpKU"),
 ];
 
 // Fecha fija de registro para que la semilla sea idempotente.

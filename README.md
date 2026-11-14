@@ -108,9 +108,28 @@ Tomadas el 9 de noviembre de 2026 con `npm run app`, MongoDB local y datos sint�
 | `npm run e2e` | Pruebas de punta a punta P-06 y P-07 con el modelo |
 | `npm run typecheck` | Verificación de tipos (TypeScript estricto) |
 
+## Inicio de sesión por rol
+
+Desde el 14 de noviembre de 2026 la interfaz tiene **inicio de sesión** (`/ingresar`) con correo y contraseña para tres
+roles. Las cuentas son sintéticas (dominio reservado `.test`) y están en [`docs/cuentas-de-prueba.md`](docs/cuentas-de-prueba.md).
+
+| Rol | Qué puede hacer |
+|---|---|
+| Visitante (sin sesión) | Chat informativo: disponibilidad, ocupación, estado de las salas y ayuda. No reserva ni cancela. |
+| Estudiante | Chat: reservas de grupo y cancelación de sus propias reservas. |
+| Docente | Chat: reservas de clase (espacio académico) y cancelación de sus propias reservas. |
+| Monitor | Vistas Laboratorios y Salas, avisos (marcar como atendidos) y detalle de reservas. En el chat solo consulta. |
+
+- La identidad del chat sale del inicio de sesión: escribir un carné ya no identifica a nadie, y el carné de otra persona se rechaza.
+- Contraseñas guardadas como hash `scrypt` con sal; token firmado con HMAC-SHA256 (8 horas), revocado al cerrar sesión.
+- 5 contraseñas erradas seguidas bloquean el correo 5 minutos. El mismo mensaje para correo inexistente y clave errada.
+- Carné vencido o con vigencia desconocida no inicia sesión (R16, R17 con aviso al monitor); el primer ingreso registra (R26).
+- El navegador guarda la sesión en `localStorage` (`guardian.sesion`), cambia con la persona que entra y se borra al cerrar sesión o si el token vence.
+
 ## Reservas por chat
 
-El chat también gestiona reservas de salas. Toda conversación empieza por el **carné** (C- o D- y 8 dígitos):
+El chat también gestiona reservas de salas. Con la API, la identidad viene del inicio de sesión (sección anterior). Las pruebas de
+flujo y la consola conservan el modo anterior, en que la conversación empieza por el **carné** (C- o D- y 8 dígitos):
 
 1. con un carné vigente, el agente guarda la sesión (30 minutos) y saluda con nombre, programa y jornada;
 2. la persona escribe la sala, la fecha y el horario en lenguaje natural («la sala 8 mañana de 10 a 12», «de 5:30 a 7:30»);
@@ -153,6 +172,7 @@ Las reservas son simuladas sobre datos sintéticos; el prototipo no reserva sala
 | `MODELO_VERCEL` | vacío | Modelo principal del Gateway (comparación) |
 | `MODELOS_RESPALDO` | vacío | Modelos de respaldo del Gateway, separados por coma |
 | `MODELO_TIEMPO_MS` | `120000` | Tiempo máximo de espera de una respuesta del modelo |
+| `SESION_SECRETO` | aleatorio al arrancar | Firma de los tokens de sesión (32+ caracteres). Nunca se sube al repositorio |
 | `PORT` | `3000` | Puerto de la API |
 
 ## Base de datos
@@ -221,24 +241,30 @@ La barra lateral de navegación es la misma en Laboratorios, Chat y Salas. Dise�
 
 ## API
 
-Todas las rutas escuchan solo en `127.0.0.1` (el prototipo no tiene autenticación).
+Todas las rutas escuchan solo en `127.0.0.1`. Las marcadas «monitor» exigen `Authorization: Bearer <token>` de una
+sesión de monitor (401 sin sesión, 403 con otro rol).
 
-| Método y ruta | Cuerpo | Respuesta |
-|---|---|---|
-| `GET /salud` | — | `{ ok, proveedor, repositorio, base }` (sin la URI) |
-| `POST /evaluar` | `{ id_sintetico, laboratorio, franja, tipo_evento }` | `{ decision, explicacion }` |
-| `POST /mensaje` | `{ texto, sesion, laboratorio? }` | Respuesta del chat con la intención, la tarjeta de reserva y la identidad (carné enmascarado) |
-| `GET /salas?fecha=` | — | 16 salas con equipos, equipos en revisión y reservas del día (carné enmascarado) |
-| `GET /salas/laboratorios` | — | Aforo y estado de los equipos de la vista Laboratorios |
-| `GET /disponibilidad` | consulta | Huecos libres por sala y fecha |
-| `GET /reservas`, `GET /reservas/dias?mes=`, `GET /reservas/:codigo` | — | Reservas, días con reservas y detalle de una reserva |
-| `GET /notificaciones` | — | Avisos para el monitor |
-| `PATCH /notificaciones/:id` | `{ estado: "atendida" }` | Marca un aviso como atendido |
+| Método y ruta | Acceso | Cuerpo | Respuesta |
+|---|---|---|---|
+| `POST /login` | público | `{ correo, clave }` | `{ token, usuario }` (carné enmascarado) |
+| `POST /logout` | con sesión | — | Revoca el token |
+| `GET /yo` | con sesión | — | `{ correo, rol, exp }` |
+| `GET /salud` | público | — | `{ ok, proveedor, repositorio, base }` (sin la URI) |
+| `POST /mensaje` | público | `{ texto, sesion, laboratorio? }` | Respuesta del chat. Con token de estudiante o docente, la identidad es la del token; sin token, solo informa |
+| `GET /disponibilidad` | público | consulta | Huecos libres por sala y fecha |
+| `POST /evaluar` | monitor | `{ id_sintetico, laboratorio, franja, tipo_evento }` | `{ decision, explicacion }` |
+| `GET /salas?fecha=` | monitor | — | 16 salas con equipos, equipos en revisión y reservas del día (carné enmascarado) |
+| `GET /salas/laboratorios`, `GET /casos` | monitor | — | Vista Laboratorios |
+| `GET /reservas`, `GET /reservas/dias?mes=`, `GET /reservas/:codigo` | monitor | — | Reservas, días con reservas y detalle de una reserva |
+| `GET /notificaciones` | monitor | — | Avisos para el monitor |
+| `PATCH /notificaciones/:id` | monitor | `{ estado: "atendida" }` | Marca un aviso como atendido |
 
 Ejemplo:
 
 ```sh
-curl -s -X POST localhost:3000/evaluar -H "Content-Type: application/json" \
+TOKEN=$(curl -s -X POST localhost:3000/login -H "Content-Type: application/json" \
+  -d '{"correo":"monitor.salas@uniespinal.test","clave":"Monitor2026!"}' | node -pe 'JSON.parse(require("fs").readFileSync(0)).token')
+curl -s -X POST localhost:3000/evaluar -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{"id_sintetico":"E-002","laboratorio":"sala-1","franja":"08:00–10:00","tipo_evento":"ingreso"}'
 ```
 
@@ -369,7 +395,7 @@ agente-guardian-labs/
 - Los ids, salas y equipos son sintéticos; los nombres reales de las salas dependen de la entrevista con el responsable.
 - El modelo de 3B a veces redacta con imprecisiones; por eso la interfaz siempre muestra la traza.
 - La guardia por patrones se puede evadir; es una primera capa, y el motor decide igual.
-- No hay autenticación: la API escucha solo en `127.0.0.1`.
+- El inicio de sesión es de prueba: contraseñas sintéticas documentadas, revocación de tokens en memoria (se pierde al reiniciar la API) y sin recuperación de contraseña. La API escucha solo en `127.0.0.1`.
 - Por pedido del docente, el chat muestra nombre, programa y jornada de la persona identificada; todos son sintéticos y el carné se olvida al terminar la reserva.
 - La interfaz todavía deja visible en la burbuja y en el historial un dato prohibido que escribe el usuario (el agente sí lo bloquea).
 - La condición del taller pide MySQL local; el prototipo usa MongoDB local.
