@@ -377,3 +377,24 @@ Cuatro fallos vistos en el chat de reservas:
 | Prompt del intérprete: 13 ejemplos guía y 4 782 caracteres (tope 4 800). Conserva las cinco frases informales pedidas («Khe puedes hazer?», «kiero resevar la sla 3 pa mñana d 2 a 4», «q salas ay libres oy», «ya no nesecito la resreva del juebes», «xq no me dejas resevar un almuerso»), la reserva con solo datos («Mañana de 3 a 5 en el laboratorio 4, vamos 12»), las reservas propias («tengo alguna reserva pa mñana?») y el registro («es mi primera vez, quiero registrarme»). | El recorte anterior clasificaba esas frases como consulta de disponibilidad y había perdido la regla de `registro_usuario`. | `agent/llm/interprete.ts` | `evals/prueba-intencion.ts` |
 | El respaldo del modelo ya no se pide cuando el extractor leyó un rango completo (`ext.inicio && ext.fin`). | «de 22:01 hasta las 22:30» hacía una llamada al modelo de ~9 s sin necesidad: el código ya había entendido el rango y solo tenía que rechazarlo. | `agent/conversacion.ts` (`necesitaRespaldo`) | C-65 y prueba manual de la API (respuesta en ~0,1 s) |
 | `MODELO_HILOS` fija los hilos de CPU del modelo local (`num_thread`); si está vacío no se envía y Ollama decide. Se documenta en `.env.example` y el README. | Aprovechar los núcleos físicos y usar el mismo valor en la app y las pruebas: si cambia, Ollama recarga el modelo y se pierde la caché del prompt. | `agent/llm/proveedor.ts` | carga de Ollama con `n_threads = 6` en el registro |
+
+## Reservas propias cuando el modelo no entiende (sección 7.0.22, 14-11-2026)
+
+Motivo: con la sesión de una docente que tiene reservas (Patricia Soto, D-20000002, titular de RS-0003), «Quiero
+cancelar una reserva» respondió «Esa consulta está fuera de mi alcance». El modelo la clasificó como
+`fuera_de_alcance` y el orquestador negó sin mirar si la persona tenía reservas.
+
+El modelo sigue interpretando; el código valida su respuesta con los datos de la persona, igual que `validarElusion`.
+Si el modelo dice `fuera_de_alcance`, el recurso no es «otro», hay una sesión identificada, no es elusión y el
+mensaje habla de reservas (`HABLA_DE_RESERVAS`: reserva/reservas, sus faltas habituales resevas/resrevas/resebas o un
+código RS-0000), se responde con `misReservasTurno` antes de negar y la traza registra
+`validacion: "fuera_de_alcance → mis_reservas"`. Sin sesión, el visitante sigue recibiendo «inicia sesión» y nunca
+la lista.
+
+| Cambio | Por qué | Archivos | Prueba |
+|---|---|---|---|
+| `HABLA_DE_RESERVAS` y, antes del bloque final de `fuera_de_alcance` en `mensajeBase`, la consulta a `misReservasTurno` cuando hay sesión y el mensaje habla de reservas. | La persona identificada ve sus reservas en vez de una negativa. | `agent/orquestador.ts` | C-66, C-67, C-70 |
+| La lista es la general desde hoy: incluye días futuros y las de hoy que ya empezaron, marcadas «(ya empezó)» y sin botón para cancelarlas (R27). | Una reserva de hoy a las 16:40 ya no se puede cancelar a las 17:52, pero debe verse. | `agent/conversacion.ts` (`misReservasTurno`, ya lo hacía) | C-70 |
+| En el modo visitante, la misma condición pide iniciar sesión en vez de negar; nunca se listan reservas ajenas. | El visitante no tiene identidad y no debe ver datos de nadie. | `agent/orquestador.ts` (`modoPublico`) | `evals/acceso.ts` 9b bis |
+| Con `error_modelo` y sesión, «Mis reservas» se agrega a los botones ofrecidos: funciona sin el modelo. | Salida útil cuando el modelo no responde. | `agent/orquestador.ts` | C-53 |
+| El ejemplo «Quiero cancelar una reserva» → `cancelar_reserva` no se agregó al prompt: 4 782 caracteres más ~79 del ejemplo superan el tope de 4 800. El caso queda cubierto por la validación del código y por el ejemplo existente «Cancela mi reserva RS-0042». | No forzar el tamaño del prompt; el respaldo es determinista. | `agent/llm/interprete.ts` (sin cambio) | C-66 |

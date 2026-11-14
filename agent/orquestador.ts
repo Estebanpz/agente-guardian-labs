@@ -31,6 +31,10 @@ const FUERA_GENERAL = "Esa consulta está fuera de mi alcance. Te ayudo con rese
 const CHIPS_BOTONES = { tipo: "sugerencia", pendiente: null, opciones: ["Reservar una sala", "Ver disponibilidad", "Estado de salas"] };
 const normO = (t: string) => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
+// El mensaje habla de reservas propias, aunque el modelo no lo haya entendido (7.0.22): reserva(s), sus faltas
+// habituales o un código RS-0000. «Reservar» no entra: si es otra cosa, lo decide `recurso`.
+const HABLA_DE_RESERVAS = /\breservas?\b|\bresevas?\b|\bresrevas?\b|\bresebas?\b|\brs-?\d{3,4}\b/;
+
 // Respuesta de fuera de alcance. Si el modelo entendió que quiere reservar otra cosa, se nombra lo que pidió
 // (solo con palabras que están en el mensaje).
 function textoFuera(c: Interpretacion, texto: string): string {
@@ -245,6 +249,8 @@ async function modoPublico(texto: string, sesion: string | undefined, repo: Repo
     return { intencion: "error_modelo", respuesta: "No pude interpretar el mensaje porque el modelo no respondió. Intenta de nuevo o usa uno de estos botones.", flujo: CHIPS_PUBLICOS };
   }
   if (c.intencion === "intento_eludir_reglas") return { intencion: c.intencion, respuesta: ALERTA_ELUSION, alerta: ALERTA_ELUSION, flujo: null };
+  // Habla de sus reservas y el modelo no lo entendió: sin sesión se pide iniciar sesión; nunca se listan.
+  if (c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && HABLA_DE_RESERVAS.test(normO(texto))) return requiereLogin();
   if (c.recurso === "otro" || c.intencion === "fuera_de_alcance") return { intencion: "fuera_de_alcance", respuesta: textoFuera(c, texto), flujo: null };
   if (SOLO_CON_SESION.includes(c.intencion)) return requiereLogin();
   if (c.intencion === "consulta_salas" || c.intencion === "consulta_disponibilidad") {
@@ -421,8 +427,10 @@ async function mensajeBase(
   if (c.fallo && !temasDe(texto).length) {
     const respuesta =
       "No pude interpretar el mensaje porque el modelo no respondió. Intenta de nuevo o usa uno de estos botones, que funcionan sin el modelo.";
+    // Con sesión, «Mis reservas» funciona sin el modelo.
+    const flujo = { ...CHIPS_BOTONES, opciones: ["Mis reservas", ...CHIPS_BOTONES.opciones] };
     registrar({ texto: resumen, intencion: "error_modelo", respuesta });
-    return { intencion: "error_modelo", respuesta, flujo: CHIPS_BOTONES };
+    return { intencion: "error_modelo", respuesta, flujo };
   }
 
   if (c.intencion === "consulta_salas" && !eludir) {
@@ -477,6 +485,14 @@ async function mensajeBase(
       registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
       return r;
     }
+  }
+
+  // El modelo no entendió el mensaje, pero la persona identificada habla de sus reservas: antes de negar se miran
+  // las suyas (7.0.22). Solo con sesión; el visitante recibe «inicia sesión» en modoPublico, nunca la lista.
+  if (sesion && !eludir && c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && HABLA_DE_RESERVAS.test(normO(texto))) {
+    const r = await misReservasTurno(sesion, repo);
+    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta, validacion: "fuera_de_alcance → mis_reservas" });
+    return r;
   }
 
   // Preguntas informativas: respuestas armadas con los datos y las reglas, sin modelo.

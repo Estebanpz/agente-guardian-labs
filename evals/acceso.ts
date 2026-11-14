@@ -161,6 +161,23 @@ try {
   r = await chat("Cancelar RS-0002", uuid(10), TC);
   comprobar(/Sí, cancelar RS-0002/.test(JSON.stringify(r.json)), "el botón «Cancelar RS-0002» pide confirmar");
 
+  // 9b bis) El modelo dice fuera_de_alcance, pero la persona habla de reservas: se valida con sus datos (7.0.22).
+  const patricia = await login("patricia.soto@docentes.uniespinal.test", D);
+  const TP = patricia.json.token;
+  const fueraSiempre = async () => ({
+    intencion: "fuera_de_alcance" as const, id_sintetico: null, laboratorio: null, tipo_evento: null,
+    recurso: null, recurso_texto: null,
+  });
+  configurarParaPruebas({ interpretar: fueraSiempre });
+  r = await chat("Quiero cancelar una reserva", uuid(15), TP);
+  comprobar(r.json.intencion === "mis_reservas" && /RS-0003/.test(r.json.respuesta)
+    && r.json.flujo?.opciones?.includes("Cancelar RS-0003") && !/RS-0001|RS-0002/.test(r.json.respuesta),
+    "Patricia: el modelo dice fuera de alcance, pero se listan sus reservas con «Cancelar RS-0003»");
+  r = await chat("Quiero cancelar una reserva", uuid(16));
+  comprobar(r.json.intencion === "requiere_login" && /inicia sesión/.test(r.json.respuesta) && !/RS-0003/.test(r.json.respuesta),
+    "sin sesión: hablar de reservas pide iniciar sesión y no lista ninguna");
+  configurarParaPruebas({ interpretar: modeloSimulado });
+
   // 9c) Hallazgos del fuzzing (14-11-2026): carné con marcas combinadas y «cambiar carné».
   const colgado = (p: Promise<R>) => Promise.race([p, new Promise<R>((ok) => setTimeout(() => ok({ status: 0, json: null }), 5000))]);
   r = await colgado(chat("C\u0301-10000002", uuid(13), TL));

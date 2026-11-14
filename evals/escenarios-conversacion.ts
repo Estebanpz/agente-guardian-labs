@@ -754,6 +754,7 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
         "avisa que el modelo no respondió y ofrece botones; el botón abre la reserva sin el modelo", [
           [salidas[1].intencion === "error_modelo", "avisa el error del modelo"],
           [(salidas[1].flujo?.opciones ?? []).includes("Reservar una sala"), "ofrece botones"],
+          [(salidas[1].flujo?.opciones ?? [])[0] === "Mis reservas", "con sesión ofrece «Mis reservas»"],
           [salidas[2].flujo?.pendiente === "fecha", "el botón abre la reserva"],
         ]));
       configurarParaPruebas({ repo: crearMemoria("2026-11-09"), interpretar: clasificadorFijo });
@@ -896,6 +897,68 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
           [(rFuera.respuesta ?? "").includes("elige un rango dentro de ese horario") && !(rFuera.respuesta ?? "").includes("¿De qué hora a qué hora?"), "no repite la pregunta completa"],
           [pendiente(rFuera) === "horario", "vuelve a pedir el horario"],
         ]));
+    }
+    {
+      // C-66 a C-69 (7.0.22): el modelo no entiende el mensaje y dice fuera_de_alcance, pero el código valida con los
+      // datos de la persona. Si habla de reservas y hay sesión, se listan las suyas antes de negar.
+      fijarReloj("2026-11-09", "08:00");
+      const fueraDeAlcance = async (t: string): Promise<Interpretacion & { fallo?: string }> => {
+        const otro = /almuerzo/i.test(t);
+        return {
+          intencion: "fuera_de_alcance", id_sintetico: null, laboratorio: null, tipo_evento: null,
+          recurso: otro ? "otro" : null, recurso_texto: otro ? "un almuerzo" : null,
+        };
+      };
+      const repo66 = crearMemoria("2026-11-09");
+      configurarParaPruebas({ repo: repo66, interpretar: fueraDeAlcance });
+      const sid66 = "abcdef66-aaaa-4aaa-8aaa-aaaaaaaaaa66";
+      await mensaje("D-20000002", { sesion: sid66 });
+      const r66 = await mensaje("Quiero cancelar una reserva", { sesion: sid66 }) as Salida;
+      filas.push(fila("C-66", "Reservas propias cuando el modelo no entiende",
+        "D-20000002 → Quiero cancelar una reserva (modelo: fuera_de_alcance)",
+        "lista solo RS-0003, con el botón Cancelar RS-0003, en vez de negar", [
+          [r66.intencion === "mis_reservas", "responde como mis_reservas"],
+          [/RS-0003/.test(r66.respuesta ?? "") && !/RS-0001|RS-0002/.test(r66.respuesta ?? ""), "solo muestra la reserva de Patricia"],
+          [Boolean(r66.flujo?.opciones.includes("Cancelar RS-0003")), "ofrece «Cancelar RS-0003»"],
+          [!(r66.respuesta ?? "").includes("fuera de mi alcance"), "no niega la consulta"],
+        ]));
+
+      const sid67 = "abcdef67-aaaa-4aaa-8aaa-aaaaaaaaaa67";
+      await mensaje("C-10000001", { sesion: sid67 });
+      const r67 = await mensaje("tengo reservas hechas?", { sesion: sid67 }) as Salida;
+      filas.push(fila("C-67", "Sin reservas cuando el modelo no entiende",
+        "C-10000001 → tengo reservas hechas? (modelo: fuera_de_alcance)",
+        "dice que no tiene reservas desde hoy y ofrece reservar una sala", [
+          [r67.intencion === "mis_reservas", "responde como mis_reservas"],
+          [(r67.respuesta ?? "").startsWith("No tienes reservas programadas desde hoy"), "lo dice con el texto del vacío"],
+          [Boolean(r67.flujo?.opciones.includes("Reservar una sala")), "ofrece «Reservar una sala»"],
+        ]));
+
+      const r68 = await mensaje("¿Cuál es mi nota de programación?", { sesion: sid66 }) as Salida;
+      filas.push(fila("C-68", "Fuera de alcance real sigue fuera", "D-20000002 → ¿Cuál es mi nota de programación?",
+        "sigue siendo fuera de alcance, sin listar reservas", [
+          [r68.intencion === "fuera_de_alcance", "fuera de alcance"],
+          [!(r68.respuesta ?? "").includes("RS-"), "no lista reservas"],
+        ]));
+
+      const r69 = await mensaje("Quiero reservar un almuerzo", { sesion: sid66 }) as Salida;
+      filas.push(fila("C-69", "Otra cosa que reservar no lista reservas", "D-20000002 → Quiero reservar un almuerzo",
+        "niega la reserva del almuerzo (recurso otro) sin listar reservas", [
+          [r69.intencion === "fuera_de_alcance", "fuera de alcance"],
+          [(r69.respuesta ?? "").startsWith("No puedo reservar un almuerzo"), "nombra lo que no puede reservar"],
+          [!(r69.respuesta ?? "").includes("RS-"), "no lista reservas"],
+        ]));
+
+      // C-70 (7.0.22): una reserva de hoy que ya empezó se muestra, pero no se puede cancelar.
+      fijarReloj("2026-11-10", "17:52");
+      const r70 = await mensaje("Quiero cancelar una reserva", { sesion: sid66 }) as Salida;
+      filas.push(fila("C-70", "Reserva de hoy ya empezada", "D-20000002 → Quiero cancelar una reserva (17:52; RS-0003 fue 10:00-12:00)",
+        "muestra RS-0003 con «(ya empezó)» y sin botón para cancelarla", [
+          [r70.intencion === "mis_reservas" && /RS-0003/.test(r70.respuesta ?? ""), "lista RS-0003"],
+          [(r70.respuesta ?? "").includes("(ya empezó)"), "avisa que ya empezó"],
+          [!r70.flujo?.opciones.includes("Cancelar RS-0003"), "no ofrece cancelarla"],
+        ]));
+      configurarParaPruebas({ repo: crearMemoria("2026-11-09"), interpretar: clasificadorFijo });
     }
   } finally {
     liberarReloj();
