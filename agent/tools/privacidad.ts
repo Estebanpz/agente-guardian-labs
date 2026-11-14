@@ -48,3 +48,6 @@ export function datosProhibidos(texto: string): string[] {
 // Sin \b al inicio: "soyC-10000002" también se enmascara (propiedades, 14-11-2026).
 export const enmascararCarnes = (texto: string): string =>
   texto.replace(/(?<!\d)([CD])-?\d{4}(\d{4})(?!\d)/gi, "$1-****$2");
+
+// Solo para pruebas (mutación): cada patrón se prueba por separado, porque varios se cubren entre sí.
+export const internos = { PATRONES, sinFechas, compacto, CARNE };

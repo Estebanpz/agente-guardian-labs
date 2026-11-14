@@ -111,6 +111,9 @@ function podar(ahoraMs: number): void {
   }
 }
 export const intentosRegistrados = () => fallos.size;
+// Solo para pruebas (mutación): estado de un correo y tamaño de la lista de tokens revocados.
+export const intentoDe = (correo: string) => fallos.get(correo) ?? null;
+export const revocadosRegistrados = () => revocados.size;
 
 // ── Inicio de sesión ──────────────────────────────────────────────────────
 export type Usuario = {
