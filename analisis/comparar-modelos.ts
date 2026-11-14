@@ -6,7 +6,7 @@
 // Cada ejecución guarda docs/contenidos/modelos/<proveedor>.json y regenera docs/contenidos/comparacion-modelos.md
 // con todas las ejecuciones guardadas.
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { interpretar, rutaRapida } from "../agent/llm/interprete.js";
+import { interpretar, rutaDeBoton } from "../agent/llm/interprete.js";
 import { esIntentoDeElusion } from "../agent/llm/guardia.js";
 import { redactar } from "../agent/llm/redactor.js";
 import { proveedorActivo } from "../agent/llm/proveedor.js";
@@ -61,7 +61,7 @@ async function correr(): Promise<Corrida | null> {
     }
     const modelo = r.fallo ? "(sin respuesta)" : r.intencion;
     // Mismo orden que agent/orquestador.ts: guardia → rutas rápidas → modelo.
-    const agente = esIntentoDeElusion(d.texto) ? "intento_eludir_reglas" : (rutaRapida(d.texto) ?? modelo);
+    const agente = esIntentoDeElusion(d.texto) ? "intento_eludir_reglas" : (rutaDeBoton(d.texto) ?? modelo);
     predicciones.push({ id: d.id, texto: d.texto, real: d.intencion, modelo, agente, ms });
     process.stdout.write(`${modelo === d.intencion ? "✅" : "❌"} ${d.id} ${modelo} (${ms} ms)\n`);
     await esperar(PAUSA);

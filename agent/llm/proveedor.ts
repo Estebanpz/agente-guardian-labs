@@ -9,7 +9,16 @@ const PROVEEDOR = process.env.PROVEEDOR ?? "ollama";
 const MODELO_OLLAMA = process.env.MODELO_OLLAMA ?? "llama3.2:3b";
 const MODELO_VERCEL = process.env.MODELO_VERCEL ?? "";
 const RESPALDO = (process.env.MODELOS_RESPALDO ?? "").split(",").map((m) => m.trim()).filter(Boolean);
-const ollama = new Ollama({ host: "http://127.0.0.1:11434" });
+// Tiempo máximo de una respuesta del modelo. Ahora el modelo interpreta todos los mensajes del chat, así que se
+// espera más que antes; con un modelo local en CPU una respuesta puede tardar decenas de segundos.
+export const TIEMPO_MODELO_MS = Number(process.env.MODELO_TIEMPO_MS ?? 120_000);
+const conLimite: typeof fetch = (input, init) => fetch(input, {
+  ...init,
+  signal: init?.signal
+    ? AbortSignal.any([init.signal, AbortSignal.timeout(TIEMPO_MODELO_MS)])
+    : AbortSignal.timeout(TIEMPO_MODELO_MS),
+});
+const ollama = new Ollama({ host: "http://127.0.0.1:11434", fetch: conLimite });
 
 export const proveedorActivo = () =>
   PROVEEDOR === "vercel" ? `vercel:${MODELO_VERCEL}` : `ollama:${MODELO_OLLAMA}`;
@@ -19,7 +28,7 @@ export async function chat(mensajes: Mensaje[], schema?: object): Promise<string
   if (PROVEEDOR === "vercel") {
     const key = process.env.AI_GATEWAY_API_KEY;
     if (!key || !MODELO_VERCEL) throw new Error("Falta AI_GATEWAY_API_KEY o MODELO_VERCEL en .env");
-    const res = await fetch("https://ai-gateway.vercel.sh/v1/chat/completions", {
+    const res = await conLimite("https://ai-gateway.vercel.sh/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({

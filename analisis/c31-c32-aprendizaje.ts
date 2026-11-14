@@ -3,7 +3,7 @@
 // entrenado con frases etiquetadas, separando ajuste y prueba. Con --llm agrega el modelo local.
 import { readFileSync } from "node:fs";
 import { esIntentoDeElusion } from "../agent/llm/guardia.js";
-import { rutaRapida, interpretar } from "../agent/llm/interprete.js";
+import { rutaDeBoton, interpretar } from "../agent/llm/interprete.js";
 import { temasDe } from "../agent/tools/ayuda.js";
 import { pct, tabla, type Seccion } from "./comun.js";
 
@@ -29,7 +29,7 @@ export function leerCsv(ruta: URL): Fila[] {
 // Línea base: la capa determinista que el agente ya tiene, sin modelo.
 export function lineaBase(texto: string): string {
   if (esIntentoDeElusion(texto)) return "intento_eludir_reglas";
-  const r = rutaRapida(texto);
+  const r = rutaDeBoton(texto);
   if (r) return r;
   if (/\bE-\d{3}\b/i.test(texto)) return "consulta_ingreso";
   const temas = temasDe(texto);
@@ -97,7 +97,7 @@ export async function c31c32(conModelo = false): Promise<Seccion> {
       p.llm = r.fallo ? "(sin modelo)" : r.intencion;
       // Mismo orden que agent/orquestador.ts: guardia → rutas rápidas → modelo.
       // (Los temas de ayuda y el id E-000 se usan después, no antes del modelo.)
-      p.agente = esIntentoDeElusion(p.texto) ? "intento_eludir_reglas" : (rutaRapida(p.texto) ?? p.llm);
+      p.agente = esIntentoDeElusion(p.texto) ? "intento_eludir_reglas" : (rutaDeBoton(p.texto) ?? p.llm);
     }
   }
   const exact = (k: "base" | "nb" | "llm" | "agente") => pred.filter((p) => p[k] === p.intencion).length / pred.length;

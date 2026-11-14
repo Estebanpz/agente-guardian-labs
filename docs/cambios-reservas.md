@@ -208,3 +208,23 @@ hasta las 3 de la tarde». Respuesta: «¿Cuántos computadores necesita?» con 
 Ya no aparece «La reserva dura más de 4 horas».
 
 RS-04b (21:00–22:30) sigue negado: termina después de las 22:00.
+
+## El modelo interpreta todo el texto libre (sección 7.0.13, 13-11-2026)
+
+Motivo: «Quiero reservar un almuerzo» abría una reserva de sala. Una lista de palabras clave (`rutaRapida`) decidía la
+intención antes del modelo: cualquier «reservar», «separar», «apartar», «agendar» o «programar» iba al flujo de salas.
+El agente respondía con un diccionario en lugar de interpretar. Las pruebas solo tenían frases del dominio.
+
+**Principio:** el modelo interpreta, el código valida y el motor decide.
+
+| cambio | motivo | archivo | prueba |
+|---|---|---|---|
+| Sale `rutaRapida`. Solo los botones de la interfaz (texto fijo: «Quiero reservar una sala», «Ver disponibilidad», «Soy nuevo», «Estado de salas») se atienden sin modelo (`rutaDeBoton`). Todo texto libre lo interpreta el modelo. Siguen sin modelo, por seguridad, los datos prohibidos y la guardia. | Que el agente piense qué se pide. | `agent/llm/interprete.ts`, `agent/orquestador.ts` | C-49 a C-53 |
+| La interpretación trae `recurso` («sala», «otro» o null) y `recurso_texto` (las palabras que nombran lo que quiere reservar). El prompt dice qué hace el asistente y que reservar otra cosa es fuera de alcance; ejemplos guía nuevos (almuerzo, cancha, «necesito reservar» a secas, frase sin verbo, horas libres). | Distinguir una sala de un almuerzo. | `agent/llm/interprete.ts` | `evals/prueba-intencion.ts` (con Ollama) |
+| `recurso` «otro»: «No puedo reservar un almuerzo: solo reservo salas de los laboratorios de sistemas. ¿Necesitas una sala?» con el chip «Reservar una sala». `recurso_texto` solo se repite si sus palabras están en el mensaje. | Responder lo que se pidió sin repetir lo que el modelo invente. | `agent/orquestador.ts` (`textoFuera`, `recursoVerificado`) | C-49, C-50 |
+| «Quiero reservar» sin decir qué ni traer datos de una sala: «¿Qué quieres reservar? Solo reservo salas de los laboratorios de sistemas.» | No suponer. | `agent/orquestador.ts` (`traeDatosDeSala`) | C-51 |
+| Dentro de una reserva, un mensaje de 3 palabras o más, sin números y sin ningún dato para la pregunta pendiente, lo interpreta el modelo. Si está fuera de alcance se responde y se retoma la pregunta («Sigamos con tu solicitud»). | Que un desvío no se tome como dato de la reserva. | `agent/orquestador.ts` (`desvioDelFlujo`) | C-52 |
+| Las preguntas por fecha («¿qué salas están ocupadas el jueves?») se responden después de que el modelo dice que es una consulta, ya no antes. | La fecha sola no define la intención. | `agent/orquestador.ts` | C-14 a C-16 |
+| Modelo sin respuesta: aviso y botones («Reservar una sala», «Ver disponibilidad», «Estado de salas»), que funcionan sin el modelo. | No dejar a la persona sin salida. | `agent/orquestador.ts` | C-53 |
+| Tiempo de espera del modelo configurable: `MODELO_TIEMPO_MS` (120 000 ms por defecto) para Ollama y el Gateway. La interfaz avisa a los 8 s que sigue pensando. | Cada mensaje pasa por el modelo; con CPU puede tardar decenas de segundos. | `agent/llm/proveedor.ts`, `.env.example`, `web/src/pages/Chat.jsx` | revisión manual |
+| Pruebas del flujo con un **modelo simulado** (`evals/modelo-simulado.ts`) para que sigan siendo deterministas; la calidad del modelo real se mide en `evals/prueba-intencion.ts` con 6 frases nuevas (4 reservas que no son salas y 2 reservas de sala). C-05, C-06, C-13 y C-22 empiezan ahora con el botón «Quiero reservar una sala». | Separar el flujo (determinista) de la interpretación (modelo). | `evals/modelo-simulado.ts`, `evals/escenarios-conversacion.ts`, `evals/prueba-intencion.ts` | `npm run pruebas`, `npm run matriz` |

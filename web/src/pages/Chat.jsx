@@ -139,6 +139,8 @@ export default function Chat() {
     setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "yo", texto: limpio }]);
     setCargando(true);
     setEspera(textoEspera(limpio));
+    // El modelo local interpreta cada mensaje: si tarda, se avisa que sigue trabajando.
+    const aviso = setTimeout(() => setEspera("Sigo pensando tu mensaje; con el modelo local puede tardar hasta un minuto…"), 8000);
     try {
       // El indicador de espera se ve al menos 600 ms, aunque la respuesta llegue antes.
       const [r] = await Promise.all([api.mensaje(limpio, sesion), new Promise((ok) => setTimeout(ok, 600))]);
@@ -151,6 +153,7 @@ export default function Chat() {
     } catch (e) {
       setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r: { error: e.message }, opciones: [] }]);
     } finally {
+      clearTimeout(aviso);
       setCargando(false);
     }
   }

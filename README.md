@@ -151,6 +151,7 @@ Las reservas son simuladas sobre datos sintéticos; el prototipo no reserva sala
 | `AI_GATEWAY_API_KEY` | vacío | Solo si `PROVEEDOR=vercel`. Nunca se sube al repositorio |
 | `MODELO_VERCEL` | vacío | Modelo principal del Gateway (comparación) |
 | `MODELOS_RESPALDO` | vacío | Modelos de respaldo del Gateway, separados por coma |
+| `MODELO_TIEMPO_MS` | `120000` | Tiempo máximo de espera de una respuesta del modelo |
 | `PORT` | `3000` | Puerto de la API |
 
 ## Base de datos
@@ -264,7 +265,7 @@ Una entrada que no cumple el esquema devuelve `400` con el detalle de los campos
 0. **Identidad:** sin carné en la sesión, el agente lo pide antes de atender; con un carné vigente saluda con una plantilla y recuerda la sesión 30 minutos.
 1. **Datos prohibidos:** si el texto trae cédula, correo o teléfono, se rechaza sin llamar al modelo y sin guardar el texto.
 2. **Guardia:** patrones de manipulación ("ignora las reglas", "tu prompt"…) se marcan sin consultar al modelo.
-3. **Interpretación:** el modelo devuelve JSON estructurado con la intención y los datos candidatos.
+3. **Interpretación:** el modelo lee **todo** texto libre y devuelve JSON con la intención, qué se quiere reservar (`recurso`: sala u otra cosa) y los datos candidatos. Solo los botones de la interfaz se atienden sin modelo. «Quiero reservar un almuerzo» queda fuera de alcance.
 4. **Verificación:** el orquestador contrasta los datos con el texto; lo que el modelo no pueda respaldar se descarta. Si falta el id o la sala, el agente pide aclaración.
 5. **Decisión:** el motor aplica las reglas y devuelve un resultado estructurado con traza.
 6. **Explicación:** el modelo redacta la explicación sin cambiar la decisión.
