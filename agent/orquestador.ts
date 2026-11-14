@@ -14,7 +14,7 @@ import { salas } from "../data/salas.js";
 import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
 import { cancelacionTurno, continuar, misReservasTurno, esBotonCancelacion, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
 import { CHIPS_SALUDO, PEDIR_CARNE, esSalida, esSaludo, saludoPara } from "./sesion.js";
-import { carne as carneDe, extraer, salaInexistente } from "./tools/extraer.js";
+import { carne as carneDe, carnesEn, extraer, salaInexistente, sinCarnes } from "./tools/extraer.js";
 import { enmascarar } from "./tools/reservas.js";
 import { ahora } from "./tools/reloj.js";
 
@@ -168,8 +168,10 @@ async function identificar(carneTxt: string, texto: string, sesion: string | und
   }
   const pendiente = sesion ? ((await repo.leerSesion(sesion))?.pendiente_texto ?? null) : null;
   // Lo que queda del mensaje sin el carné: si es una petición, se continúa en este mismo turno.
-  const resto = texto.replace(/\b[CD]-?\d{8}\b/gi, " ").replace(/\s+/g, " ").trim();
-  const peticion = resto.length > 4 && !esSaludo(resto) && rutaDeBoton(resto) !== "registro_usuario" ? resto : pendiente;
+  const resto = sinCarnes(texto);
+  // Sin recursión infinita: si el resto aún trae un carné (forma rara), no se reenvía (hallazgo de fuzzing).
+  const pedido = resto.length > 4 && !esSaludo(resto) && rutaDeBoton(resto) !== "registro_usuario" ? resto : pendiente;
+  const peticion = pedido && !carnesEn(pedido).length ? pedido : null;
   if (sesion) await repo.guardarSesion({ _id: sesion, carne: carneTxt, actualizado: new Date(), pendiente_texto: null });
   const saludo = saludoPara(doc, ahora().minutos);
   const identidad = {
@@ -215,7 +217,6 @@ const requiereLogin = (antes = ""): RespuestaChat =>
 const SALUDO_PUBLICO = "¡Hola! Soy Guardian Labs. Sin iniciar sesión te informo la disponibilidad, la ocupación y el estado de las salas. " + INICIA_SESION;
 const CHIPS_PUBLICOS = { tipo: "sugerencia", pendiente: null, opciones: ["Ver disponibilidad", "Estado de salas", "Ayuda"] };
 const CIERRE_CON_SESION = "Tu reserva quedó registrada. ¿Necesitas algo más?";
-const CARNES = /\b[CD]-?\d{8}\b/gi;
 const SOLO_CON_SESION = ["solicitud_reserva", "cancelar_reserva", "mis_reservas", "registro_usuario"];
 
 // Visitante: solo informa. Nunca abre una reserva, un registro ni una cancelación.
@@ -279,13 +280,17 @@ export async function mensaje(texto: string, contexto: Contexto = {}) {
   // Con sesión: la identidad es la del token. Un carné ajeno no se atiende (ADV-03); el propio sobra.
   const propio = contexto.autenticado;
   if (!sesion) return { intencion: "identidad", respuesta: "Falta la sesión del chat.", flujo: null };
-  const escritos = [...texto.matchAll(CARNES)].map((m) => carneDe(m[0])!);
+  const escritos = carnesEn(texto);
   if (escritos.some((c) => c !== propio)) {
     const respuesta = "Tu identidad viene de tu inicio de sesión: no atiendo solicitudes con el carné de otra persona.";
     registrar({ texto: "[carné ajeno]", intencion: "identidad", respuesta });
     return { intencion: "identidad", respuesta, flujo: null };
   }
-  const limpio = texto.replace(CARNES, " ").replace(/\s+/g, " ").trim();
+  const limpio = sinCarnes(texto);
+  // Defensa: si aún se lee un carné (una forma que sinCarnes no quitó), no se sigue con ese texto.
+  if (carnesEn(limpio).length) {
+    return { intencion: "identidad", respuesta: "Ya te identifiqué con tu sesión: escribe tu mensaje sin el carné.", flujo: null };
+  }
   const doc = await repo.leerSesion(sesion);
   if (doc?.carne !== propio) {
     // Otra persona en esta sesión del navegador: se cierra la conversación que haya quedado abierta.
@@ -335,7 +340,7 @@ async function mensajeBase(
   // Un carné solo (o "Soy C-…") con la sesión ya identificada: se vuelve a identificar y saludar, y se cierra
   // la conversación abierta. Pasa al recargar la página o al cambiar de persona (7.0.9).
   const carneNuevo = carneDe(texto);
-  if (carneNuevo && sesion && texto.replace(/\b[CD]-?\d{8}\b/gi, " ").replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(Boolean).length <= 2) {
+  if (carneNuevo && sesion && sinCarnes(texto).replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(Boolean).length <= 2) {
     await repo.borrarConversacion(sesion);
     const r = await identificar(carneNuevo, texto, sesion, repo);
     registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });

@@ -1,7 +1,8 @@
 // Inicio de sesión por rol (estudiante, docente, monitor). Mitiga ADV-03, ADV-05 y ADV-06: la identidad ya no
 // sale de un carné escrito en el chat, sino de una cuenta con contraseña, y la API del monitor exige su rol.
 // Sin dependencias nuevas: scrypt y HMAC de node:crypto.
-import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomUUID, scrypt, scryptSync, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 import { Carne, Rol, type CuentaDoc } from "./esquemas-reservas.js";
 import { enmascarar } from "./reservas.js";
 import type { Repositorio } from "../store/repositorio.js";
@@ -19,6 +20,16 @@ export function verificarClave(clave: string, hash: string): boolean {
   const [, sal, esperado] = hash.split("$");
   if (!sal || !esperado) return false;
   const calculado = scryptSync(clave, Buffer.from(sal, "base64url"), LARGO, PARAMS);
+  const e = Buffer.from(esperado, "base64url");
+  return e.length === calculado.length && timingSafeEqual(e, calculado);
+}
+
+// Versión asíncrona para el login: scrypt corre en el pool de libuv y no bloquea el hilo principal (fuzzing).
+const scryptAsync = promisify(scrypt) as (clave: string, sal: Buffer, largo: number, opciones: typeof PARAMS) => Promise<Buffer>;
+export async function verificarClaveAsync(clave: string, hash: string): Promise<boolean> {
+  const [, sal, esperado] = hash.split("$");
+  if (!sal || !esperado) return false;
+  const calculado = await scryptAsync(clave, Buffer.from(sal, "base64url"), LARGO, PARAMS);
   const e = Buffer.from(esperado, "base64url");
   return e.length === calculado.length && timingSafeEqual(e, calculado);
 }
@@ -82,6 +93,17 @@ const MAX_FALLOS = 5;
 const BLOQUEO_MS = 5 * 60 * 1000;
 const fallos = new Map<string, { n: number; hasta: number }>();
 export const reiniciarIntentos = () => fallos.clear();
+// El mapa no crece sin límite (fuzzing): se limpian los bloqueos vencidos y, pasado el tope, las entradas más viejas.
+const MAX_ENTRADAS = 10_000;
+function podar(ahoraMs: number): void {
+  if (fallos.size < MAX_ENTRADAS) return;
+  for (const [c, f] of fallos) if (f.hasta !== 0 && f.hasta <= ahoraMs) fallos.delete(c);
+  for (const c of fallos.keys()) {
+    if (fallos.size < MAX_ENTRADAS * 0.9) break;
+    fallos.delete(c);
+  }
+}
+export const intentosRegistrados = () => fallos.size;
 
 // ── Inicio de sesión ──────────────────────────────────────────────────────
 export type Usuario = {
@@ -95,14 +117,16 @@ export type ResultadoLogin =
 const INCORRECTO = "Correo o contraseña incorrectos.";
 
 export async function iniciarSesion(correoTxt: string, claveTxt: string, repo: Repositorio, ahoraMs = Date.now()): Promise<ResultadoLogin> {
-  const correo = correoTxt.trim().toLowerCase();
+  // NFKC: formas Unicode equivalentes del mismo correo cuentan como el mismo correo para el bloqueo.
+  const correo = correoTxt.normalize("NFKC").trim().toLowerCase();
   const f = fallos.get(correo);
   if (f && f.hasta > ahoraMs) {
     return { ok: false, status: 429, error: "Demasiados intentos fallidos. Espera 5 minutos e intenta de nuevo." };
   }
   const cuenta = await repo.cuenta(correo);
-  const valida = verificarClave(claveTxt, cuenta?.hash ?? HASH_FICTICIO) && cuenta !== null;
+  const valida = (await verificarClaveAsync(claveTxt, cuenta?.hash ?? HASH_FICTICIO)) && cuenta !== null;
   if (!valida || !cuenta) {
+    podar(ahoraMs);
     // Un bloqueo ya vencido empieza la cuenta de cero.
     const n = (f && f.hasta === 0 ? f.n : 0) + 1;
     fallos.set(correo, n >= MAX_FALLOS ? { n: 0, hasta: ahoraMs + BLOQUEO_MS } : { n, hasta: 0 });

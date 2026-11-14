@@ -33,6 +33,20 @@ const existe = (f: string): boolean => {
 const valida = (h: Hallazgo<string> | null): Hallazgo<string> | null => (h && existe(h.valor) ? h : null);
 
 // ── Carné ────────────────────────────────────────────────────────────────
+// Todos los carnés del texto, con la MISMA normalización que carne() (sin tildes ni marcas combinadas):
+// «Ć-10000002» o «Ç-10000002» también cuentan. Lo usan el orquestador y la privacidad (hallazgo de fuzzing, 14-11-2026).
+export function carnesEn(t: string): string[] {
+  return [...norm(t).matchAll(/\b([cd])-?(\d{8})\b/g)].map((m) => `${m[1].toUpperCase()}-${m[2]}`);
+}
+
+// Quita los carnés del texto aunque traigan marcas combinadas o letras con tilde (C, Ç, Ć, Č…). Se trabaja sobre la
+// forma NFD (letra base + marcas) y se vuelve a NFC: el resto del mensaje conserva sus tildes.
+export function sinCarnes(t: string): string {
+  return t.normalize("NFD")
+    .replace(/(?<![\p{L}\p{N}])[CDcd]\p{M}*\s*-?\s*\p{M}*\d{8}(?!\d)/gu, " ")
+    .normalize("NFC").replace(/\s+/g, " ").trim();
+}
+
 export function carne(t: string): string | null {
   const m = norm(t).match(/\b([cd])-?(\d{8})\b/);
   return m ? `${m[1].toUpperCase()}-${m[2]}` : null;

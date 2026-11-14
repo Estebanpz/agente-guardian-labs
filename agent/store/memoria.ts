@@ -21,6 +21,14 @@ export function crearMemoria(hoy: string): Repositorio {
   const conversaciones = new Map<string, Conversacion>();
   const sesiones = new Map<string, SesionDoc>();
   let ultimo = 3; // las tres reservas de la semilla son RS-0001 … RS-0003
+  // Igual que el TTL de Mongo (1800 s sobre `actualizado`): sin esto, sesiones y conversaciones crecen sin límite
+  // cuando la app usa la memoria como respaldo (hallazgo de fuzzing, 14-11-2026). Se poda al escribir.
+  const TTL_MS = 1800 * 1000;
+  const podar = <T extends { actualizado: Date }>(m: Map<string, T>) => {
+    if (m.size < 1000) return;
+    const limite = Date.now() - TTL_MS;
+    for (const [k, v] of m) if (v.actualizado.getTime() < limite) m.delete(k);
+  };
 
   const siguienteCodigo = () => `RS-${String(++ultimo).padStart(4, "0")}`;
 
@@ -125,6 +133,7 @@ export function crearMemoria(hoy: string): Repositorio {
     },
 
     async guardarConversacion(c) {
+      podar(conversaciones);
       conversaciones.set(c._id, c);
     },
 
@@ -137,6 +146,7 @@ export function crearMemoria(hoy: string): Repositorio {
     },
 
     async guardarSesion(s) {
+      podar(sesiones);
       sesiones.set(s._id, s);
     },
 

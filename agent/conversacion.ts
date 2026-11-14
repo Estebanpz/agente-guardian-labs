@@ -687,6 +687,13 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   if (usar) conv.ofrecer = null;
 
   const ext = extraer(texto, { hoy: h.fecha, pendiente: conv.pendiente });
+  // El carné de la reserva es siempre el de la sesión (inicio de sesión o carné identificado): ni «cambiar carné»
+  // ni un carné escrito lo reemplazan (hallazgo de fuzzing, 14-11-2026: reservar a nombre de otra persona).
+  const deSesion = (await repo.leerSesion(conv._id))?.carne ?? null;
+  if (deSesion) {
+    conv.datos.carne = deSesion;
+    ext.carne = null;
+  }
   // Docente: la materia se elige entre sus espacios académicos (plan de identidad, sección 4.5).
   const carneSesion = conv.datos.carne ? await repo.carne(conv.datos.carne) : null;
   const espacios = carneSesion?.rol === "docente" ? carneSesion.espacios : [];

@@ -300,3 +300,13 @@ Motivo: para cancelar había que saber el código RS de memoria; el botón «Mis
 |---|---|---|---|
 | Intención nueva `mis_reservas` (el modelo la reconoce: «quiero ver mis reservas», «qué reservas tengo») y botón «Mis reservas» (texto fijo, sin modelo). Lista las reservas programadas del carné de la sesión desde hoy, marca las que ya empezaron y ofrece «Cancelar RS-…» para las que aún se pueden cancelar (R27). Sin sesión pide iniciar sesión. | Ver y cancelar las reservas propias sin recordar el código. | `agent/llm/interprete.ts`, `agent/conversacion.ts` (`misReservasTurno`), `agent/orquestador.ts`, `web/src/pages/Chat.jsx` | `evals/acceso.ts` (4 comprobaciones), `evals/prueba-intencion.ts` (2 frases, con Ollama) |
 
+## Correcciones del fuzzing (sección 7.0.20, 14-11-2026)
+
+| Hallazgo | Severidad | Corrección | Archivos | Prueba |
+|---|---|---|---|---|
+| «Ć-10000002» (C con tilde combinada) colgaba la API: `carne()` normaliza el texto y lo lee como carné, pero el orquestador quitaba carnés con una expresión sin normalizar, e `identificar` se llamaba a sí mismo sin fin. | Alta | Detector único `carnesEn` / `sinCarnes` con la misma normalización; si aún queda un carné no se sigue; `identificar` no reenvía un texto con carné. | `agent/tools/extraer.ts`, `agent/orquestador.ts` | `evals/acceso.ts` 9c |
+| Con sesión, «cambiar carné» + un carné ajeno con tilde reservaba a nombre de otra persona (ADV-03 de nuevo). | Alta | El carné de la reserva es siempre el de la sesión: ni «cambiar carné» ni un carné escrito lo reemplazan. | `agent/conversacion.ts` (`turnoReserva`) | `evals/acceso.ts` 9c |
+| JSON malformado, cuerpo > 10 kb, charset o compresión inválidos y URL mal codificada devolvían la página de error de Express con la traza y rutas del servidor. | Media | Manejador de errores y de rutas inexistentes en JSON, sin traza. | `agent/channels/http.ts` | `evals/acceso.ts` 9d |
+| El mapa de intentos fallidos crecía sin límite y scrypt síncrono bloqueaba el hilo con muchos correos distintos. | Media | Poda del mapa (tope 10 000), `scrypt` asíncrono en el login, correo normalizado NFKC y límite de 20 logins por minuto por dirección. | `agent/tools/acceso.ts`, `agent/channels/http.ts` | `evals/acceso.ts` |
+| Sesiones y conversaciones en memoria sin vencimiento (respaldo sin Mongo). | Baja | Poda con el mismo TTL de Mongo (1800 s) al escribir. | `agent/store/memoria.ts` | — |
+

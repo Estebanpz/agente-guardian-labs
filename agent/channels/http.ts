@@ -47,7 +47,25 @@ const exigir = (...roles: Rol[]): express.RequestHandler => (req, res, next) => 
 };
 const soloMonitor = exigir("monitor");
 
+// Límite por dirección (además del bloqueo por correo): 20 intentos de login por minuto. Evita gastar CPU en
+// scrypt con muchos correos distintos (hallazgo de fuzzing, 14-11-2026).
+const intentosPorIp = new Map<string, { n: number; desde: number }>();
+function demasiadosIntentos(ip: string, ahora = Date.now()): boolean {
+  if (intentosPorIp.size > 10_000) intentosPorIp.clear();
+  const v = intentosPorIp.get(ip);
+  if (!v || ahora - v.desde > 60_000) {
+    intentosPorIp.set(ip, { n: 1, desde: ahora });
+    return false;
+  }
+  v.n++;
+  return v.n > 20;
+}
+export const reiniciarLimiteLogin = () => intentosPorIp.clear();
+
 app.post("/login", async (req, res) => {
+  if (demasiadosIntentos(req.ip ?? "?")) {
+    return void res.status(429).json({ error: "Demasiados intentos desde este equipo. Espera un minuto." });
+  }
   const v = z.object({ correo: z.string().trim().min(3).max(120), clave: z.string().min(1).max(128) }).strict().safeParse(req.body);
   if (!v.success) return void res.status(400).json({ error: "Escribe tu correo y tu contraseña." });
   try {
@@ -286,4 +304,18 @@ app.patch("/notificaciones/:id", soloMonitor, async (req, res) => {
 // Estado de salas y equipos de la vista Laboratorios (solo lectura).
 app.get("/salas/laboratorios", soloMonitor, (_req, res) => {
   res.json(resumenSalas());
+});
+
+// Rutas que no existen y errores no atrapados (JSON malformado, cuerpo > 10 kb, charset o compresión inválidos,
+// URL mal codificada): respuesta JSON corta, sin la traza ni rutas del servidor (hallazgo de fuzzing, 14-11-2026).
+app.use((_req, res) => {
+  res.status(404).json({ error: "Ruta no encontrada." });
+});
+app.use((err: { status?: number; statusCode?: number; type?: string; message?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const status = Number(err?.status ?? err?.statusCode ?? 500);
+  const codigo = status >= 400 && status < 600 ? status : 500;
+  if (codigo >= 500) console.error("[http]", err?.message);
+  const error = codigo === 413 ? "El cuerpo de la petición es demasiado grande."
+    : codigo < 500 ? "Petición inválida." : "Error interno";
+  res.status(codigo).json({ error });
 });

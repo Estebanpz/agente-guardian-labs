@@ -161,6 +161,30 @@ try {
   r = await chat("Cancelar RS-0002", uuid(10), TC);
   comprobar(/Sí, cancelar RS-0002/.test(JSON.stringify(r.json)), "el botón «Cancelar RS-0002» pide confirmar");
 
+  // 9c) Hallazgos del fuzzing (14-11-2026): carné con marcas combinadas y «cambiar carné».
+  const colgado = (p: Promise<R>) => Promise.race([p, new Promise<R>((ok) => setTimeout(() => ok({ status: 0, json: null }), 5000))]);
+  r = await colgado(chat("C\u0301-10000002", uuid(13), TL));
+  comprobar(r.status === 200 && r.json.intencion === "identidad" && /otra persona/.test(r.json.respuesta),
+    "«Ć-10000002» (C con tilde combinada) con sesión de Laura: responde y se rechaza (antes colgaba la API)");
+  for (const t of ["Quiero reservar una sala", "cambiar carne", "mi carne es Ç-10000002", "pasado mañana de 2 a 4 en la sala 7 para 3 personas", "si"]) {
+    r = await chat(t, uuid(14), TL);
+  }
+  const hechas = await repo.reservasDeCarne("C-10000002", "2026-11-09");
+  comprobar(!hechas.some((x) => x.sala === "sala-7"), "«cambiar carne» + carné ajeno no reserva a nombre de Juan");
+
+  // 9d) Errores de Express en JSON, sin traza ni rutas del servidor.
+  for (const [nombre, init] of [
+    ["JSON malformado", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{malo" }],
+    ["cuerpo de 11 kb", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ correo: "a".repeat(11_000), clave: "x" }) }],
+  ] as const) {
+    const res = await fetch(base + "/login", init as RequestInit);
+    const txt = await res.text();
+    comprobar(res.status >= 400 && res.status < 500 && !/node_modules|at \w+ \(|\.ts:\d+/.test(txt) && txt.startsWith("{"),
+      `${nombre} → ${res.status} en JSON, sin traza`);
+  }
+  const malCodificada = await fetch(base + "/reservas/%E0%A4%A");
+  comprobar(malCodificada.status === 400 && !/node_modules/.test(await malCodificada.text()), "URL mal codificada → 400 sin traza");
+
   // 10) Misma sesión del navegador, otra persona: no hereda la conversación.
   await chat("Quiero reservar una sala", uuid(5), TL);
   r = await chat("mañana de 2 a 4", uuid(5), TC);
