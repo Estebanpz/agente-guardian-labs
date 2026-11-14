@@ -1,0 +1,53 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "REPOSITORIO=memoria npm run --silent pruebas:rapidas"
+  },
+  "coverageAnalysis": "off",
+  "concurrency": "50%",
+  "timeoutMS": 20000,
+  "timeoutFactor": 1.5,
+  "disableTypeChecks": true,
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": true,
+  "mutate": [
+    "agent/tools/privacidad.ts",
+    "agent/tools/acceso.ts",
+    "agent/tools/extraer.ts",
+    "agent/tools/reservas.ts:44-44",
+    "agent/tools/reservas.ts:307-308",
+    "agent/tools/reservas.ts:320-329"
+  ],
+  "ignorePatterns": [
+    ".env",
+    ".env.*",
+    "/web",
+    "/docs",
+    "/analisis",
+    "/reports",
+    "/.codegraph",
+    "*.webp",
+    "/tsconfig.json",
+    "/logs/*",
+    "!/logs/.gitkeep"
+  ],
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": null
+  },
+  "reporters": [
+    "clear-text",
+    "progress",
+    "html",
+    "json"
+  ],
+  "htmlReporter": {
+    "fileName": "reports/mutation/mutation.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  }
+}
