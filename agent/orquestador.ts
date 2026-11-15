@@ -360,7 +360,7 @@ async function mensajeBase(
     registrar({ intencion: "datos_prohibidos", tipos: prohibidos });
     return {
       intencion: "datos_prohibidos",
-      respuesta: `El mensaje contiene datos personales (${prohibidos.join(", ")}). Use solo el identificador sintético (por ejemplo E-001).`,
+      respuesta: `El mensaje contiene datos personales (${prohibidos.join(", ")}). No escribas cédula, correo ni teléfono: el agente no los necesita y no los guarda.`,
     };
   }
 

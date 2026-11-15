@@ -165,7 +165,8 @@ export default function Chat() {
     const limpio = t.trim();
     if (!limpio || cargando) return;
     setTexto("");
-    setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "yo", texto: limpio }]);
+    const idYo = crypto.randomUUID();
+    setMensajes((m) => [...m, { id: idYo, de: "yo", texto: limpio }]);
     setCargando(true);
     setEspera(textoEspera(limpio));
     // El modelo local interpreta cada mensaje: si tarda, se avisa que sigue trabajando.
@@ -175,7 +176,12 @@ export default function Chat() {
       const [r] = await Promise.all([api.mensaje(limpio, sesion), new Promise((ok) => setTimeout(ok, 600))]);
       const opciones = r.flujo?.opciones ?? [];
       setFlujoActivo(Boolean(r.flujo?.pendiente) || r.flujo?.tipo === "reserva" || r.flujo?.tipo === "registro");
-      setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r, opciones }]);
+      // Un mensaje con datos personales (cédula, correo, teléfono) no queda visible en la burbuja ni en el historial.
+      const ocultar = r.intencion === "datos_prohibidos";
+      setMensajes((m) => [
+        ...m.map((x) => (ocultar && x.id === idYo ? { ...x, texto: "Mensaje oculto: contenía datos personales." } : x)),
+        { id: crypto.randomUUID(), de: "agente", r, opciones },
+      ]);
       // "salir" escrito en el chat cierra también la sesión de la cuenta.
       if (r.intencion === "cerrar_sesion" && usuario) await cerrarSesion();
     } catch (e) {
