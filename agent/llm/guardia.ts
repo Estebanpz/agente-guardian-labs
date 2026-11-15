@@ -8,6 +8,10 @@ const PATRONES: RegExp[] = [
   /\b(desactiva|desactivar|deshabilita|quita|quitar|apaga)\w*\b.{0,40}\b(reglas?|restricciones|filtros|validaciones)\b/,
   /\b(autorizo|autorizado|autorizada|autorizacion|autoriza|aprobo|aprobado)\b.{0,30}\b(de palabra|verbalmente|verbal)\b/,
   /\b(de palabra|verbalmente)\b.{0,30}\b(autoriz|aprob|permit)/,
+  // Autoridad declarada (7.0.24): solo permiso explícito, «el coordinador me deja», «mi profe dijo que puedo
+  // usarla». No entra preguntar por ella («quiero hablar con el coordinador»), el chip («escalar al monitor») ni
+  // que la autoridad solo reparta una tarea («el docente me dijo que reservara para el grupo»).
+  /\b(coordinador\w*|coordinacion|monitor\w*|profesor\w*|profe|docente\w*|decano\w*|director\w*|rector\w*)\b[^.!?]{0,40}\b(me deja|me dejan|me dejo|me autoriz\w*|me dio permiso|me dieron permiso|me aprob\w*|dijo que (puedo|podemos|si puedo|si podemos))\b/,
   /\b(disregard|forget)\b.{0,30}\b(previous|prior|above|all|your)\b.{0,30}\b(instructions|rules)\b/,
 ];
 

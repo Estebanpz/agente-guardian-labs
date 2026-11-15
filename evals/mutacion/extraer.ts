@@ -98,7 +98,8 @@ igual("«salir» cancela", () => cancelar("salir"), true);
 igual("«salir.» cancela", () => cancelar("salir."), true);
 igual("«salir!!» cancela", () => cancelar("salir!!"), true);
 igual("«¡¡salir» cancela", () => cancelar("¡¡salir"), true);
-igual("«quiero empezar de nuevo» cancela", () => cancelar("quiero empezar de nuevo"), true);
+igual("«empezar de nuevo» cancela", () => cancelar("empezar de nuevo"), true);
+igual("«quiero empezar de nuevo» no es el pedido exacto (7.0.24)", () => cancelar("quiero empezar de nuevo"), false);
 
 // ── Duración con espacios dobles ──
 igual("«hora  y  media» → 90", () => ex("hora  y  media").duracion_min, 90);

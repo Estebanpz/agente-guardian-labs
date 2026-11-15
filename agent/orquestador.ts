@@ -208,8 +208,16 @@ async function desvioDelFlujo(texto: string, sesion: string, repo: Repositorio):
   const e = extraer(texto, { hoy: ahora().fecha, pendiente: conv.pendiente ?? null });
   const aporta = e.carne || e.fecha || e.inicio || e.sala || e.personas !== null || e.equipos !== null
     || e.computo_alto !== null || e.materia || e.confirmacion || e.cancelar || e.duracion_min;
-  if (aporta) return null;
+  // Pedir algo sobre una reserva («cancela esa reserva y me la das a mi») no es un desvío (7.0.24): lo decide
+  // `continuar`, sin depender de que el modelo lo entienda.
+  if (aporta || (PIDE_CANCELAR.test(t) && HABLA_DE_RESERVAS.test(t))) return null;
   const c = await clasificar(texto);
+  // El modelo vio un intento de elusión que la guardia no detectó (7.0.24): se responde la alerta y se retoma la
+  // pregunta pendiente, sin cambiar datos. La solicitud sigue abierta.
+  if (!c.fallo && c.intencion === "intento_eludir_reglas") {
+    const r = await reanudar(sesion, repo, ALERTA_ELUSION);
+    return r ? { ...r, intencion: "intento_eludir_reglas", alerta: ALERTA_ELUSION } : null;
+  }
   if (c.fallo || c.intencion !== "fuera_de_alcance") return null;
   const r = await reanudar(sesion, repo, `${textoFuera(c, texto)} Sigamos con tu solicitud.`);
   return r ? { ...r, intencion: "fuera_de_alcance" } : null;

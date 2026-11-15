@@ -1,5 +1,5 @@
 // Pruebas de los extractores deterministas del chat de reservas (sin modelo).
-import { extraer, fechas, salaInexistente, type Extraido } from "../agent/tools/extraer.js";
+import { cancelar, extraer, fechas, salaInexistente, type Extraido } from "../agent/tools/extraer.js";
 
 const HOY = "2026-11-09"; // lunes
 
@@ -96,6 +96,37 @@ for (const caso of CASOS) {
   if (fallas.length) fallos++;
   const detalle = fallas.map((k) => `${k}=${JSON.stringify(r[k])}`).join(" ");
   console.log(`${fallas.length ? "❌" : "✅"} "${caso.entrada}"${caso.pendiente ? ` [${caso.pendiente}]` : ""}${fallas.length ? ` · ${detalle}` : ""}`);
+}
+// 7.0.24: cancelar la solicitud solo cuando el mensaje ES el pedido (anclado), no cuando la palabra aparece suelta.
+const CANCELA: [string, boolean][] = [
+  ["cancelar", true],
+  ["Cancela", true],
+  ["cancélalo", true],
+  ["cancélala", true],
+  ["cancelar la solicitud", true],
+  ["olvídalo", true],
+  ["olvídate", true],
+  ["empezar de nuevo", true],
+  ["ya no quiero", true],
+  ["ya no la quiero", true],
+  ["ya no quiero reservar", true],
+  ["salir", true],
+  ["¡No, cancélalo, por favor!", true],
+  ["mejor cancelar", true],
+  // No: la palabra aparece, pero el mensaje no es el pedido de cancelar la solicitud.
+  ["se me olvidaba decir que somos 4", false],
+  ["ya no quiero esa sala, mejor la 5", false],
+  ["cancelación de la clase pero igual necesito la sala", false],
+  ["no quiero cancelar", false],
+  ["cancela esa reserva y me la das a mi", false],
+  ["quiero cancelar la reserva RS-0002", false],
+  ["hasta salir de clase necesito la sala", false],
+];
+for (const [texto, esperado] of CANCELA) {
+  const r = cancelar(texto);
+  const ok = r === esperado;
+  if (!ok) fallos++;
+  console.log(`${ok ? "✅" : "❌"} cancelar("${texto}") = ${esperado}${ok ? "" : ` · ${r}`}`);
 }
 // Varias fechas en un mensaje (sección 7.0.4).
 const FECHAS: [string, string[]][] = [

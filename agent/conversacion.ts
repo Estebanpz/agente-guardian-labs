@@ -552,6 +552,25 @@ function textoOcupada(conv: Conversacion, etiqueta: string, ocupada: ReservaDoc)
     ["Ver otras salas", "Escalar al monitor"]);
 }
 
+// 7.0.24: pedir la reserva de otra persona (cancelarla o que se la pasen) no es cancelar la solicitud.
+// Un mensaje que habla de una reserva sigue el flujo abierto; solo «cancelar», «olvídalo» o «salir» lo cierran.
+const HABLA_DE_RESERVA = /\breservas?\b|\brs[\s-]?\d{1,5}\b|\b(me la (das|dejes|pases|pasas|quitas)|damela|pasamela|quitasela)\b/;
+const hablaDeReserva = (texto: string): boolean => HABLA_DE_RESERVA.test(norm(texto));
+// Verbos de cancelación (7.0.24): un mensaje que pide cancelar y habla de una reserva no cierra la solicitud.
+const PIDE_CANCELAR = /\b(cancel\w*|anul\w*|elimin\w*|borr\w*|quit\w*)\b/;
+
+// La sala pedida la tiene otra persona: se niega por R27, sin revelar quién es ni datos de su reserva, y la
+// solicitud sigue abierta con las mismas opciones de la sala ocupada.
+async function reservaAjenaTurno(conv: Conversacion, repo: Repositorio): Promise<RespuestaChat> {
+  const d = conv.datos;
+  const ocupada = d.sala && d.fecha && d.inicio && d.fin ? await choqueDe(d, repo) : undefined;
+  if (!ocupada) return abierto(conv, "Esa reserva es de otra persona: solo quien la hizo puede cancelarla (R27), y no puedo pasártela.", ["Ver otras salas", "Escalar al monitor"]);
+  const etiqueta = await etiquetaDe(repo, d.sala!);
+  return abierto(conv,
+    `Esa reserva es de otra persona: solo quien la hizo puede cancelarla (R27), y no puedo pasártela. La ${etiqueta} sigue ocupada de ${ocupada.inicio} a ${ocupada.fin}.`,
+    ["Ver otras salas", "Escalar al monitor"]);
+}
+
 // "Escalar al monitor" (7.0.7): solo crea un aviso para el monitor (sin reserva, reserva_codigo null),
 // cierra la conversación y olvida el carné. R20/R21 si el solicitante es docente; R22 si es estudiante.
 async function escalarAlMonitor(conv: Conversacion, repo: Repositorio): Promise<RespuestaChat> {
@@ -1134,9 +1153,14 @@ export async function continuar(texto: string, sesion: string, repo: Repositorio
     return conv.pendiente === "oferta_dia" ? respuestaOferta(texto, sesion, repo) : null;
   }
   if (!conv) return null;
+  // «cancelar», «cancélalo», «olvídalo», «ya no quiero», «salir» (anclado, 7.0.24): cierra la solicitud.
   if (esCancelar(texto)) {
     await repo.borrarConversacion(sesion);
     return cerrado("cancelar", "Cancelé la solicitud. No se guardó nada.");
+  }
+  // Pedir algo sobre una reserva (cancelarla o que se la pasen) no cierra la solicitud: se atiende por R27.
+  if (PIDE_CANCELAR.test(norm(texto)) && hablaDeReserva(texto)) {
+    return conv.pendiente === "ocupada" ? reservaAjenaTurno(conv, repo) : cancelacionTurno(texto, sesion, repo);
   }
   return conv.flujo === "registro" ? turnoRegistro(conv, texto, repo) : turnoReserva(conv, texto, repo);
 }
@@ -1204,6 +1228,14 @@ export async function reanudar(sesion: string, repo: Repositorio, alerta: string
   const conv = await repo.leerConversacion(sesion);
   if (!conv || conv.flujo === "disponibilidad") return null;
   const pendiente = conv.pendiente ?? "carne";
+  // Sala ocupada (7.0.24): la pregunta pendiente es el aviso de ocupación con sus dos opciones, no «¿Confirmo?».
+  if (pendiente === "ocupada" && conv.datos.sala && conv.datos.fecha && conv.datos.inicio && conv.datos.fin) {
+    const ocupada = await choqueDe(conv.datos, repo);
+    if (ocupada) {
+      const aviso = textoOcupada(conv, await etiquetaDe(repo, conv.datos.sala), ocupada);
+      return { ...aviso, respuesta: `${alerta}\n\n${aviso.respuesta}` };
+    }
+  }
   const p = preguntaPara(pendiente, docenteDe(conv.datos));
   return abierto(conv, `${alerta}\n\n${p.texto}`, p.opciones);
 }

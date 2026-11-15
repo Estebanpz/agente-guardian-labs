@@ -241,9 +241,23 @@ export function confirmacion(t: string): "si" | "no" | null {
 }
 
 // "salir" cancela solo como mensaje completo: "hasta salir de clase" no cancela la reserva.
+// 7.0.24: la solicitud se cancela solo cuando el mensaje ES el pedido, de inicio a fin. Que la palabra aparezca
+// suelta no basta: «se me olvidaba decir que somos 4», «ya no quiero esa sala, mejor la 5» (cambio de sala) o
+// «cancelación de la clase pero igual necesito la sala» no cancelan la solicitud.
+const MULETILLA = "(?:por favor|porfa|mejor|ya|no|oye|bueno|entonces|vale|ok)";
+const CANCELA_SOLICITUD = new RegExp(
+  `^(?:${MULETILLA}\\s+)*` +
+  "(?:cancel(?:ar|a|alo|ala|arlo|arla)(?:\\s+(?:la|esta|esa|mi)\\s+solicitud)?" +
+  "|olvida(?:lo|te|r)?" +
+  "|empezar de nuevo" +
+  "|ya no (?:la |lo |las |los )?quiero(?:\\s+(?:reservar|reservarla|reservarlo))?" +
+  "|salir)" +
+  `(?:\\s+${MULETILLA})*$`,
+);
 export function cancelar(t: string): boolean {
-  const n = norm(t).replace(/^[¡¿\s]+|[.!?¡¿,;:\s]+$/g, "");
-  return /\b(cancelar|cancela|olvidalo|empezar de nuevo)\b/.test(n) || n === "salir";
+  // Sin signos ni muletillas: «¡No, cancélalo, por favor!» es el mismo pedido que «cancelar».
+  const n = norm(t).replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  return CANCELA_SOLICITUD.test(n);
 }
 
 // ── Duración pedida sin rango (plan de rango horario, 3.1) ───────────────

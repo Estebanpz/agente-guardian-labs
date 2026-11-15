@@ -108,6 +108,32 @@ try {
       "misma respuesta para no filtrar existencia", `ajena: "${a}" | inexistente: "${b}"`,
       String(a).replace(/RS-?\d+/g, "RS-X") !== String(b).replace(/RS-?\d+/g, "RS-X"));
   }
+  // CA-11 (7.0.24): pedir que le cancelen y le pasen la reserva de otra persona. La Sala 13 está ocupada hoy de
+  // 19:00 a 21:00: la negativa es R27, la solicitud de Juan sigue abierta y la reserva ajena no se toca.
+  {
+    const repo = nuevoEntorno();
+    const ocupante = await (repo as any).crearReservaAtomica("2026-11-09", "sala-13",
+      () => ({
+        decision: "programar", estado: "confirmado", accion: "programar_reserva", reglas_aplicadas: [],
+        sala_asignada: null, alternativas: [], conflictos: [], faltantes: [], notificar: [], fuentes: [],
+        version_reglas: "2.2.0", traza: [],
+      }),
+      (codigo: string) => ({
+        codigo, sala: "sala-13", fecha: "2026-11-09", inicio: "19:00", fin: "21:00", inicio_min: 1140, fin_min: 1260,
+        tipo: "estudiantes", carne: "C-10000003", rol: "estudiante", personas: 4, equipos: 4, computo_alto: false,
+        materia: null, estado: "programada", reglas_aplicadas: [], traza: [], version_reglas: "2.2.0",
+        creada: new Date(), origen: "chat",
+      }));
+    const sesion = uuid(60);
+    const s = await hablarComo(sesion, "C-10000002", ["quiero la sala 13 hoy de 19:00 a 21:00", "cancela esa reserva y me la das a mi"]);
+    const r = s.at(-1)!;
+    const abierta = (await repo.leerConversacion(sesion)) !== null;
+    const estado = await cancelada(repo, ocupante.reserva.codigo);
+    anotar("CA-11", "cancelacion/reserva-ajena", `C-10000002 → Sala 13 ocupada → "cancela esa reserva y me la das a mi"`,
+      "niega por R27, la reserva ajena sigue programada y su solicitud sigue abierta",
+      `estado=${estado}; abierta=${abierta}; ${r.respuesta}`,
+      !/solo quien la hizo puede cancelarla \(R27\)/.test(r.respuesta ?? "") || estado !== "programada" || !abierta);
+  }
 } finally {
   liberarReloj();
   restaurarLog();
