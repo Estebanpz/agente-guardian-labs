@@ -1346,7 +1346,149 @@ export async function correrEscenariosConversacion(): Promise<FilaConv[]> {
             [(r94[2].respuesta ?? "").includes("La Sala 4 está libre el domingo 15 de noviembre de 10:00 a 12:00 para 8 personas."), "propuesta para 8 personas"],
             [conv94?.datos.personas === 8, "personas reemplazadas"],
           ]));
+      }
+      // C-95 a C-101 (7.0.27): corroboración adversarial de Juan. Solo un afirmativo puro confirma; una sala
+      // rechazada no se asigna ni se vuelve a ofrecer; una corrección dentro del mensaje usa el último valor; dos
+      // fechas y dos pedidos se resuelven preguntando, no eligiendo en silencio.
+      {
+        fijarReloj("2026-11-14", "20:25");
+
+        // C-95: «si, claro que no» y «nunca» no confirman; la propuesta sigue y un «sí» puro sí reserva.
+        const repo95 = crearMemoria("2026-11-14");
+        configurarParaPruebas({ repo: repo95, interpretar: clasificadorFijo });
+        const sid95a = "abcdef95-aaaa-4aaa-8aaa-aaaaaaaaaa95";
+        const sid95b = "abcdef95-bbbb-4bbb-8bbb-bbbbbbbbbb95";
+        const a95 = await guionCon(repo95, sid95a, [
+          "C-10000001", "Quiero reservar la sala 4 mañana de 10 a 12 para 5", "si, claro que no", "sí",
+        ]);
+        const b95 = await guionCon(repo95, sid95b, [
+          "C-10000001", "Quiero reservar la sala 4 mañana de 14 a 16 para 5", "nunca",
+        ]);
+        const conv95 = await repo95.leerConversacion(sid95b);
+        filas.push(fila("C-95", "Confirmación estricta (7.0.27)",
+          "C-10000001 → sala 4 mañana 10–12 para 5 → si, claro que no → sí · y en otra sesión: nunca",
+          "la contradicción pide aclarar sin confirmar; «nunca» tampoco confirma; un «sí» puro sí reserva", [
+            [(a95[2].respuesta ?? "") === "No entendí si confirmas. ¿Confirmo la reserva?", "«si, claro que no» pide aclaración"],
+            [pendiente(a95[2]) === "confirmar", "la propuesta sigue en pie"],
+            [(a95[3].respuesta ?? "").includes("Reserva RS-0004 confirmada"), "un «sí» puro sí confirma"],
+            [(b95[2].respuesta ?? "") === "No entendí si confirmas. ¿Confirmo la reserva?", "«nunca» no confirma"],
+            [conv95?.propuesta?.sala === "sala-4", "la propuesta no se pierde"],
+          ]));
+
+        // C-96: una hora suelta no decide el rango; se pide completo y se conserva la fecha.
+        const repo96 = crearMemoria("2026-11-14");
+        configurarParaPruebas({ repo: repo96, interpretar: clasificadorFijo });
+        const sid96 = "abcdef96-aaaa-4aaa-8aaa-aaaaaaaaaa96";
+        const r96 = await guionCon(repo96, sid96, [
+          "C-10000001", "Quiero reservar la sala 4 mañana de 10 a 12 para 5", "si pero mejor a las 4",
+        ]);
+        const conv96 = await repo96.leerConversacion(sid96);
+        // El repositorio en memoria devuelve el mismo objeto: se copian los valores antes del turno siguiente.
+        const estado96 = { pendiente: pendiente(r96[2]), fecha: conv96?.datos.fecha, inicio: conv96?.datos.inicio };
+        const r96b = await guionCon(repo96, sid96, ["de 4 a 6"]);
+        filas.push(fila("C-96", "Contradicción con una hora nueva (7.0.27)",
+          "C-10000001 → sala 4 mañana 10–12 para 5 → si pero mejor a las 4 → de 4 a 6",
+          "«a las 4» pide el rango conservando el domingo 15; «de 4 a 6» propone 16:00–18:00", [
+            [(r96[2].respuesta ?? "").includes("¿De qué hora a qué hora?"), "pide el rango completo"],
+            [!((r96[2].respuesta ?? "").includes("ya pasó")), "no arrastra la hora de la propuesta anterior"],
+            [estado96.pendiente === "horario" && estado96.fecha === "2026-11-15" && estado96.inicio === null, "conserva la fecha y borra la hora suelta"],
+            [(r96b[0].respuesta ?? "").includes("La Sala 4 está libre el domingo 15 de noviembre de 16:00 a 18:00 para 5 personas."), "propone 16:00–18:00"],
+          ]));
+
+        // C-97: la sala rechazada queda excluida y no se ofrece como alternativa.
+        const repo97 = crearMemoria("2026-11-14");
+        configurarParaPruebas({ repo: repo97, interpretar: clasificadorFijo });
+        const sid97 = "abcdef97-aaaa-4aaa-8aaa-aaaaaaaaaa97";
+        const r97 = await guionCon(repo97, sid97, [
+          "C-10000001", "Quiero reservar la sala 13 mañana de 10 a 12 para 5", "No quiero la sala 13 dame otra",
+        ]);
+        const conv97 = await repo97.leerConversacion(sid97);
+        filas.push(fila("C-97", "Sala rechazada (7.0.27)",
+          "C-10000001 → sala 13 mañana 10–12 para 5 → No quiero la sala 13 dame otra",
+          "la Sala 13 queda excluida, no se asigna y no aparece entre las alternativas", [
+            [(conv97?.excluidas ?? []).includes("sala-13"), "la Sala 13 queda excluida"],
+            [conv97?.datos.sala === null && conv97?.propuesta === null, "no se queda con la sala rechazada"],
+            [!((r97[2].respuesta ?? "").includes("Sala 13")), "no vuelve a ofrecer la Sala 13"],
+            [(r97[2].respuesta ?? "").includes("Elige una o escribe su número."), "ofrece otras salas"],
+          ]));
+
+        // C-98: con marcador de corrección manda el último valor; sin marcador, dos cantidades se preguntan.
+        const repo98 = crearMemoria("2026-11-14");
+        configurarParaPruebas({ repo: repo98, interpretar: clasificadorFijo });
+        const sid98a = "abcdef98-aaaa-4aaa-8aaa-aaaaaaaaaa98";
+        const sid98b = "abcdef98-bbbb-4bbb-8bbb-bbbbbbbbbb98";
+        const a98 = await guionCon(repo98, sid98a, [
+          "C-10000001", "Quiero reservar la sala 4 mañana de 10 a 12, para 10 personas, bueno no, somos 8",
+        ]);
+        const b98 = await guionCon(repo98, sid98b, [
+          "C-10000001", "Quiero reservar la sala 4 mañana de 10 a 12 para 5", "somos 10 o 12", "12",
+        ]);
+        const conv98 = await repo98.leerConversacion(sid98a);
+        filas.push(fila("C-98", "Corrección dentro del mensaje (7.0.27)",
+          "sala 4 mañana 10–12 para 10 personas, bueno no, somos 8 · y en otra sesión: somos 10 o 12",
+          "«bueno no» deja 8 personas; «10 o 12» pregunta cuál y luego aplica la elegida", [
+            [conv98?.datos.personas === 8 && (a98[1].respuesta ?? "").includes("para 8 personas"), "el último valor manda"],
+            [(b98[2].respuesta ?? "") === "¿Cuántas personas son: 10 o 12?", "dos cantidades sin marcador se preguntan"],
+            [JSON.stringify(b98[2].flujo?.opciones ?? []) === JSON.stringify(["10", "12"]), "botones con las dos cantidades"],
+            [(b98[3].respuesta ?? "").includes("para 12 personas"), "aplica la cantidad elegida"],
+          ]));
+
+        // C-99: dos fechas en un mensaje. Una reserva es por día: se pregunta cuál y se conserva el horario.
+        const repo99 = crearMemoria("2026-11-14");
+        configurarParaPruebas({ repo: repo99, interpretar: clasificadorFijo });
+        const sid99 = "abcdef99-aaaa-4aaa-8aaa-aaaaaaaaaa99";
+        const r99 = await guionCon(repo99, sid99, [
+          "C-10000001", "reserva la sala 4 mañana y el lunes de 2 a 4", "Domingo 15 de noviembre",
+        ]);
+        const conv99 = await repo99.leerConversacion(sid99);
+        filas.push(fila("C-99", "Dos fechas en un mensaje (7.0.27)",
+          "C-10000001 → reserva la sala 4 mañana y el lunes de 2 a 4 → Domingo 15 de noviembre",
+          "pregunta para cuál día con un botón por fecha; el elegido conserva el horario", [
+            [(r99[1].respuesta ?? "") === "¿Para cuál día: domingo 15 de noviembre o lunes 16 de noviembre? Una reserva es por día; después puedes hacer la otra.", "pregunta cuál de los dos días"],
+            [JSON.stringify(r99[1].flujo?.opciones ?? []) === JSON.stringify(["Domingo 15 de noviembre", "Lunes 16 de noviembre"]), "un botón por fecha"],
+            [conv99?.datos.fecha === "2026-11-15" && conv99?.datos.inicio === "14:00" && conv99?.datos.fin === "16:00", "el día elegido conserva 14:00–16:00"],
+          ]));
+
+        // C-100: datos de una reserva nueva y una cancelación en el mismo mensaje. Se atiende una cosa a la vez y
+        // la cancelación solo se nombra si la reserva es del carné de la sesión.
+        const repo100 = crearMemoria("2026-11-14");
+        configurarParaPruebas({ repo: repo100, interpretar: clasificadorFijo });
+        const sid100a = "abcdef10-aaaa-4aaa-8aaa-aaaaaaaaaa10";
+        const sid100b = "abcdef10-bbbb-4bbb-8bbb-bbbbbbbbbb10";
+        const r100 = await guionCon(repo100, sid100a, [
+          "C-10000002", "Quiero reservar la sala 4 el lunes de 10 a 12 para 5", "sí", "C-10000002",
+          "reserva la sala 4 mañana de 2 a 4 y cancela RS-0004",
+        ]);
+        const ajena100 = await guionCon(repo100, sid100b, [
+          "C-10000001", "reserva la sala 4 mañana de 2 a 4 y cancela RS-0004",
+        ]);
+        filas.push(fila("C-100", "Dos pedidos en un mensaje (7.0.27)",
+          "Juan crea RS-0004 → reserva la sala 4 mañana de 2 a 4 y cancela RS-0004 · y Laura con la misma frase",
+          "ofrece reservar o cancelar cuando la RS es propia; con una RS ajena no la nombra ni revela", [
+            [(r100[4].respuesta ?? "") === "Hagamos una cosa a la vez. ¿Qué prefieres: reservar o cancelar RS-0004?", "propia: pregunta qué hacer"],
+            [JSON.stringify(r100[4].flujo?.opciones ?? []) === JSON.stringify(["Reservar la Sala 4 mañana de 14:00 a 16:00", "Cancelar RS-0004"]), "propia: dos botones"],
+            [(ajena100[1].respuesta ?? "") === "Hagamos una cosa a la vez. ¿Reservo la Sala 4 mañana de 14:00 a 16:00?", "ajena: solo ofrece reservar"],
+            [!((ajena100[1].respuesta ?? "").includes("RS-0004")), "ajena: no revela la RS"],
+          ]));
+
+        // C-101: el texto distingue entre recibir la fecha por primera vez y cambiarla.
+        const repo101 = crearMemoria("2026-11-14");
+        configurarParaPruebas({ repo: repo101, interpretar: clasificadorFijo });
+        const sid101a = "abcdef11-aaaa-4aaa-8aaa-aaaaaaaaaa11";
+        const sid101b = "abcdef11-bbbb-4bbb-8bbb-bbbbbbbbbb11";
+        const r101a = await guionCon(repo101, sid101a, ["C-10000001", "Quiero reservar una sala", "mañana"]);
+        const r101b = await guionCon(repo101, sid101b, [
+          "C-10000001", "Quiero reservar la sala 4 mañana de 10 a 12 para 5", "Cambiar horario", "el lunes",
+        ]);
+        filas.push(fila("C-101", "Texto al recibir o cambiar la fecha (7.0.27)",
+          "Quiero reservar una sala → mañana · y en otra sesión: sala 4 mañana 10–12 → Cambiar horario → el lunes",
+          "sin fecha previa dice «Listo, mañana (…)»; con una fecha previa dice «Listo, cambio al lunes 16 de noviembre.»", [
+            [(r101a[2].respuesta ?? "") === "Listo, mañana (domingo 15 de noviembre). ¿De qué hora a qué hora?", "fecha nueva: «Listo, mañana (…)»"],
+            [(r101b[3].respuesta ?? "") === "Listo, cambio al lunes 16 de noviembre. ¿De qué hora a qué hora?", "fecha cambiada: «Listo, cambio (…)»"],
+          ]));
+
         fijarReloj("2026-11-09", "08:00");
+        configurarParaPruebas({ repo: crearMemoria("2026-11-09"), interpretar: clasificadorFijo });
         configurarParaPruebas({ repo: crearMemoria("2026-11-09"), interpretar: clasificadorFijo });
       }
     }

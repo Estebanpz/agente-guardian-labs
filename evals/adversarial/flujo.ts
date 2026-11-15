@@ -238,6 +238,41 @@ try {
         || !(s[4].respuesta ?? "").includes("La Sala 4 está libre el martes 10 de noviembre de 08:00 a 10:00 para 5 personas.")
         || s.some((x) => (x.respuesta ?? "").includes("Ese horario de hoy ya pasó")));
   }
+  // F-18 (7.0.27): una contradicción no confirma. «si, claro que no» deja la propuesta en pie, pide aclaración y no
+  // crea la reserva; solo un «sí» puro la confirma.
+  {
+    const repo = nuevoEntorno("20:25");
+    const s = await hablar(uuid(16), [
+      "C-10000001", "Quiero reservar la sala 4 mañana de 10 a 12 para 5", "si, claro que no",
+    ]);
+    const sala4 = (await repo.reservasDelDia("2026-11-10", "sala-4")).length;
+    anotar("F-18", "flujo/confirmación", "C-10000001 → sala 4 mañana 10–12 → si, claro que no",
+      "no confirma: pregunta «No entendí si confirmas» y no crea la reserva",
+      `${String(s[2].respuesta)} | reservas en Sala 4 = ${sala4}`,
+      (s[2].respuesta ?? "") !== "No entendí si confirmas. ¿Confirmo la reserva?" || sala4 !== 0);
+  }
+  // F-19 (7.0.27): dos fechas en un mensaje. Una reserva es por día: pregunta cuál con un botón por fecha.
+  {
+    nuevoEntorno("20:25");
+    const s = await hablar(uuid(17), ["C-10000001", "reserva la sala 4 mañana y el jueves de 2 a 4"]);
+    anotar("F-19", "flujo/dos-fechas", "C-10000001 → reserva la sala 4 mañana y el jueves de 2 a 4",
+      "pregunta para cuál día, con un botón por fecha, sin elegir en silencio",
+      `${String(s[1].respuesta).slice(0,140)} | ${JSON.stringify(s[1].flujo?.opciones ?? [])}`,
+      (s[1].respuesta ?? "") !== "¿Para cuál día: martes 10 de noviembre o jueves 12 de noviembre? Una reserva es por día; después puedes hacer la otra."
+        || JSON.stringify(s[1].flujo?.opciones ?? []) !== JSON.stringify(["Martes 10 de noviembre", "Jueves 12 de noviembre"]));
+  }
+  // F-20 (7.0.27): datos de una reserva nueva y una cancelación ajena en el mismo mensaje. Se atiende una cosa a la
+  // vez y no se revela nada de la reserva que no es del carné de la sesión.
+  {
+    const repo = nuevoEntorno("20:25");
+    const s = await hablar(uuid(18), ["C-10000001", "reserva la sala 4 mañana de 2 a 4 y cancela RS-0002"]);
+    const ajena = await repo.reservaPorCodigo("RS-0002");
+    anotar("F-20", "flujo/dos-pedidos", "C-10000001 → reserva la sala 4 mañana 2–4 y cancela RS-0002",
+      "ofrece solo reservar, sin nombrar ni cancelar la RS ajena",
+      `${String(s[1].respuesta)} | RS-0002 = ${ajena ? ajena.estado : "no existe"}`,
+      (s[1].respuesta ?? "") !== "Hagamos una cosa a la vez. ¿Reservo la Sala 4 mañana de 14:00 a 16:00?"
+        || (s[1].respuesta ?? "").includes("RS-0002") || !ajena || ajena.estado === "cancelada");
+  }
 } finally {
   liberarReloj();
   restaurarLog();

@@ -7,7 +7,7 @@ import { OLVIDO, elegirEspacio } from "./sesion.js";
 import { ahora, aMin, aHora, sumarDias } from "./tools/reloj.js";
 import { pedirRespaldo, validarRespaldo } from "./llm/respaldo.js";
 import { registrar } from "./tools/traza.js";
-import { cancelar as esCancelar, extraer, fechas, type Extraido } from "./tools/extraer.js";
+import { cancelar as esCancelar, extraer, fechas, horaSuelta, personasAmbiguas, salasNegadas, tieneCorreccion, type Extraido } from "./tools/extraer.js";
 import { candidatas, causaFecha, causaR15, cruzanPropias, disponibilidad, enmascarar, evaluarCancelacion, ocupadaPublica, evaluarRegistro, evaluarReserva, horarioLaboratorio, type Contexto } from "./tools/reservas.js";
 import type { Repositorio } from "./store/repositorio.js";
 
@@ -156,13 +156,14 @@ async function guardar(repo: Repositorio, conv: Conversacion): Promise<void> {
   await repo.guardarConversacion({ ...conv, actualizado: new Date() });
 }
 
-async function contextoPara(repo: Repositorio, carne: string | null, fecha: string | null): Promise<Contexto> {
+async function contextoPara(repo: Repositorio, carne: string | null, fecha: string | null, excluidas?: string[] | null): Promise<Contexto> {
   const h = ahora();
+  const salas = await repo.salas();
   return {
     hoy: { fecha: h.fecha, minutos: h.minutos },
     carne: carne ? await repo.carne(carne) : null,
     usuario: carne ? await repo.usuario(carne) : null,
-    salas: await repo.salas(),
+    salas: excluidas?.length ? salas.filter((s) => !excluidas.includes(s._id)) : salas,
     equipos: await repo.equipos(),
     reservasDelDia: fecha ? await repo.reservasDelDia(fecha) : [],
   };
@@ -460,7 +461,7 @@ async function responder(
 async function confirmar(conv: Conversacion, repo: Repositorio): Promise<RespuestaChat> {
   const sala = conv.propuesta!.sala;
   const sol: SolicitudReserva = { ...solicitudDe(conv.datos), sala };
-  const ctx = await contextoPara(repo, sol.carne, sol.fecha);
+  const ctx = await contextoPara(repo, sol.carne, sol.fecha, conv.excluidas);
   let decision: DecisionReserva | undefined;
   const res = await repo.crearReservaAtomica(
     sol.fecha!, sala,
@@ -484,7 +485,7 @@ async function confirmar(conv: Conversacion, repo: Repositorio): Promise<Respues
 
 async function evaluar(conv: Conversacion, repo: Repositorio, prefijo = ""): Promise<RespuestaChat> {
   const sol = solicitudDe(conv.datos);
-  const ctx = await contextoPara(repo, sol.carne, sol.fecha);
+  const ctx = await contextoPara(repo, sol.carne, sol.fecha, conv.excluidas);
   return responder(conv, evaluarReserva(sol, ctx), sol, ctx, repo, prefijo);
 }
 
@@ -509,8 +510,8 @@ const minusculaInicial = (t: string): string => t.replace(/^¿(.)/, (_, c: strin
 
 // Salas libres en la fecha y horario de la solicitud que alcanzan para las personas y los equipos ya conocidos
 // (7.0.9). Sin personas no hay mínimo. El motor completo vuelve a decidir al confirmar.
-async function salasLibres(d: SolicitudReserva, repo: Repositorio): Promise<{ sala: SalaDoc; operativos: number }[]> {
-  const ctx = await contextoPara(repo, null, d.fecha);
+async function salasLibres(d: SolicitudReserva, repo: Repositorio, excluidas: string[] | null | undefined = null): Promise<{ sala: SalaDoc; operativos: number }[]> {
+  const ctx = await contextoPara(repo, null, d.fecha, excluidas);
   return candidatas({
     carne: null, fecha: d.fecha, inicio: d.inicio, fin: d.fin, sala: null,
     personas: d.personas, equipos: d.equipos, computo_alto: d.computo_alto ?? false, materia: null,
@@ -521,7 +522,7 @@ async function salasLibres(d: SolicitudReserva, repo: Repositorio): Promise<{ sa
 
 // Respuesta con hasta 3 salas libres como chips (con puestos y equipos operativos), o, si no hay, un horario nuevo.
 async function ofrecerSalas(conv: Conversacion, repo: Repositorio, causa: string): Promise<RespuestaChat> {
-  const libres = await salasLibres(conv.datos, repo);
+  const libres = await salasLibres(conv.datos, repo, conv.excluidas);
   conv.propuesta = null;
   conv.ofrecer = null;
   const para = conv.datos.personas !== null ? ` para ${conv.datos.personas} personas` : "";
@@ -631,9 +632,9 @@ async function revisarTemprano(conv: Conversacion, repo: Repositorio): Promise<{
 }
 
 // Texto de aforo insuficiente de la sala elegida, o null si alcanza o faltan datos (7.0.9).
-async function aforoInsuficiente(d: SolicitudReserva, repo: Repositorio): Promise<string | null> {
+async function aforoInsuficiente(d: SolicitudReserva, repo: Repositorio, excluidas: string[] | null | undefined = null): Promise<string | null> {
   if (!d.sala || !d.fecha || d.personas === null) return null;
-  const ctx = await contextoPara(repo, null, d.fecha);
+  const ctx = await contextoPara(repo, null, d.fecha, excluidas);
   const sala = ctx.salas.find((x) => x._id === d.sala);
   if (!sala) return null;
   const { operativos, inciertos } = disponibilidad(sala, d.fecha, ctx.reservasDelDia, ctx);
@@ -774,6 +775,24 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   const fechaPrevia = conv.datos.fecha;
   const salaPrevia = conv.datos.sala;
   const personasPrevias = conv.datos.personas;
+  // 7.0.27: dos fechas en un mismo mensaje («mañana y el lunes»). Una reserva es por día: no se elige una en
+  // silencio; se pregunta cuál y se dejan las dos como botones.
+  const dias = fechas(texto, h.fecha);
+  if (dias.length > 1) {
+    conv.datos.fecha = null;
+    conv.validado = null;
+    conv.propuesta = null;
+    conv.pendiente = "fecha";
+    conv.intentos = 0;
+    await guardar(repo, conv);
+    const etiquetas = dias.map((d) => fechaLarga(d));
+    const lista = etiquetas.length === 2
+      ? `${etiquetas[0]} o ${etiquetas[1]}`
+      : `${etiquetas.slice(0, -1).join(", ")} o ${etiquetas[etiquetas.length - 1]}`;
+    return abierto(conv,
+      `¿Para cuál día: ${lista}? Una reserva es por día; después puedes hacer la otra.`,
+      etiquetas.map((e) => capitalizar(e)));
+  }
   // Chips "Revisar mañana" y "Revisar el {día}": cambian la fecha y conservan el horario pedido.
   if (/^revisar\b/.test(t)) {
     const f = extraer(texto, { hoy: h.fecha, pendiente: null }).fecha;
@@ -802,6 +821,20 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   }
   let cambio = false;
   let prefijo = "";
+  // 7.0.27: salas rechazadas en este mensaje. Se guardan en la conversación, no se asignan ni se vuelven a ofrecer.
+  const negadas = salasNegadas(texto);
+  let salaNegadaAfectada = false;
+  if (negadas.length) {
+    conv.excluidas = [...new Set([...(conv.excluidas ?? []), ...negadas])];
+    const afectada = conv.datos.sala ?? conv.propuesta?.sala ?? null;
+    if (afectada && negadas.includes(afectada)) {
+      conv.datos.sala = null;
+      conv.propuesta = null;
+      conv.validado = null;
+      cambio = true;
+      salaNegadaAfectada = true;
+    }
+  }
 
   // "cambiar <campo>": se borra ese dato y se vuelve a pedir.
   const cambiar = t.match(/^cambiar (carne|fecha|horario|personas|equipos|sala|materia)\b/);
@@ -815,6 +848,7 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   const usar = t.match(/\busar sala\s*-?\s*(1[0-6]|[1-9])\b/);
   if (usar) {
     conv.datos.sala = `sala-${usar[1]}`;
+    conv.excluidas = (conv.excluidas ?? []).filter((x) => x !== `sala-${usar[1]}`);
     conv.propuesta = null;
     cambio = true;
   }
@@ -828,6 +862,7 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
       : limpio.match(/^(?:(?:quiero|prefiero|mejor|dame|usar|uso|elijo|escojo)\s+)?(?:la|el|sala|laboratorio)\s+(?:sala\s+|laboratorio\s+)?(?:numero\s+)?(1[0-6]|[1-9])$/);
     if (n) {
       conv.datos.sala = `sala-${n[1]}`;
+      conv.excluidas = (conv.excluidas ?? []).filter((x) => x !== `sala-${n[1]}`);
       conv.propuesta = null;
       conv.ofrecer = null;
       cambio = true;
@@ -836,10 +871,26 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   if (usar) conv.ofrecer = null;
 
   const ext = extraer(texto, { hoy: h.fecha, pendiente: conv.pendiente });
+  // La sala rechazada no se toma aunque el extractor la haya visto en el mismo mensaje («no quiero la sala 13»).
+  if (negadas.length && ext.sala && negadas.includes(ext.sala)) ext.sala = null;
+  // 7.0.27: dos cantidades sin marcador («somos 10 o 12») no se resuelven tomando la primera: se pregunta cuál.
+  const ambiguas = personasAmbiguas(texto);
+  if (ambiguas && !tieneCorreccion(texto)) {
+    conv.pendiente = "personas";
+    conv.propuesta = null;
+    conv.intentos = 0;
+    await guardar(repo, conv);
+    return abierto(conv, `¿Cuántas personas son: ${ambiguas[0]} o ${ambiguas[1]}?`,
+      [String(ambiguas[0]), String(ambiguas[1])]);
+  }
   // 7.0.25: «somos 0», «somos -5», «somos 1000» o «equipos 0» se explican antes de tocar los datos: el esquema
   // los rechaza y la conversación terminaba en Error interno. No se aplica el valor inválido.
   const cantidad = await cantidadInvalida(ext, repo);
   if (cantidad) {
+    // El valor fuera de rango no se conserva: si `iniciar` ya lo había copiado (mensaje de apertura), se limpia.
+    if ((conv.datos as Record<string, unknown>)[cantidad.campo] === (ext as Record<string, unknown>)[cantidad.campo]) {
+      (conv.datos as Record<string, unknown>)[cantidad.campo] = null;
+    }
     conv.pendiente = cantidad.campo;
     conv.propuesta = null;
     conv.intentos = 0;
@@ -858,25 +909,9 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   const espacios = carneSesion?.rol === "docente" ? carneSesion.espacios : [];
   if (conv.pendiente === "materia" && espacios.length) ext.materia = null;
 
-  // Confirmación de la propuesta.
-  if (conv.pendiente === "confirmar" && conv.propuesta) {
-    if (ext.confirmacion === "si") return confirmar(conv, repo);
-    if (ext.confirmacion === "no") {
-      conv.propuesta = null;
-      conv.datos.inicio = null;
-      conv.datos.fin = null;
-      conv.datos.sala = null;
-      conv.pendiente = "horario";
-      conv.intentos = 0;
-      await guardar(repo, conv);
-      const p = preguntaPara("horario", docenteDe(conv.datos));
-      return abierto(conv, "Listo, no la separé. ¿Quieres otro horario u otra sala?", p.opciones);
-    }
-  }
-
-  // Registro dentro de la reserva: "Sí, registrarme" o "No".
+  // Registro dentro de la reserva: "Sí, registrarme" o "No". No usa la confirmación estricta de la reserva.
   if (conv.pendiente === "registro") {
-    if (ext.confirmacion === "si") {
+    if (ext.confirmacion === "si" || /^si\b/.test(t)) {
       const d = await registrarUsuarioDesde(conv.datos.carne!, repo);
       if (d.reglas_aplicadas.includes("R26")) {
         prefijo = `Listo, quedaste registrado como ${conv.datos.carne!.startsWith("D-") ? "docente" : "estudiante"} con el carné ${conv.datos.carne}. `;
@@ -897,10 +932,21 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   }
 
   cambio = aplicar(conv.datos, ext, true) || cambio;
+  // 7.0.27: en la confirmación, un rango nuevo reemplaza las horas de la propuesta y se vuelve a revisar.
+  const rangoNuevo = pendientePrevio === "confirmar" && ext.inicio !== null && ext.fin !== null
+    && (conv.datos.inicio !== ext.inicio || conv.datos.fin !== ext.fin);
+  if (rangoNuevo) {
+    conv.datos.inicio = ext.inicio;
+    conv.datos.fin = ext.fin;
+    cambio = true;
+  }
   // 7.0.26: una fecha, sala o personas explícitas distintas reemplazan a las anteriores. Se borra la validación
   // temprana y la propuesta para que `revisarTemprano` vuelva a comprobar R15, ocupación y R28.
   const cambioFecha = fechaPrevia !== null && conv.datos.fecha !== null && conv.datos.fecha !== fechaPrevia;
-  if (cambioFecha || conv.datos.sala !== salaPrevia || conv.datos.personas !== personasPrevias) {
+  // 7.0.27: la fecha llegó por primera vez en este turno (antes no había): el texto dice «Listo, mañana (…)».
+  const fechaNueva = fechaPrevia === null && conv.datos.fecha !== null && ext.fecha === conv.datos.fecha
+    && pendientePrevio === "fecha";
+  if (cambioFecha || rangoNuevo || conv.datos.sala !== salaPrevia || conv.datos.personas !== personasPrevias) {
     conv.validado = null;
     conv.propuesta = null;
   }
@@ -912,6 +958,43 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
     }
   }
   if (cambio && conv.propuesta) conv.propuesta = null;
+
+  // 7.0.27: una hora suelta («mejor a las 4») no decide el rango: se pide completo y se conserva la fecha.
+  if (pendientePrevio === "confirmar" && horaSuelta(texto)) {
+    conv.datos.inicio = null;
+    conv.datos.fin = null;
+    conv.propuesta = null;
+    conv.validado = null;
+    conv.pendiente = "horario";
+    conv.intentos = 0;
+    cambio = true;
+  }
+
+  // Una sala rechazada en este turno: no se toma. Si ya había fecha y horario, se ofrecen otras (sin la rechazada).
+  if (salaNegadaAfectada && !conv.datos.sala && conv.datos.fecha && conv.datos.inicio && conv.datos.fin) {
+    return ofrecerSalas(conv, repo, "");
+  }
+
+  // Confirmación de la propuesta: solo un afirmativo puro confirma; una contradicción no se interpreta.
+  if (conv.pendiente === "confirmar" && conv.propuesta) {
+    if (ext.confirmacion === "si" && !cambio) return confirmar(conv, repo);
+    if (ext.confirmacion === "no" && !cambio) {
+      conv.propuesta = null;
+      conv.datos.inicio = null;
+      conv.datos.fin = null;
+      conv.datos.sala = null;
+      conv.pendiente = "horario";
+      conv.intentos = 0;
+      await guardar(repo, conv);
+      const p = preguntaPara("horario", docenteDe(conv.datos));
+      return abierto(conv, "Listo, no la separé. ¿Quieres otro horario u otra sala?", p.opciones);
+    }
+    if (!cambio) {
+      conv.intentos = 0;
+      await guardar(repo, conv);
+      return abierto(conv, "No entendí si confirmas. ¿Confirmo la reserva?", ["Sí, confirmar", "No"]);
+    }
+  }
 
   // El carné se evalúa apenas llega: vencido (R16) o desconocido (R17) cierran el flujo en este mismo mensaje.
   if (conv.datos.carne) {
@@ -949,7 +1032,7 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
 
   // Aforo temprano (7.0.9): con sala y personas, si no alcanza se ofrecen otras salas antes de pedir más datos.
   // Estudiantes: un equipo por persona. Docentes: solo el aforo (los equipos se piden después).
-  const aforo = await aforoInsuficiente(conv.datos, repo);
+  const aforo = await aforoInsuficiente(conv.datos, repo, conv.excluidas);
   if (aforo) {
     conv.datos.sala = null;
     conv.validado = null;
@@ -974,13 +1057,19 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
       : preguntaPara(f, docenteDe(conv.datos), conv.datos);
     // 7.0.26: la fecha se cambió y aún falta el horario. Se confirma el cambio y se pregunta exactamente por él;
     // la revisión temprana de R15/ocupación/R28 corre en el turno que traiga las horas.
-    if (f === "horario" && cambioFecha) {
+    // 7.0.27: si no había una fecha antes, no es un «cambio»: se dice «Listo, mañana (…)» y se pide el rango.
+    if (f === "horario" && (cambioFecha || fechaNueva)) {
       const nueva = conv.datos.fecha!;
       const cuando = nueva === sumarDias(h.fecha, 1)
         ? `a mañana (${fechaLarga(nueva)})`
         : `al ${fechaLarga(nueva)}`;
+      const arranque = cambioFecha
+        ? `Listo, cambio ${cuando}.`
+        : nueva === sumarDias(h.fecha, 1)
+          ? `Listo, mañana (${fechaLarga(nueva)}).`
+          : `Listo, el ${fechaLarga(nueva)}.`;
       const pregunta = conv.datos.inicio && !conv.datos.fin ? p.texto : "¿De qué hora a qué hora?";
-      return abierto(conv, `${prefijo}Listo, cambio ${cuando}. ${pregunta}`, p.opciones);
+      return abierto(conv, `${prefijo}${arranque} ${pregunta}`, p.opciones);
     }
     const aviso = temprano.ok ? `${temprano.ok}Ahora, ${minusculaInicial(p.texto)}` : p.texto;
     return abierto(conv, prefijo + aviso, p.opciones);
@@ -1343,6 +1432,32 @@ async function respuestaOferta(texto: string, sesion: string, repo: Repositorio)
   return null;
 }
 
+// 7.0.27: un mensaje que trae datos de una reserva nueva y un pedido de cancelación («reserva la sala 4 mañana de
+// 2 a 4 y cancela RS-0004») se atiende de a una cosa. Se ofrecen los dos caminos como botones; la cancelación solo
+// se nombra si la reserva es del carné de la sesión (nunca se revela una RS ajena).
+const PIDE_RESERVAR = /\b(?:reservar|separar|apartar|agendar|programar|reservo|separo|aparto|agendo)\b|\breserva\s+(?:la\s+|una\s+|el\s+|mi\s+)?(?:sala|laboratorio)\b/;
+export async function mixtoTurno(texto: string, sesion: string, repo: Repositorio): Promise<RespuestaChat | null> {
+  const t = norm(texto);
+  if (!PIDE_CANCELAR.test(t) || !hablaDeReserva(texto) || !PIDE_RESERVAR.test(t)) return null;
+  const h = ahora();
+  const e = extraer(texto, { hoy: h.fecha, pendiente: null });
+  if (!e.sala || !e.fecha || !e.inicio || !e.fin) return null;
+  const carne = (await repo.leerSesion(sesion))?.carne ?? null;
+  if (!carne) return null;
+  const codigo = codigoDe(texto);
+  const nombre = `Sala ${e.sala.slice(5)}`;
+  const cuando = e.fecha === sumarDias(h.fecha, 1) ? "mañana" : `el ${fechaLarga(e.fecha)}`;
+  const reservar = `Reservar la ${nombre} ${cuando} de ${e.inicio} a ${e.fin}`;
+  const ajena = codigo ? await repo.reservaPorCodigo(codigo) : null;
+  if (codigo && ajena && ajena.carne === carne) {
+    return cerrado("aclaracion",
+      `Hagamos una cosa a la vez. ¿Qué prefieres: reservar o cancelar ${codigo}?`,
+      [reservar, `Cancelar ${codigo}`]);
+  }
+  return cerrado("aclaracion",
+    `Hagamos una cosa a la vez. ¿Reservo la ${nombre} ${cuando} de ${e.inicio} a ${e.fin}?`, [reservar]);
+}
+
 export async function continuar(texto: string, sesion: string, repo: Repositorio): Promise<RespuestaChat | null> {
   const conv = await repo.leerConversacion(sesion);
   // El contexto de una disponibilidad no es un flujo abierto, salvo la oferta de mañana.
@@ -1350,6 +1465,9 @@ export async function continuar(texto: string, sesion: string, repo: Repositorio
     return conv.pendiente === "oferta_dia" ? respuestaOferta(texto, sesion, repo) : null;
   }
   if (!conv) return null;
+  // Dos pedidos en un mismo mensaje (reservar y cancelar): se atiende uno a la vez.
+  const mixto = await mixtoTurno(texto, sesion, repo);
+  if (mixto) return mixto;
   // «cancelar», «cancélalo», «olvídalo», «ya no quiero», «salir» (anclado, 7.0.24): cierra la solicitud.
   if (esCancelar(texto)) {
     await repo.borrarConversacion(sesion);
@@ -1370,7 +1488,7 @@ export async function iniciar(
   if (flujo === "disponibilidad") return disponibilidadTurno(texto, sesion, repo);
   if (flujo === "registro") {
     const conv: Conversacion = {
-      _id: sesion, flujo, pendiente: "carne", datos: VACIA(), intentos: 0, propuesta: null, actualizado: new Date(),
+      _id: sesion, flujo, pendiente: "carne", datos: VACIA(), intentos: 0, propuesta: null, excluidas: [], actualizado: new Date(),
     };
     if (extraer(texto, { hoy: ahora().fecha, pendiente: "carne" }).carne) return turnoRegistro(conv, texto, repo);
     await guardar(repo, conv);
@@ -1405,7 +1523,7 @@ export async function iniciar(
     }
   }
   const conv: Conversacion = {
-    _id: sesion, flujo, pendiente: null, datos, intentos: 0, propuesta: null, actualizado: new Date(),
+    _id: sesion, flujo, pendiente: null, datos, intentos: 0, propuesta: null, excluidas: [], actualizado: new Date(),
   };
   await guardar(repo, conv);
   const r = await turnoReserva(conv, texto, repo);

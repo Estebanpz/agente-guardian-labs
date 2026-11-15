@@ -1,5 +1,5 @@
 // Pruebas de los extractores deterministas del chat de reservas (sin modelo).
-import { cancelar, extraer, fechas, salaInexistente, type Extraido } from "../agent/tools/extraer.js";
+import { cancelar, confirmacion, extraer, fechas, horaSuelta, personasAmbiguas, salaInexistente, salasNegadas, type Extraido } from "../agent/tools/extraer.js";
 
 const HOY = "2026-11-09"; // lunes
 
@@ -86,6 +86,10 @@ const CASOS: Caso[] = [
   { entrada: "a las 3", esperado: { duracion_min: null } },
   { entrada: "3 de la tarde", esperado: { duracion_min: null } },
   { entrada: "de 3 a 5", esperado: { duracion_min: null, inicio: "15:00", fin: "17:00" } },
+  // 7.0.27: con un marcador de corrección manda el último valor del campo.
+  { entrada: "para 10 personas, bueno no, somos 8", esperado: { personas: 8 } },
+  { entrada: "de 10 a 12, perdón, de 2 a 4", esperado: { inicio: "14:00", fin: "16:00" } },
+  { entrada: "mañana, mejor el jueves", esperado: { fecha: "2026-11-12" } },
 ];
 
 let fallos = 0;
@@ -133,6 +137,9 @@ const FECHAS: [string, string[]][] = [
   ["el jueves y viernes", ["2026-11-12", "2026-11-13"]],
   ["mañana y pasado mañana", ["2026-11-10", "2026-11-11"]],
   ["lunes, martes y miércoles", ["2026-11-09", "2026-11-10", "2026-11-11"]],
+  // 7.0.27: el día de la semana que precede a «13 de noviembre» es la misma fecha, no otra.
+  ["el sábado 14 de noviembre", ["2026-11-14"]],
+  ["mañana y el jueves", ["2026-11-10", "2026-11-12"]],
   ["en la mañana", []],
   ["por la mañana", []],
   ["en la tarde", []],
@@ -158,6 +165,61 @@ for (const [texto, esperado] of SALAS) {
   const ok = r === esperado;
   if (!ok) fallos++;
   console.log(`${ok ? "✅" : "❌"} salaInexistente("${texto}") = ${esperado}${ok ? "" : ` · ${r}`}`);
+}
+// 7.0.27: confirmación estricta. Solo un afirmativo puro de inicio a fin confirma; una negación o una contradicción
+// no se interpretan (el flujo pregunta «No entendí si confirmas»). «no, cancela» sigue siendo un no.
+const CONFIRMA: [string, "si" | "no" | null][] = [
+  ["sí", "si"], ["si", "si"], ["sí, confirmar", "si"], ["confirmo", "si"], ["confirmar", "si"],
+  ["dale", "si"], ["de una", "si"], ["ok", "si"], ["listo", "si"], ["👍", "si"],
+  ["no", "no"], ["no, cancela", "no"], ["no gracias", "no"],
+  ["si, claro que no", null], ["nunca", null], ["claro que no", null], ["si pero mejor a las 4", null],
+  ["sí, pero a las 4", null], ["no, mejor mañana", null],
+];
+for (const [texto, esperado] of CONFIRMA) {
+  const r = confirmacion(texto);
+  const ok = r === esperado;
+  if (!ok) fallos++;
+  console.log(`${ok ? "✅" : "❌"} confirmacion("${texto}") = ${JSON.stringify(esperado)}${ok ? "" : ` · ${JSON.stringify(r)}`}`);
+}
+// 7.0.27: salas rechazadas en el mensaje. Se guardan como excluidas y no se vuelven a ofrecer.
+const NEGADAS: [string, string[]][] = [
+  ["No quiero la sala 13 dame otra", ["sala-13"]],
+  ["la 13 no", ["sala-13"]],
+  ["otra que no sea la 13", ["sala-13"]],
+  ["menos la sala 5", ["sala-5"]],
+  ["no la 2", ["sala-2"]],
+  ["quiero la sala 4", []],
+  ["la sala 13 está lejos", []],
+];
+for (const [texto, esperado] of NEGADAS) {
+  const r = salasNegadas(texto);
+  const ok = JSON.stringify(r) === JSON.stringify(esperado);
+  if (!ok) fallos++;
+  console.log(`${ok ? "✅" : "❌"} salasNegadas("${texto}") = ${JSON.stringify(esperado)}${ok ? "" : ` · ${JSON.stringify(r)}`}`);
+}
+// 7.0.27: dos cantidades sin marcador no se resuelven tomando la primera; se pregunta cuál.
+const AMBIGUAS: [string, number[] | null][] = [
+  ["somos 10 o 12", [10, 12]],
+  ["para 5 o 6 personas", [5, 6]],
+  ["somos 5", null],
+  ["somos 10 personas, bueno no, 12", null],
+];
+for (const [texto, esperado] of AMBIGUAS) {
+  const r = personasAmbiguas(texto);
+  const ok = JSON.stringify(r) === JSON.stringify(esperado);
+  if (!ok) fallos++;
+  console.log(`${ok ? "✅" : "❌"} personasAmbiguas("${texto}") = ${JSON.stringify(esperado)}${ok ? "" : ` · ${JSON.stringify(r)}`}`);
+}
+// 7.0.27: una hora suelta («a las 4») no es un rango; el flujo pide las dos horas conservando la fecha.
+const HORA_SUELTA: [string, boolean][] = [
+  ["a las 4", true], ["mejor a las 4", true], ["4 pm", true], ["hasta las 3", true],
+  ["de 4 a 6", false], ["de 10 a 12", false], ["somos 4", false],
+];
+for (const [texto, esperado] of HORA_SUELTA) {
+  const r = horaSuelta(texto);
+  const ok = r === esperado;
+  if (!ok) fallos++;
+  console.log(`${ok ? "✅" : "❌"} horaSuelta("${texto}") = ${esperado}${ok ? "" : ` · ${r}`}`);
 }
 console.log(fallos === 0 ? "\nTodas pasaron" : `\n${fallos} fallaron`);
 process.exit(fallos === 0 ? 0 : 1);

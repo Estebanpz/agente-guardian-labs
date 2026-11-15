@@ -12,7 +12,7 @@ import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import { salas } from "../data/salas.js";
 import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
-import { cancelacionTurno, continuar, misReservasTurno, esBotonCancelacion, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionPrivadaTurno, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
+import { cancelacionTurno, continuar, misReservasTurno, esBotonCancelacion, escalarCarneDesconocido, estadoSalasDeBase, iniciar, mixtoTurno, ocupacionPrivadaTurno, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
 import { CHIPS_SALUDO, PEDIR_CARNE, esSalida, esSaludo, saludoPara } from "./sesion.js";
 import { carne as carneDe, carnesEn, extraer, salaInexistente, sinCarnes } from "./tools/extraer.js";
 import { enmascarar } from "./tools/reservas.js";
@@ -211,6 +211,11 @@ async function desvioDelFlujo(texto: string, sesion: string, repo: Repositorio):
   if (/\d/.test(t)) return null;
   if (/^(usar sala|ver otras salas|escalar al monitor|revisar|cambiar|si\b|no\b)/.test(t)) return null;
   const e = extraer(texto, { hoy: ahora().fecha, pendiente: conv.pendiente ?? null });
+  // En «¿Confirmo la reserva?», una respuesta con afirmación, negación, contradicción o un dato nuevo la decide
+  // `turnoReserva` (7.0.27): no es un desvío que deba interpretar el modelo.
+  if (conv.pendiente === "confirmar"
+    && (e.confirmacion || e.fecha || e.inicio || e.sala || e.personas !== null || e.equipos !== null
+      || /\b(si|no|nunca|pero|mejor|claro|cambia|cambiar|corrijo|digo|perdon)\b/.test(t))) return null;
   const aporta = e.carne || e.fecha || e.inicio || e.sala || e.personas !== null || e.equipos !== null
     || e.computo_alto !== null || e.materia || e.confirmacion || e.cancelar || e.duracion_min;
   // Pedir algo sobre una reserva («cancela esa reserva y me la das a mi») no es un desvío (7.0.24): lo decide
@@ -430,6 +435,15 @@ async function mensajeBase(
         registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
         return r;
       }
+    }
+  }
+
+  // Dos pedidos en un mismo mensaje (reservar y cancelar), sin flujo abierto: se atiende uno a la vez.
+  if (sesion && !eludir) {
+    const mixto = await mixtoTurno(texto, sesion, repo);
+    if (mixto) {
+      registrar({ texto: resumen, intencion: mixto.intencion, respuesta: mixto.respuesta });
+      return mixto;
     }
   }
 

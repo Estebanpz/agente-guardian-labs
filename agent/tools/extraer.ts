@@ -5,6 +5,31 @@ import { aHora, aMin, diaSemana, sumarDias } from "./reloj.js";
 // Minúsculas y sin tildes, para reconocer las frases.
 const norm = (t: string): string => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
+// ── Correcciones dentro del mismo mensaje (7.0.27) ───────────────────────
+// «sala 4 para 10 personas, bueno no, somos 40» tomaba 10: con un marcador de corrección manda el último valor
+// del campo. Sin marcador («somos 10 o 12») no se supone: el llamador pregunta cuál.
+const RE_CORRECCION = /\b(bueno no|mejor|perdon|digo|corrijo|mas bien)\b/;
+export const tieneCorreccion = (t: string): boolean => RE_CORRECCION.test(norm(t));
+// Texto que sigue al último marcador, o null si no hay ninguno.
+function trasCorreccion(n: string): string | null {
+  let fin: number | null = null;
+  for (const m of n.matchAll(new RegExp(RE_CORRECCION.source, "g"))) {
+    fin = (m.index ?? 0) + m[0].length;
+  }
+  return fin === null ? null : n.slice(fin).trim();
+}
+// Busca primero en lo que sigue al último marcador; si allí no hay valor, en el mensaje completo. Así «mejor la
+// sala 6» corrige la sala pero no borra la fecha que ya venía antes («mañana mejor la sala 6»).
+function conUltimo<T>(texto: string, buscar: (n: string) => T | null): T | null {
+  const n = norm(texto);
+  const cola = trasCorreccion(n);
+  if (cola !== null) {
+    const v = buscar(cola);
+    if (v !== null) return v;
+  }
+  return buscar(n);
+}
+
 const MESES: Record<string, number> = {
   enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8,
   septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
@@ -74,8 +99,9 @@ function buscarFechaTexto(t: string, hoy: string): Hallazgo<string> | null {
   if (/\b(?:antier|anteayer)\b/.test(n)) return { valor: sumarDias(hoy, -2), texto: n.match(/\b(?:antier|anteayer)\b/)![0] };
   if (/\bayer\b/.test(n)) return { valor: sumarDias(hoy, -1), texto: "ayer" };
   // "10 de noviembre" (año de hoy). Va antes que el día de la semana: en «el sábado 13 de noviembre» manda el 13.
-  m = n.match(new RegExp(`\\b(\\d{1,2}) de (${Object.keys(MESES).join("|")})\\b`));
-  if (m) return { valor: fmtFecha(Number(hoy.slice(0, 4)), MESES[m[2]], Number(m[1])), texto: m[0] };
+  // El día de la semana que lo precede forma parte de la misma fecha (si no, `fechas` lo contaría como otra).
+  m = n.match(new RegExp(`((?:\\b(?:el |este |del )?(?:${Object.keys(DIAS).join("|")})\\s+)?)\\b(\\d{1,2}) de (${Object.keys(MESES).join("|")})\\b`));
+  if (m) return { valor: fmtFecha(Number(hoy.slice(0, 4)), MESES[m[3]], Number(m[2])), texto: m[0] };
   // Día de la semana: la fecha más cercana igual o posterior a hoy.
   m = n.match(new RegExp(`\\b(?:el |este |del )?(${Object.keys(DIAS).join("|")})\\b`));
   if (m) {
@@ -189,9 +215,30 @@ export function sala(t: string): string | null {
   return buscarSala(t)?.valor ?? null;
 }
 
-// ── Números (sobre el texto ya sin carné, fecha, horario y sala) ─────────
-export function personas(t: string, pendiente: string | null = null): number | null {
+// Salas que el mensaje rechaza (7.0.27): «no quiero la sala 13 dame otra», «la 13 no», «otra que no sea la 13».
+// Se guardan en la conversación y no se vuelven a proponer ni a asignar.
+export function salasNegadas(t: string): string[] {
   const n = norm(t);
+  const NUM_SALA = "(1[0-6]|[1-9])";
+  const re = [
+    new RegExp(`\\bno\\s+(?:quiero|deseo|necesito|uso|usar|tomo|tomar)\\s+(?:la\\s+|el\\s+|sala\\s+|laboratorio\\s+)*(?:sala\\s+|laboratorio\\s+)?(?:numero\\s+)?${NUM_SALA}\\b`, "g"),
+    new RegExp(`\\b(?:la|el|sala|laboratorio)\\s+(?:sala\\s+|laboratorio\\s+)?(?:numero\\s+)?${NUM_SALA}\\s+no\\b`, "g"),
+    new RegExp(`\\b(?:otra|otro)\\s+(?:que\\s+)?no\\s+(?:sea|fuera|es)\\s+(?:la\\s+|el\\s+|sala\\s+|laboratorio\\s+)*(?:sala\\s+|laboratorio\\s+)?${NUM_SALA}\\b`, "g"),
+    new RegExp(`\\b(?:menos|excepto|salvo|sin|que\\s+no\\s+sea|que\\s+no\\s+fuera)\\s+(?:la\\s+|el\\s+|sala\\s+|laboratorio\\s+)*(?:sala\\s+|laboratorio\\s+)?${NUM_SALA}\\b`, "g"),
+    new RegExp(`\\bno\\s+(?:la|el|sala|laboratorio)\\s+(?:sala\\s+)?(?:numero\\s+)?${NUM_SALA}\\b`, "g"),
+  ];
+  const out: string[] = [];
+  for (const r of re) {
+    for (const m of n.matchAll(r)) {
+      const id = `sala-${m[1]}`;
+      if (!out.includes(id)) out.push(id);
+    }
+  }
+  return out;
+}
+
+// ── Números (sobre el texto ya sin carné, fecha, horario y sala) ─────────
+function personasEn(n: string, pendiente: string | null): number | null {
   let m = n.match(new RegExp(`\\b(?:somos|para|grupo de)\\s+${NUM_CANTIDAD}\\b`));
   if (m) return valorNum(m[1]);
   m = n.match(new RegExp(`(?:^|\\s)${NUM_CANTIDAD}\\s+(?:personas|estudiantes|alumnos|integrantes|companeros)\\b`));
@@ -206,8 +253,22 @@ export function personas(t: string, pendiente: string | null = null): number | n
   return null;
 }
 
-export function equipos(t: string, pendiente: string | null = null): number | null {
+export function personas(t: string, pendiente: string | null = null): number | null {
+  return conUltimo(t, (n) => personasEn(n, pendiente));
+}
+
+// «somos 10 o 12»: dos valores sin marcador de corrección. El flujo pregunta cuál en vez de tomar el primero.
+export function personasAmbiguas(t: string): number[] | null {
   const n = norm(t);
+  const m = n.match(new RegExp(`\\b(?:somos|para|grupo de)\\s+${NUM_CANTIDAD}\\s+o\\s+${NUM_CANTIDAD}\\b`))
+    ?? n.match(new RegExp(`\\b${NUM_CANTIDAD}\\s+o\\s+${NUM_CANTIDAD}\\s+(?:personas|estudiantes|alumnos|integrantes|companeros)\\b`));
+  if (!m) return null;
+  const a = valorNum(m[1]);
+  const b = valorNum(m[2]);
+  return a === b ? null : [a, b];
+}
+
+function equiposEn(n: string, pendiente: string | null): number | null {
   let m = n.match(new RegExp(`(?:^|\\s)${NUM_CANTIDAD}\\s+(?:computadores|computadoras|equipos|pcs?|maquinas)\\b`));
   if (m) return valorNum(m[1]);
   // «equipos 0», «computadores 1000»: la cantidad también puede ir después de la palabra.
@@ -218,6 +279,10 @@ export function equipos(t: string, pendiente: string | null = null): number | nu
     if (s) return valorNum(s[1]);
   }
   return null;
+}
+
+export function equipos(t: string, pendiente: string | null = null): number | null {
+  return conUltimo(t, (n) => equiposEn(n, pendiente));
 }
 
 export function computoAlto(t: string, pendiente: string | null = null): boolean | null {
@@ -241,11 +306,24 @@ export function materia(t: string, pendiente: string | null = null): string | nu
 }
 
 // ── Respuestas cortas ────────────────────────────────────────────────────
+// 7.0.27: solo confirma un afirmativo puro, de inicio a fin. «si, claro que no» o «si pero mejor a las 4» no
+// confirman: el flujo pregunta «No entendí si confirmas» (o aplica el dato nuevo y vuelve a revisar).
+// «no, cancela» sigue siendo un no (lo usan los guiones y la cancelación de la solicitud).
+const AFIRMATIVO = /^(si|si confirmar|confirmo|confirmo la reserva|confirmar|confirmar la reserva|dale|de una|ok|okay|listo|👍)$/;
+const NEGATIVO = /^(no|no gracias|nel|no cancela|no cancelalo|no cancelarla|no cancelar|no cancela la reserva)$/;
 export function confirmacion(t: string): "si" | "no" | null {
-  const n = norm(t);
-  if (/\b(si|confirmo|dale|de una|ok|listo)\b/.test(n)) return "si";
-  if (/\b(no|cancela)\b/.test(n)) return "no";
+  const n = norm(t).replace(/[.,!?¡¿;:]+/g, " ").replace(/\s+/g, " ").trim();
+  if (AFIRMATIVO.test(n)) return "si";
+  if (NEGATIVO.test(n)) return "no";
   return null;
+}
+
+// «a las 4», «4 pm», «hasta las 3»: una hora suelta, sin rango. Sirve para pedir las dos horas conservando la fecha.
+export function horaSuelta(t: string): boolean {
+  const n = normalizarHorario(norm(t));
+  if (buscarHorario(n)) return false;
+  return /\b(?:a|desde|de|hasta)\s+las?\s+\d{1,2}(?::\d{2})?\b/.test(n)
+    || /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/.test(n);
 }
 
 // "salir" cancela solo como mensaje completo: "hasta salir de clase" no cancela la reserva.
@@ -302,13 +380,13 @@ export function extraer(texto: string, opts: { hoy: string; pendiente: string | 
   let r = normalizarHorario(norm(texto));
   if (c) r = r.replace(/\b[cd]-?\d{8}\b/, " ");
   // 2) fecha
-  const f = buscarFecha(r, opts.hoy);
+  const f = conUltimo(r, (n) => buscarFecha(n, opts.hoy));
   if (f) r = r.replace(f.texto, " ");
   // 3) sala: antes del horario, para que su número no se lea como una hora ("sala 6 de 2 a 4" → 14:00–16:00)
-  const s = buscarSala(r);
+  const s = conUltimo(r, buscarSala);
   if (s) r = r.replace(s.texto, " ");
   // 4) horario
-  const h = buscarHorario(r);
+  const h = conUltimo(r, buscarHorario);
   if (h) r = r.replace(h.texto, " ");
   // 5) números, sobre el texto ya sin esos fragmentos
   return {
