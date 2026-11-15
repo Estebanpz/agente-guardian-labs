@@ -1,0 +1,56 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 170
+title Diagrama de decisiones: reserva de una sala
+start
+:Solicitud con carné, fecha, horario y personas;
+if (¿Falta algún dato?) then (sí)
+  :pedir_datos;
+  stop
+endif
+if (R15: ¿fecha u horario no permitido?) then (sí)
+  :negar;
+  stop
+endif
+if (R16: ¿carné vencido?) then (sí)
+  :negar y remitir a carnetización;
+  stop
+endif
+if (R17: ¿carné desconocido?) then (sí)
+  :escalar al monitor;
+  stop
+endif
+if (R18: ¿la sala no alcanza?) then (sí)
+  :negar;
+  stop
+endif
+if (R28: ¿el mismo carné ya tiene\notra reserva que se cruza?) then (sí)
+  :negar y mostrar la reserva existente;
+  stop
+endif
+if (R19: ¿equipos desconocidos\no en conflicto?) then (sí)
+  :escalar al monitor y a mantenimiento;
+  stop
+endif
+if (¿Choca con otra reserva?) then (sí)
+  if (R20: ¿docente frente a estudiantes?) then (sí)
+    :escalar al monitor con alternativas;
+  else (no)
+    :negar con alternativas;
+  endif
+  stop
+endif
+:programar la sala más pequeña que cumple;
+stop
+legend right
+Rombo = regla evaluada en orden real
+Acción = salida del motor con regla y traza
+R27 (cancelar) es un flujo aparte
+endlegend
+caption Versión 3.0 · 14-nov-2026 · Autores: Esteban Páez Leonel y Kevin Alexis Ayala Rodriguez · Elaboración propia
+@enduml

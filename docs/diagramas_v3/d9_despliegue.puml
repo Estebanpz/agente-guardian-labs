@@ -1,0 +1,38 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 170
+title Diagrama de despliegue local
+node "Equipo del monitor (Linux)" {
+  node "Navegador" {
+    artifact "web (Vite :5173)" as W
+  }
+  node "Node.js 24" {
+    artifact "agent (Express :3000)" as A
+    artifact "reglas.json" as R
+  }
+  node "MongoDB Community 8.0 (:27017, rs0)" {
+    database "guardian_labs" as DB
+  }
+  node "Ollama 0.34.2 (:11434)" {
+    artifact "llama3.2:3b" as M
+  }
+}
+W --> A : HTTP
+A --> M : HTTP local
+A --> DB : driver mongodb (localhost)
+A --> R : lectura al arrancar
+note bottom of DB
+  La URI vive en .env, no se sube al repositorio
+  y la base solo escucha en localhost.
+end note
+legend right
+Nodo = equipo o proceso · Artefacto = programa
+Todo corre en el mismo equipo, sin nube
+endlegend
+caption Versión 3.0 · 14-nov-2026 · Autores: Esteban Páez Leonel y Kevin Alexis Ayala Rodriguez · Elaboración propia
+@enduml

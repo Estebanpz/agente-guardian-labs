@@ -1,0 +1,49 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 170
+title Diagrama de actividades: mensaje de chat
+start
+:Recibir mensaje (máx. 500 caracteres);
+if (¿Pide reservar o ver sus reservas sin sesión?) then (sí)
+  :Pedir inicio de sesión;
+  stop
+endif
+if (¿Trae cédula, correo o teléfono?) then (sí)
+  :Bloquear; no llamar al modelo ni guardar el texto;
+  stop
+endif
+if (¿Hay un flujo abierto?) then (sí)
+  if (¿Intento de eludir reglas?) then (sí)
+    :Alerta; el flujo sigue sin cambios;
+    stop
+  endif
+  :Continuar el flujo (llenar campos);
+else (no)
+  :Ruta rápida o modelo clasifica la intención;
+endif
+if (¿Reserva?) then (sí)
+  :Pedir fecha, horario y personas
+(el carné sale de la sesión);
+  :Motor R14-R28 decide;
+  if (¿programar?) then (sí)
+    :Proponer sala y pedir confirmación;
+    :Crear reserva atómica en la base;
+  else (escalar o negar)
+    :Registrar escalada y avisar al monitor;
+  endif
+else (otra intención)
+  :Responder con datos de la base;
+endif
+:Responder con la traza;
+stop
+legend right
+Rombo = decisión · Rectángulo = acción
+Círculo negro = inicio · Círculo con borde = fin
+endlegend
+caption Versión 3.0 · 14-nov-2026 · Autores: Esteban Páez Leonel y Kevin Alexis Ayala Rodriguez · Elaboración propia
+@enduml

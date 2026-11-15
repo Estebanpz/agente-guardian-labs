@@ -1,0 +1,109 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 170
+hide empty members
+title Diagrama de clases (tipos principales)
+class Decision {
+  decision : permitir | negar | escalar
+  reglas_aplicadas
+  hechos_desconocidos
+  contradicciones
+  version_reglas
+  traza
+}
+class Hechos {
+  rol
+  carne_vigente
+  induccion_seguridad
+  equipo_estado_inventario
+  equipo_estado_mantenimiento
+}
+class SolicitudReserva {
+  carne
+  fecha
+  inicio
+  fin
+  sala
+  personas
+  equipos
+  computo_alto
+}
+class DecisionReserva {
+  decision : programar | negar | escalar | pedir_datos | registrar
+  estado
+  sala_asignada
+  alternativas
+  conflictos
+  notificar
+  traza
+}
+class ReservaDoc {
+  codigo
+  sala
+  fecha
+  inicio
+  fin
+  estado
+  reglas_aplicadas
+}
+class CuentaDoc {
+  _id : correo
+  nombres
+  apellidos
+  rol : estudiante | docente | monitor
+  carne
+  hash : scrypt
+}
+class SalaDoc {
+  _id
+  capacidad
+  computo
+}
+class EquipoDoc {
+  sala
+  inventario
+  mantenimiento
+}
+class Conversacion {
+  _id
+  flujo
+  pendiente
+  propuesta
+}
+class NotificacionDoc {
+  para
+  motivo
+  regla
+  estado
+}
+interface Repositorio {
+  salas()
+  reservasDelDia()
+  crearReservaAtomica()
+  registrarEscalada()
+  notificar()
+}
+class RepositorioMongo
+class RepositorioMemoria
+Repositorio <|.. RepositorioMongo
+Repositorio <|.. RepositorioMemoria
+Hechos --> Decision : motor evaluar
+SolicitudReserva --> DecisionReserva : evaluarReserva
+DecisionReserva ..> ReservaDoc
+ReservaDoc --> SalaDoc
+EquipoDoc --> SalaDoc
+ReservaDoc "1" --> "*" NotificacionDoc
+Conversacion o-- SolicitudReserva
+Repositorio ..> Conversacion
+Repositorio ..> CuentaDoc : cuenta(correo)
+legend right
+Clase = tipo del código TypeScript
+Flecha hueca = implementa · Rombo = composición
+endlegend
+caption Versión 3.0 · 14-nov-2026 · Autores: Esteban Páez Leonel y Kevin Alexis Ayala Rodriguez · Elaboración propia
+@enduml

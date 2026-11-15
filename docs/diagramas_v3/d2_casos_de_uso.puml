@@ -1,0 +1,53 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 170
+left to right direction
+title Casos de uso del agente (ingreso y reservas)
+actor "Monitor" as M
+actor "Estudiante" as E
+actor "Docente" as D
+actor "Coordinación /\nMantenimiento" as C
+rectangle "Agente Guardian Labs" {
+  usecase "Evaluar ingreso a una sala" as U1
+  usecase "Consultar disponibilidad\ny ocupación por día" as U2
+  usecase "Reservar sala por chat" as U3
+  usecase "Registrarse (carné)" as U4
+  usecase "Aplicar reglas R1-R28" as U5
+  usecase "Escalar caso" as U6
+  usecase "Ver salas y pendientes" as U7
+  usecase "Iniciar sesión por rol" as U8
+  usecase "Ver y cancelar mis reservas (R27)" as U9
+}
+M --> U8
+E --> U8
+D --> U8
+E --> U9
+D --> U9
+M --> U1
+M --> U7
+E --> U2
+E --> U3
+E --> U4
+D --> U2
+D --> U3
+D --> U4
+U1 ..> U5 : <<include>>
+U3 ..> U5 : <<include>>
+U9 ..> U5 : <<include>>
+U6 ..> U5 : <<extend>>
+U6 --> C
+note right of U6
+  Los conflictos entre personas los
+  resuelve el monitor (primera instancia).
+end note
+legend right
+Actor = rol que usa el agente
+Óvalo = caso de uso · include = siempre · extend = solo si aplica
+endlegend
+caption Versión 3.0 · 14-nov-2026 · Autores: Esteban Páez Leonel y Kevin Alexis Ayala Rodriguez · Elaboración propia
+@enduml

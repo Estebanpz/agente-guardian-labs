@@ -1,0 +1,48 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 170
+title Arquitectura del sistema (implementada)
+rectangle "Navegador (estudiante, docente o monitor)" as NAV {
+  component "Interfaz React 19 + Bootstrap 5\n(Vite, puerto 5173)\nVistas Laboratorios, Chat y Salas" as UI
+}
+rectangle "Equipo local (Node.js 24)" as LOC {
+  component "API Express 5\nchannels/http.ts (puerto 3000)" as API
+  component "Acceso\n(login por rol, scrypt,\ntoken HMAC 8 h)" as ACC
+  component "Orquestador\n(guardia, rutas, flujos)" as ORQ
+  component "Motor de reglas\nR1-R13 ingreso · R14-R28 reservas" as MOT
+  component "Conversación por pasos\n(extractores deterministas)" as CONV
+  component "Repositorio\n(mongo | memoria)" as REP
+  file "reglas.json\n(se carga al arrancar)" as RJ
+  file "logs/*.jsonl" as LOG
+}
+rectangle "Ollama (local, puerto 11434)" as OL {
+  component "llama3.2:3b" as LLM
+}
+database "MongoDB Community 8.0 local\n(replica set rs0, puerto 27017)" as ATL
+UI --> API : HTTP JSON
+API --> ACC : /login, /logout, /yo
+ACC --> REP : cuentas
+API --> ORQ
+ORQ --> CONV
+ORQ --> MOT
+MOT --> RJ : lee
+ORQ --> LLM : clasifica intención\n(JSON estructurado)
+CONV --> REP
+MOT --> REP
+REP --> ATL : driver mongodb (localhost)
+ORQ --> LOG : trazas (carnés enmascarados)
+note bottom of ATL
+  MongoDB local, autorizado por el docente
+  del curso en lugar de MySQL (sección 12.4).
+end note
+legend right
+Componente = módulo del código · Archivo = configuración o registro
+Base = MongoDB local · Flecha = llamada o lectura
+endlegend
+caption Versión 3.0 · 14-nov-2026 · Autores: Esteban Páez Leonel y Kevin Alexis Ayala Rodriguez · Elaboración propia
+@enduml

@@ -1,0 +1,55 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 170
+title Diagrama de componentes
+package "web" {
+  [Vistas Laboratorios, Chat y Salas] as W
+}
+package "agent" {
+  [http.ts] as H
+  [acceso.ts] as AC
+  [orquestador.ts] as O
+  [conversacion.ts] as C
+  [privacidad.ts] as P
+  [guardia.ts] as G
+  [interprete.ts] as I
+  [redactor.ts] as R
+  [proveedor.ts] as PR
+  [motor.ts R1-R13] as MI
+  [reservas.ts R14-R28] as MR
+  [extraer.ts] as X
+  [repositorio.ts] as S
+}
+database "reglas.json" as RJ
+database "MongoDB local o memoria" as DB
+[Ollama llama3.2:3b] as L
+W --> H
+H --> AC
+AC --> S
+H --> O
+O --> P
+O --> G
+O --> I
+O --> C
+O --> MI
+C --> X
+C --> MR
+MI --> RJ
+MR --> RJ
+MR --> S
+C --> S
+S --> DB
+I --> PR
+R --> PR
+PR --> L
+legend right
+Paquete = carpeta del repositorio
+Componente = archivo .ts · Base = datos
+endlegend
+caption Versión 3.0 · 14-nov-2026 · Autores: Esteban Páez Leonel y Kevin Alexis Ayala Rodriguez · Elaboración propia
+@enduml

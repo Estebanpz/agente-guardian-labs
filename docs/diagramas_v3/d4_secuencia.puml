@@ -1,0 +1,44 @@
+@startuml
+skinparam monochrome true
+skinparam defaultFontSize 15
+skinparam defaultFontName Arial
+skinparam backgroundColor white
+skinparam roundcorner 10
+skinparam shadowing false
+skinparam dpi 170
+title Diagrama de secuencia: reserva por chat
+actor "Estudiante o docente" as Monitor
+participant "Interfaz React" as UI
+participant "API Express" as API
+participant Orquestador as O
+participant "Ollama\nllama3.2:3b" as L
+participant "Motor de reglas" as M
+database "MongoDB local" as DB
+Monitor -> UI : correo y contraseña
+UI -> API : POST /login
+API --> UI : token (rol y carné de la cuenta)
+Monitor -> UI : "Quiero reservar una sala"
+UI -> API : POST /mensaje
+API -> O : texto + sesión autenticada
+O -> O : privacidad, guardia, ruta rápida
+O -> L : clasificar (solo si no hay ruta rápida)
+O -> DB : leer/guardar conversación
+O --> UI : "¿Cuál es tu carné?"
+Monitor -> UI : fecha, horario, personas
+note right of O : el carné sale del login, no del texto
+UI -> API : POST /mensaje (por cada dato)
+O -> DB : carné, salas, equipos, reservas del día
+O -> M : evaluar(solicitud, contexto)
+M --> O : decisión + reglas + traza
+alt programar
+  O -> DB : transacción: candado + reserva RS-NNNN
+else escalar
+  O -> DB : reserva escalada + avisos
+end
+O --> UI : respuesta con regla y traza
+legend right
+Flecha continua = llamada · Flecha punteada = respuesta
+alt = caminos alternativos
+endlegend
+caption Versión 3.0 · 14-nov-2026 · Autores: Esteban Páez Leonel y Kevin Alexis Ayala Rodriguez · Elaboración propia
+@enduml
