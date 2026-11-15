@@ -17,7 +17,9 @@ const NUMEROS: Record<string, number> = {
   quince: 15, veinte: 20, veinticinco: 25, treinta: 30, cuarenta: 40,
 };
 const NUM = `(\\d{1,3}|${Object.keys(NUMEROS).join("|")})`;
-const valorNum = (tok: string): number => (/^\d+$/.test(tok) ? Number(tok) : NUMEROS[tok]);
+// Cantidades de personas/equipos: hasta 4 cifras y negativas, para poder explicar el rango en vez de fallar (7.0.25).
+const NUM_CANTIDAD = `(-?\\d{1,4}|${Object.keys(NUMEROS).join("|")})`;
+const valorNum = (tok: string): number => (/^-?\d+$/.test(tok) ? Number(tok) : NUMEROS[tok]);
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 const fmtFecha = (y: number, m: number, d: number): string => `${y}-${pad(m)}-${pad(d)}`;
@@ -190,12 +192,15 @@ export function sala(t: string): string | null {
 // ── Números (sobre el texto ya sin carné, fecha, horario y sala) ─────────
 export function personas(t: string, pendiente: string | null = null): number | null {
   const n = norm(t);
-  let m = n.match(new RegExp(`\\b(?:somos|para|grupo de)\\s+${NUM}\\b`));
+  let m = n.match(new RegExp(`\\b(?:somos|para|grupo de)\\s+${NUM_CANTIDAD}\\b`));
   if (m) return valorNum(m[1]);
-  m = n.match(new RegExp(`\\b${NUM}\\s+(?:personas|estudiantes|alumnos|integrantes|companeros)\\b`));
+  m = n.match(new RegExp(`(?:^|\\s)${NUM_CANTIDAD}\\s+(?:personas|estudiantes|alumnos|integrantes|companeros)\\b`));
+  if (m) return valorNum(m[1]);
+  // También «personas 0» / «estudiantes 1000» (la cantidad antes se exigía detrás de la palabra).
+  m = n.match(new RegExp(`\\b(?:personas|estudiantes|alumnos|integrantes|companeros)\\s*:?\\s*${NUM_CANTIDAD}\\b`));
   if (m) return valorNum(m[1]);
   if (pendiente === "personas") {
-    m = n.match(new RegExp(`^\\s*${NUM}\\s*$`));
+    m = n.match(new RegExp(`^\\s*${NUM_CANTIDAD}\\s*$`));
     if (m) return valorNum(m[1]);
   }
   return null;
@@ -203,10 +208,13 @@ export function personas(t: string, pendiente: string | null = null): number | n
 
 export function equipos(t: string, pendiente: string | null = null): number | null {
   const n = norm(t);
-  const m = n.match(new RegExp(`\\b${NUM}\\s+(?:computadores|computadoras|equipos|pcs?|maquinas)\\b`));
+  let m = n.match(new RegExp(`(?:^|\\s)${NUM_CANTIDAD}\\s+(?:computadores|computadoras|equipos|pcs?|maquinas)\\b`));
+  if (m) return valorNum(m[1]);
+  // «equipos 0», «computadores 1000»: la cantidad también puede ir después de la palabra.
+  m = n.match(new RegExp(`\\b(?:computadores|computadoras|equipos|pcs?|maquinas)\\s*:?\\s*${NUM_CANTIDAD}\\b`));
   if (m) return valorNum(m[1]);
   if (pendiente === "equipos") {
-    const s = n.match(new RegExp(`^\\s*${NUM}\\s*$`));
+    const s = n.match(new RegExp(`^\\s*${NUM_CANTIDAD}\\s*$`));
     if (s) return valorNum(s[1]);
   }
   return null;

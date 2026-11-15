@@ -159,6 +159,7 @@ la reserva, el chat lo explica y pide otro horario o sala; los conflictos se esc
 | R25 | `programar` | Ninguna regla bloquea: separar la sala en la base de demostración tras la confirmación. |
 | R26 | `registrar_usuario` | Carné vigente en carnetización y aún no registrado: registrar al usuario sin pedir más datos personales. |
 | R27 | `cancelar_reserva` | Cancelar una reserva desde el chat solo si está programada, aún no empieza y es del carné de la sesión (estudiante o docente titular); si no, negar sin revelar datos de la reserva. |
+| R28 | `negar` | Una persona no puede tener dos reservas programadas que se crucen en el tiempo, en ninguna sala: negar con el código y el horario de su reserva, y ofrecer cancelarla o cambiar el horario. Varias reservas el mismo día se permiten si no se cruzan. |
 
 Las reservas son simuladas sobre datos sintéticos; el prototipo no reserva salas reales.
 
@@ -301,9 +302,9 @@ Una entrada que no cumple el esquema devuelve `400` con el detalle de los campos
 6. **Explicación:** el modelo redacta la explicación sin cambiar la decisión.
 7. **Registro:** se guarda en `logs/evaluaciones.jsonl`.
 
-## Reglas (versión 2.1.0: R1–R13 más R14–R26)
+## Reglas (versión 2.3.0: R1–R13 más R14–R28)
 
-Las reglas R1–R13 se describen aquí; las reglas R14–R26 de las reservas por chat están en la sección
+Las reglas R1–R13 se describen aquí; las reglas R14–R28 de las reservas por chat están en la sección
 [Reservas por chat](#reservas-por-chat).
 
 | ID | Prioridad | Condición | Efecto |
@@ -380,7 +381,7 @@ agente-guardian-labs/
 │   ├── llm/                  proveedor, intérprete, guardia, redactor y respaldo
 │   ├── tools/                esquemas, motor, reservas, extractores, privacidad y monitor
 │   ├── store/                repositorio MongoDB (local o Atlas) y en memoria
-│   ├── rules/reglas.json     base de reglas versionada (R1–R26)
+│   ├── rules/reglas.json     base de reglas versionada (R1–R28)
 │   └── instructions.md       reglas permanentes del agente
 ├── data/                     casos, equipos, salas, carnetización y programas sintéticos
 ├── evals/                    pruebas automáticas y matriz

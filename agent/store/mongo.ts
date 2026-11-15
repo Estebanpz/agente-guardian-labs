@@ -118,19 +118,25 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
       return docs.map((d) => ReservaDoc.parse(d));
     },
 
-    async crearReservaAtomica(fecha, sala, revalidar, construir) {
+    async crearReservaAtomica(fecha, sala, revalidar, construir, carne) {
       Fecha.parse(fecha);
       SalaId.parse(sala);
+      if (carne) Carne.parse(carne);
       const salida: { r?: { decision: DecisionReserva; reserva: ReservaDoc | null } } = {};
       await c.withSession((session) => session.withTransaction(async (s) => {
-        // 1) candado por sala y día: fuerza el orden entre dos reservas simultáneas
+        // 1) candados: sala|día (choques en la sala) y carné|día (R28: dos pestañas de la misma persona).
         await db.collection("bloqueos").updateOne(
           porId(`${sala}|${fecha}`), { $inc: { v: 1 } }, { upsert: true, session: s });
-        // 2) reservas programadas de esa sala y ese día
-        const docs = await db.collection("reservas").find(
-          { fecha, sala, estado: "programada" }, { session: s, projection: PROY_RESERVA }).toArray();
+        if (carne) {
+          await db.collection("bloqueos").updateOne(
+            porId(`carne|${carne}|${fecha}`), { $inc: { v: 1 } }, { upsert: true, session: s });
+        }
+        // 2) reservas programadas del día (todas las salas: R28) y, por separado, las de la sala pedida.
+        const delDia = await db.collection("reservas").find(
+          { fecha, estado: "programada" }, { session: s, projection: PROY_RESERVA }).toArray();
+        const deSala = delDia.filter((d) => d.sala === sala);
         // 3) revalidar; si ya no se puede programar, no se inserta nada
-        const decision = revalidar(docs.map((d) => ReservaDoc.parse(d)));
+        const decision = revalidar(deSala.map((d) => ReservaDoc.parse(d)), delDia.map((d) => ReservaDoc.parse(d)));
         if (decision.decision !== "programar") {
           salida.r = { decision, reserva: null };
           return;

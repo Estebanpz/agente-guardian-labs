@@ -239,6 +239,102 @@ try {
   comprobar(r.json.intencion === "cancelar" && /Cancelé la solicitud/.test(r.json.respuesta),
     "Juan: «cancelar» a secas sí cierra su solicitud");
 
+  // 9b quinquies) R28 (7.0.25): una persona no puede tener dos reservas que se crucen, en ninguna sala.
+  const rsJuan = await repo.crearReservaAtomica("2026-11-09", "sala-4", () => programar(), (codigo) => ({
+    codigo, sala: "sala-4", fecha: "2026-11-09", inicio: "15:00", fin: "17:00", inicio_min: aMin("15:00"), fin_min: aMin("17:00"),
+    tipo: "estudiantes", carne: "C-10000002", rol: "estudiante", personas: 5, equipos: 5, computo_alto: false,
+    materia: null, estado: "programada", reglas_aplicadas: ["R25"], traza: [], version_reglas: "2.3.0",
+    creada: new Date(), origen: "chat",
+  }));
+  const codigoJuan = rsJuan.reserva!.codigo;
+  r = await chat("Quiero reservar la sala 5 hoy de 16:00 a 18:00 para 5", uuid(22), TJ);
+  comprobar(r.status === 200
+    && (r.json.respuesta ?? "").includes(`Ya tienes ${codigoJuan} (Sala 4) de 15:00 a 17:00: no puedes tener dos salas a la misma hora.`)
+    && JSON.stringify(r.json.flujo?.opciones) === JSON.stringify([`Cancelar ${codigoJuan}`, "Cambiar horario"]),
+    "Juan: cruce en otra sala → R28 con «Cancelar RS-…» y «Cambiar horario»");
+  r = await chat("Quiero reservar la sala 5 hoy de 12:00 a 14:00 para 5", uuid(23), TJ);
+  comprobar(r.status === 200 && r.json.flujo?.pendiente === "confirmar",
+    "Juan: mismo día sin cruce → se permite y pide confirmar");
+  r = await chat("sí", uuid(23), TJ);
+  comprobar(r.status === 200 && /RS-\d{4}/.test(r.json.respuesta ?? "") && /Sala 5/.test(r.json.respuesta ?? ""),
+    "Juan: confirma la segunda reserva del día sin cruce");
+
+  // Dos pestañas de la misma persona: solo una confirma; la segunda revalida y R28 la niega.
+  const sidT1 = uuid(24), sidT2 = uuid(25);
+  r = await chat("Quiero reservar la sala 6 hoy de 17:00 a 19:00 para 5", sidT1, TJ);
+  const prepT1 = r.json.flujo?.pendiente === "confirmar";
+  r = await chat("Quiero reservar la sala 7 hoy de 17:00 a 19:00 para 5", sidT2, TJ);
+  const prepT2 = r.json.flujo?.pendiente === "confirmar";
+  r = await chat("sí", sidT1, TJ);
+  const codigoT = (r.json.respuesta ?? "").match(/RS-\d{4}/)?.[0] ?? "";
+  r = await chat("sí", sidT2, TJ);
+  const propiasHoy = await repo.reservasDeCarne("C-10000002", "2026-11-09");
+  comprobar(prepT1 && prepT2 && codigoT !== ""
+    && (r.json.respuesta ?? "").includes(`Ya tienes ${codigoT} (Sala 6) de 17:00 a 19:00: no puedes tener dos salas a la misma hora.`)
+    && JSON.stringify(r.json.flujo?.opciones) === JSON.stringify([`Cancelar ${codigoT}`, "Cambiar horario"]),
+    "Juan: dos pestañas confirman → la segunda se niega por R28");
+  comprobar(propiasHoy.filter((x) => x.inicio === "17:00").length === 1,
+    "Juan: dos confirmaciones seguidas → solo una reserva a las 17:00");
+
+  // Cantidades fuera del esquema: nunca 500.
+  const sidQ = uuid(26);
+  r = await chat("Quiero reservar la sala 8 hoy de 14:00 a 16:00", sidQ, TL);
+  comprobar(r.status === 200 && r.json.flujo?.pendiente === "personas", "Laura: la reserva pide personas");
+  for (const [t, esperado] of [
+    ["somos 0", "El número de personas debe ser al menos 1. ¿Cuántas son?"],
+    ["somos -5", "El número de personas debe ser al menos 1. ¿Cuántas son?"],
+    ["somos 1000", "Ninguna sala tiene cupo para 1000 personas; la más grande es de 30. ¿Cuántas son?"],
+    ["equipos 0", "¿Cuántas personas son?"],
+    ["equipos 1000", "Ninguna sala tiene cupo para 1000 equipos;"],
+  ] as const) {
+    r = await chat(t, sidQ, TL);
+    comprobar(r.status === 200 && (r.json.respuesta ?? "").includes(esperado),
+      `«${t}» → 200 y se explica, sin Error interno`);
+  }
+
+  // Horarios inválidos en disponibilidad y en la reserva; el chip posterior no arrastra el horario inválido.
+  const sidH = uuid(27);
+  r = await chat("¿Qué salas hay disponibles hoy de 2pm a 2pm?", sidH, TL);
+  comprobar(r.status === 200 && (r.json.respuesta ?? "") === "La hora final debe ser después de la inicial.",
+    "disponibilidad «2pm a 2pm» → fin igual al inicio, sin listar salas");
+  r = await chat("¿Qué salas hay disponibles hoy de 21:45 a 22:15?", sidH, TL);
+  comprobar(r.status === 200 && (r.json.respuesta ?? "") === "Las salas abren de 07:00 a 22:00: elige un rango dentro de ese horario.",
+    "disponibilidad «21:45 a 22:15» → fuera de horario, sin listar salas");
+  r = await chat("Reservar Sala 13", sidH, TL);
+  comprobar(r.status === 200 && r.json.flujo?.pendiente === "fecha" && !(r.json.respuesta ?? "").includes("21:45"),
+    "tras el horario inválido, «Reservar Sala 13» no arrastra el horario");
+  const sidH2 = uuid(28);
+  r = await chat("Quiero reservar la sala 4 hoy de 2pm a 2pm", sidH2, TL);
+  comprobar(r.status === 200 && (r.json.respuesta ?? "").includes("La hora final debe ser después de la inicial."),
+    "reserva «2pm a 2pm» → explica el fin igual al inicio");
+  r = await chat("de 4 a 2", sidH2, TL);
+  comprobar(r.status === 200 && (r.json.respuesta ?? "").includes("La hora final debe ser después de la inicial."),
+    "reserva «de 4 a 2» → explica el fin anterior al inicio");
+  r = await chat("de 21:45 a 22:15", sidH2, TL);
+  comprobar(r.status === 200 && (r.json.respuesta ?? "").includes("Las salas abren de 07:00 a 22:00: elige un rango dentro de ese horario."),
+    "reserva «21:45 a 22:15» → explica el horario de las salas");
+
+  // Ocupación sin datos personales: no es fuera de alcance y no revela carné, nombre ni materia.
+  const sidO = uuid(29);
+  r = await chat("¿quién reservó la sala 13?", sidO, TJ);
+  comprobar(r.status === 200
+    && (r.json.respuesta ?? "") === "No comparto quién reserva ni la materia. La Sala 13 está ocupada hoy de 19:00 a 21:00 por un grupo de estudiantes."
+    && !JSON.stringify(r.json).includes("C-10000003"),
+    "«¿quién reservó la sala 13?» → ocupación sin datos personales");
+  r = await chat("¿qué materia hay en la sala 5 mañana?", sidO, TJ);
+  comprobar(r.status === 200
+    && (r.json.respuesta ?? "") === "No comparto quién reserva ni la materia. La Sala 5 está ocupada el martes 10 de noviembre de 08:00 a 10:00 por un docente."
+    && !/Bases de Datos/.test(r.json.respuesta ?? ""),
+    "«¿qué materia hay en la sala 5?» → ocupación sin materia");
+
+  // El modelo dice fuera_de_alcance, pero el mensaje trae datos de sala y horario: se trata como reserva.
+  configurarParaPruebas({ repo, interpretar: fueraSiempre });
+  r = await chat("Quiero una sala de 4 a 2", uuid(30), TL);
+  comprobar(r.status === 200 && r.json.intencion === "solicitud_reserva"
+    && (r.json.respuesta ?? "").includes("La hora final debe ser después de la inicial.") && r.json.flujo?.pendiente === "horario",
+    "fuera_de_alcance con datos de sala → solicitud de reserva y explica el horario");
+  configurarParaPruebas({ repo, interpretar: modeloSimulado });
+
   // 9c) Hallazgos del fuzzing (14-11-2026): carné con marcas combinadas y «cambiar carné».
   const colgado = (p: Promise<R>) => Promise.race([p, new Promise<R>((ok) => setTimeout(() => ok({ status: 0, json: null }), 5000))]);
   r = await colgado(chat("C\u0301-10000002", uuid(13), TL));

@@ -1,5 +1,5 @@
 {
-  "version": "2.2.0",
+  "version": "2.3.0",
   "parametros": {
     "tolerancia_asistencia_min": 15,
     "horario_abre": "07:00",
@@ -276,6 +276,16 @@
       "tipo": "recomendacion",
       "efecto": "cancelar_reserva",
       "descripcion": "Cancelar una reserva desde el chat solo si está programada, aún no empieza y su carné es el de la sesión identificada (estudiante o docente titular); si no, negar sin revelar datos de la reserva.",
+      "fuente": "Pedido de Esteban, 14-11-2026",
+      "vigente_desde": "2026-11-14"
+    },
+    {
+      "id": "R28",
+      "prioridad": 19,
+      "especificidad": 1,
+      "tipo": "negar",
+      "efecto": "negar_reserva_cruzada",
+      "descripcion": "Una persona no puede tener dos reservas programadas que se crucen en el tiempo, en ninguna sala; en el mismo día puede tener varias si no se cruzan.",
       "fuente": "Pedido de Esteban, 14-11-2026",
       "vigente_desde": "2026-11-14"
     }

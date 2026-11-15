@@ -447,3 +447,48 @@ la cancelación exige el pedido anclado y la guardia, un permiso explícito.
 La regla «Pedir que cancelen o le pasen la reserva de otra persona no es cancelar_reserva: es una solicitud sobre una
 sala ocupada.» no se agregó al prompt: son 121 caracteres y el prompt está en 4 782 de 4 800. El código cubre el
 caso de forma determinista.
+
+## Cruces de reservas propias, cantidades y horarios inválidos (sección 7.0.25, 14-11-2026)
+
+Motivo: las pruebas adversariales de Esteban encontraron cuatro fallos. (1) Una persona podía tener dos reservas
+cruzadas en salas distintas a la misma hora, incluso desde dos pestañas. (2) Un dato fuera del esquema (`somos 0`,
+`somos -5`, `somos 1000`, `equipos 1000`) terminaba en «Error interno» al guardar la conversación, porque Zod rechaza
+el documento. (3) La disponibilidad listaba salas con un horario inválido (`2pm a 2pm`, `21:45 a 22:15`) y el chip
+«Reservar Sala 13» arrastraba ese horario; además, si el modelo decía `fuera_de_alcance` pero el mensaje traía datos
+de sala, la solicitud se perdía. (4) «¿Quién reservó la sala 13?» y «¿qué materia hay en la sala 5?» se respondían
+como fuera de alcance, sin dar la ocupación.
+
+La regla R28 queda en `reglas.json` versión **2.3.0**, con fuente «Pedido de Esteban, 14-11-2026».
+
+| Cambio | Por qué | Archivos | Prueba |
+|---|---|---|---|
+| R28: una persona no puede tener dos reservas **programadas** que se crucen en el tiempo, en cualquier sala. Varias el mismo día se permiten si no se cruzan. Se evalúa en `evaluarReserva` (antes de R22, con las reservas del día del mismo carné) y en `revisarTemprano`, para no esperar a la confirmación. | Antes dos salas a la misma hora se aceptaban si cada una estaba libre; en dos pestañas, la segunda también. | `agent/rules/reglas.json` (R28), `agent/tools/reservas.ts` (`cruzanPropias`, `evaluarReserva`), `agent/conversacion.ts` (`revisarTemprano`, `responder`) | RS-27, RS-28, RS-19, C-82 a C-84, F-11 a F-13, propiedades de `evals/propiedades/reservas.ts` |
+| El mensaje de R28 nombra el código, la sala y el horario de la reserva propia («Ya tienes RS-0001 (Sala 6) de 13:00 a 15:00: no puedes tener dos salas a la misma hora. Elige otro horario o cancela RS-0001.») y ofrece «Cancelar RS-0001» y «Cambiar horario». Al detectar el cruce se limpian `inicio`/`fin` y se sigue pidiendo horario. | Que la persona sepa qué reserva le choca y pueda corregir sin salir del flujo. | `agent/conversacion.ts` (`mensajeR28`, `opcionesR28`) | C-82, F-11 |
+| `crearReservaAtomica` recibe todas las reservas programadas del día y un `carne` opcional; memoria y MongoDB revalidan R28 dentro de la misma escritura, con candado `carne|fecha` en Mongo para dos pestañas. | Dos confirmaciones simultáneas de la misma persona no deben crear dos reservas cruzadas. | `agent/store/repositorio.ts`, `agent/store/memoria.ts`, `agent/store/mongo.ts`, `agent/conversacion.ts` (`confirmar`) | RS-19, C-84, F-13 |
+| `personas`/`equipos` aceptan la cantidad antes o después de la palabra (`personas 1000`, `equipos 0`) y las cifras negativas. `cantidadInvalida` responde «El número de personas debe ser al menos 1. ¿Cuántas son?» o «Ninguna sala tiene cupo para N personas; la más grande es de M.» Lo mismo para equipos (0 es válido). `sanear` corrige el documento antes de guardarlo, tanto en el flujo de reserva como en el contexto de disponibilidad. | Ningún dato del usuario debe terminar en 500; antes Zod rechazaba el documento y el chat mostraba «Error interno». | `agent/tools/extraer.ts` (`NUM_CANTIDAD`, `valorNum`, `personas`, `equipos`), `agent/conversacion.ts` (`cantidadInvalida`, `sanear`) | C-85, F-14, `evals/acceso.ts` 9b quinquies |
+| La disponibilidad aplica R15 antes de listar salas (07:00–22:00, mínimo 30 minutos, fin después del inicio) y usa el mismo mensaje que la reserva; si el horario es inválido, borra el contexto para que «Reservar Sala N» no lo arrastre. | «2pm a 2pm» listaba salas y el chip reservaba ese horario inválido. | `agent/conversacion.ts` (`disponibilidadTurno`) | C-86, C-87, F-15 |
+| `revisarTemprano` explica «La hora final debe ser después de la inicial.» apenas conoce las horas, aunque falte la fecha («Quiero una sala de 4 a 2»). Si el modelo dice `fuera_de_alcance` pero el mensaje nombra una sala o equipos y trae fecha u horario, se abre la solicitud de reserva. | El mensaje se perdía como fuera de alcance y la hora invertida no se explicaba hasta tener fecha. | `agent/conversacion.ts` (`revisarTemprano`), `agent/orquestador.ts` (`pideSalaConDatos`, `NOMBRA_SALA`) | C-89, F-15, `evals/acceso.ts` |
+| `ocupacionPrivadaTurno` responde «No comparto quién reserva ni la materia. La Sala 13 está ocupada hoy de 19:00 a 21:00 por un grupo de estudiantes.» (o «por un docente»), sin nombres, carnés ni materias. Se resuelve en código porque la línea no cabe en el prompt de 4 800 caracteres. | La ocupación es información pública; quién reservó y la materia, no. | `agent/conversacion.ts` (`ocupacionPrivadaTurno`), `agent/orquestador.ts` | C-88, F-16, `evals/acceso.ts` 9b quinquies |
+| RS-08 se movió a 08:30–09:30 para seguir probando R21 sin cruzarse con la propia RS-0003 de Patricia (10:00–12:00). C-82 a C-89 y F-11 a F-16 fijan los casos con reloj fijo y modelo simulado; `evals/propiedades/reservas.ts` agrega dos propiedades de R28 (una reserva programada nunca deja dos propias cruzadas; con cruce, la decisión es `negar [R28]`). | Cubrir la regla nueva sin depender del modelo ni de la hora real. | `evals/escenarios-reservas.ts`, `evals/escenarios-conversacion.ts`, `evals/acceso.ts`, `evals/adversarial/flujo.ts`, `evals/propiedades/reservas.ts` | `npm run pruebas:rapidas`, adversariales, `npm run propiedades` |
+
+El prompt del intérprete no cambió (sigue en 4 782 de 4 800 caracteres): R28, las cantidades y la ocupación privada
+se resuelven en el código, antes o después del modelo.
+
+## Reemplazo de fecha, sala y personas dentro de una reserva (sección 7.0.26, 14-11-2026)
+
+Motivo: con Juan (C-10000002), a las 20:25 y una reserva propia a las 21:00, el chat respondió R28 y «Cambiar
+horario». Al decir «mañana mejor» volvió a preguntar «¿De qué hora a qué hora?» (ignoró el cambio de día) y, con
+«8am a 10am», respondió «Ese horario de hoy ya pasó» con el botón «Revisar mañana». La causa estaba en `aplicar`:
+solo escribía campos vacíos, así que una fecha nueva no reemplazaba la anterior.
+
+| Cambio | Por qué | Archivos | Prueba |
+|---|---|---|---|
+| `aplicar` recibe `reemplazar` y, cuando está activo, la fecha, la sala y las personas que el mensaje trae explícitas reemplazan a las anteriores. `turnoReserva` lo activa en cada turno. El carné sigue siendo solo de relleno: nunca se reemplaza, porque es el de la sesión. | Un dato nuevo debía ganarle al anterior dentro de una reserva, no quedarse con el primero. | `agent/conversacion.ts` (`aplicar`, `turnoReserva`) | C-90 a C-94, F-17 |
+| Al cambiar la fecha, la sala o las personas se borran `validado` y `propuesta`; `revisarTemprano` vuelve a comprobar R15, la ocupación de la sala y R28 para el dato nuevo. Si ya había horario, se conserva (`inicio`/`fin` no se tocan) y se revisa para la fecha nueva. | Reutilizar la validación temprana evita aceptar una fecha, sala o cantidad que ya no cumple las reglas. | `agent/conversacion.ts` (`turnoReserva`, `revisarTemprano`, `claveHorario`) | C-90, C-91, C-92, C-94 |
+| Si la fecha cambió y aún falta el horario, la respuesta es «Listo, cambio a mañana (domingo 15 de noviembre). ¿De qué hora a qué hora?»; para otro día, «Listo, cambio al lunes 16 de noviembre.» seguido de la pregunta del horario. Si solo falta la hora final, se conserva la pregunta «¿Hasta qué hora? Empiezas a las …». | Confirmar el cambio antes de pedir las horas evita que la persona crea que se quedó con el día anterior. | `agent/conversacion.ts` (`turnoReserva`, `preguntaPara`) | C-90, F-17 |
+| «en la mañana», «por la mañana», «la mañana» y «en la tarde» son franjas, no fechas: `buscarFechaTexto` ya excluía las dos primeras con el lookbehind y «en la tarde» no coincide con ninguna fecha. Se fija con pruebas de extracción y de conversación. | Una franja no debe mover el día de la reserva. | `agent/tools/extraer.ts` (`buscarFechaTexto`), `evals/extraer.ts` | `evals/extraer.ts` (fechas), C-93 |
+| C-90 a C-94 usan reloj fijo 2026-11-14 20:25: la secuencia completa de Juan (R28 → Cambiar horario → «mañana mejor» → «8am a 10am» → Sala 4 libre el domingo), «el lunes mejor» con horario ya dado, «mejor la sala 6», «en la mañana» y «mejor somos 8». F-17 repite el caso por la vía adversarial. | Fijar el comportamiento sin depender de la hora real ni del modelo. | `evals/escenarios-conversacion.ts`, `evals/adversarial/flujo.ts` | `npm run pruebas:rapidas`, adversariales |
+
+`agent/tools/reservas.ts` no cambió en esta ronda; los rangos de `stryker.config.json` se ajustaron a la longitud
+que dejó 7.0.25: `ocupadaPublica` 333-334 y `evaluarCancelacion` 346-357. El prompt del intérprete sigue en 4 782 de
+4 800 caracteres; el cambio se resuelve en la conversación.

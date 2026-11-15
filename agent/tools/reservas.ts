@@ -1,4 +1,4 @@
-// Motor de reservas (R14–R26). Decide con reglas; el modelo nunca interviene aquí.
+// Motor de reservas (R14–R28). Decide con reglas; el modelo nunca interviene aquí.
 import { readFileSync } from "node:fs";
 import {
   Carne, DecisionReserva,
@@ -84,6 +84,13 @@ const aConflicto = (r: ReservaDoc): Conflicto => ({
   carne_enmascarado: enmascarar(r.carne), materia: r.materia,
 });
 
+// R28 (14-11-2026): reservas programadas del mismo carné que se cruzan con el horario pedido, en cualquier sala.
+// Se usa en el motor (evaluarReserva) y en la revisión temprana del chat, para no esperar a la confirmación.
+export const cruzanPropias = (
+  reservas: ReservaDoc[], carne: string, inicio: number, fin: number,
+): ReservaDoc[] => reservas.filter((r) =>
+  r.carne === carne && r.estado === "programada" && solapa(r, inicio, fin));
+
 type Req = { personas: number; equipos: number; alto: boolean; inicio: number; fin: number; fecha: string; docente: boolean };
 
 // Salas que cumplen los criterios de la solicitud, en el orden de preferencia (paso 6 del plan).
@@ -139,7 +146,7 @@ export function causaR15(fecha: string, inicio: string, fin: string, hoy: { fech
   if (i < aMin(P.horario_abre) || f > aMin(P.horario_cierra)) {
     return { campo: "horario", motivo: `las salas abren de ${P.horario_abre} a ${P.horario_cierra}` };
   }
-  if (f <= i) return { campo: "horario", motivo: "la hora de fin debe ser posterior a la de inicio" };
+  if (f <= i) return { campo: "horario", motivo: "la hora final debe ser después de la inicial" };
   if (dur < P.duracion_min_min) return { campo: "horario", motivo: `la reserva dura menos de ${P.duracion_min_min} minutos` };
   // Sin tope de duración (reglas 2.1.0): solo se revisa si el parámetro tiene valor.
   if (P.duracion_max_min !== null && dur > P.duracion_max_min) return { campo: "horario", motivo: `la reserva dura más de ${P.duracion_max_min / 60} horas` };
@@ -188,13 +195,24 @@ export function evaluarReserva(s: SolicitudReserva, c: Contexto): DecisionReserv
     });
   }
 
+  const reservasDeFecha = c.reservasDelDia.filter((r) => r.fecha === fecha);
+
+  // R28 (14-11-2026): una persona no puede tener dos reservas que se crucen, aunque sean en salas distintas.
+  // Va antes de mirar la sala pedida: el choque es con su propia reserva, no con una ajena (R22).
+  const propias = cruzanPropias(reservasDeFecha, s.carne!, inicio, fin);
+  if (propias.length) {
+    return decidir({
+      decision: "negar", estado: "falso", accion: "orientar_proceso", reglas: ["R28"],
+      conflictos: propias.map(aConflicto),
+    });
+  }
+
   const req: Req = {
     personas: s.personas!,
     equipos: s.equipos ?? s.personas!,
     alto: s.computo_alto ?? false,
     inicio, fin, fecha, docente,
   };
-  const reservasDeFecha = c.reservasDelDia.filter((r) => r.fecha === fecha);
 
   // Sala pedida.
   if (s.sala) {

@@ -8,7 +8,7 @@ import { ahora, aMin, aHora, sumarDias } from "./tools/reloj.js";
 import { pedirRespaldo, validarRespaldo } from "./llm/respaldo.js";
 import { registrar } from "./tools/traza.js";
 import { cancelar as esCancelar, extraer, fechas, type Extraido } from "./tools/extraer.js";
-import { candidatas, causaFecha, causaR15, disponibilidad, enmascarar, evaluarCancelacion, ocupadaPublica, evaluarRegistro, evaluarReserva, horarioLaboratorio, type Contexto } from "./tools/reservas.js";
+import { candidatas, causaFecha, causaR15, cruzanPropias, disponibilidad, enmascarar, evaluarCancelacion, ocupadaPublica, evaluarRegistro, evaluarReserva, horarioLaboratorio, type Contexto } from "./tools/reservas.js";
 import type { Repositorio } from "./store/repositorio.js";
 
 export type RespuestaChat = {
@@ -134,7 +134,25 @@ function cerrado(intencion: string, respuesta: string, opciones: string[] = [], 
   };
 }
 
+// Red de seguridad (7.0.25): la conversación se valida con Zod al guardar. Si un dato llegara fuera del esquema,
+// se descarta en vez de lanzar un Error interno (500); el flujo lo vuelve a pedir.
+const HORA_OK = /^([01]\d|2[0-3]):[0-5]\d$/;
+const FECHA_OK = /^\d{4}-\d{2}-\d{2}$/;
+const CARNE_OK = /^[CD]-\d{8}$/;
+const SALA_OK = /^sala-(1[0-6]|[1-9])$/;
+const sanear = (d: SolicitudReserva): void => {
+  if (d.carne !== null && !CARNE_OK.test(d.carne)) d.carne = null;
+  if (d.fecha !== null && !FECHA_OK.test(d.fecha)) d.fecha = null;
+  if (d.inicio !== null && !HORA_OK.test(d.inicio)) d.inicio = null;
+  if (d.fin !== null && !HORA_OK.test(d.fin)) d.fin = null;
+  if (d.sala !== null && !SALA_OK.test(d.sala)) d.sala = null;
+  if (d.personas !== null && (d.personas < 1 || d.personas > 200)) d.personas = null;
+  if (d.equipos !== null && (d.equipos < 0 || d.equipos > 200)) d.equipos = null;
+  if (d.materia !== null && (d.materia.length < 2 || d.materia.length > 60)) d.materia = null;
+};
+
 async function guardar(repo: Repositorio, conv: Conversacion): Promise<void> {
+  sanear(conv.datos);
   await repo.guardarConversacion({ ...conv, actualizado: new Date() });
 }
 
@@ -167,20 +185,60 @@ async function faltante(datos: SolicitudReserva, repo: Repositorio): Promise<str
   return null;
 }
 
-// Pasa lo que el mensaje trae a los campos vacíos. Nunca sobrescribe un dato dado.
-function aplicar(d: SolicitudReserva, e: Extraido): boolean {
+// 7.0.25: valida personas y equipos antes de guardarlos. El esquema exige personas 1–200 y equipos 0–200; además,
+// pedir más que la sala más grande no tiene sentido. Devuelve el campo a volver a preguntar y el texto exacto.
+async function cantidadInvalida(
+  ext: Extraido, repo: Repositorio,
+): Promise<{ campo: "personas" | "equipos"; texto: string } | null> {
+  if (ext.personas !== null && ext.personas < 1) {
+    return { campo: "personas", texto: "El número de personas debe ser al menos 1. ¿Cuántas son?" };
+  }
+  if (ext.equipos !== null && ext.equipos < 0) {
+    return { campo: "equipos", texto: "El número de equipos no puede ser negativo. ¿Cuántos computadores necesita?" };
+  }
+  const salas = (await repo.salas()).filter((s) => s.activa);
+  if (!salas.length) return null;
+  if (ext.personas !== null) {
+    const max = Math.max(...salas.map((s) => s.capacidad));
+    if (ext.personas > Math.min(200, max)) {
+      return { campo: "personas", texto: `Ninguna sala tiene cupo para ${ext.personas} personas; la más grande es de ${max}. ¿Cuántas son?` };
+    }
+  }
+  if (ext.equipos !== null) {
+    const equipos = await repo.equipos();
+    const max = Math.max(...salas.map((s) => {
+      const propios = equipos.filter((q) => q.sala === s._id);
+      const operativos = propios.filter((q) => q.inventario === "disponible" && q.mantenimiento === "disponible").length;
+      const inciertos = propios.filter((q) =>
+        q.inventario === "desconocido" || q.mantenimiento === "desconocido" || q.inventario !== q.mantenimiento).length;
+      return operativos + inciertos;
+    }));
+    if (ext.equipos > Math.min(200, max)) {
+      return { campo: "equipos", texto: `Ninguna sala tiene cupo para ${ext.equipos} equipos; la más grande es de ${max}. ¿Cuántos computadores necesita?` };
+    }
+  }
+  return null;
+}
+
+// Pasa lo que el mensaje trae a los campos vacíos. Con `reemplazar`, la fecha, la sala y las personas que el
+// mensaje trae explícitas reemplazan a las anteriores (7.0.26: «mañana mejor» dentro de una reserva). El carné
+// nunca se reemplaza: es el de la sesión.
+function aplicar(d: SolicitudReserva, e: Extraido, reemplazar = false): boolean {
   let cambio = false;
-  const llenar = <K extends keyof SolicitudReserva>(k: K, v: SolicitudReserva[K] | null) => {
-    if (d[k] === null && v !== null) {
+  const llenar = <K extends keyof SolicitudReserva>(k: K, v: SolicitudReserva[K] | null, reemplaza = false) => {
+    if (v === null || d[k] === v) return;
+    if (d[k] === null || (reemplazar && reemplaza)) {
       d[k] = v;
       cambio = true;
     }
   };
   llenar("carne", e.carne);
-  llenar("fecha", e.fecha);
-  llenar("sala", e.sala);
-  llenar("personas", e.personas);
-  llenar("equipos", e.equipos);
+  llenar("fecha", e.fecha, true);
+  llenar("sala", e.sala, true);
+  // 7.0.25: el esquema exige personas 1–200 y equipos 0–200. Un valor fuera de rango no se guarda; se explica
+  // en `turnoReserva`/`disponibilidadTurno` y se vuelve a preguntar. Así ningún dato del usuario termina en 500.
+  if (e.personas !== null && e.personas >= 1 && e.personas <= 200) llenar("personas", e.personas, true);
+  if (e.equipos !== null && e.equipos >= 0 && e.equipos <= 200) llenar("equipos", e.equipos);
   llenar("computo_alto", e.computo_alto);
   llenar("materia", e.materia);
   if (d.inicio === null && d.fin === null && e.inicio && e.fin) {
@@ -340,6 +398,25 @@ async function responder(
       { reserva: publica(d), solicitud: resumenDe(sol, ctx.salas, sol.sala), sesion_olvidada: codigo ? true : undefined, cierre: codigo ? OLVIDO : undefined });
   }
   if (d.decision === "negar") {
+    // R28: choca con otra reserva del mismo carné (pudo entrar por la ventana entre la revisión temprana y la
+    // confirmación). Se explica y se dejan los dos caminos; la reserva no se crea.
+    if (d.reglas_aplicadas.includes("R28")) {
+      const c = d.conflictos[0];
+      const propia = c ? await repo.reservaPorCodigo(c.codigo) : null;
+      conv.datos.inicio = null;
+      conv.datos.fin = null;
+      conv.propuesta = null;
+      conv.validado = null;
+      conv.pendiente = "horario";
+      conv.intentos = 0;
+      await guardar(repo, conv);
+      const texto = propia
+        ? mensajeR28(propia)
+        : "Ya tienes otra reserva que se cruza con ese horario: no puedes tener dos salas a la misma hora. Elige otro horario.";
+      // Sin el prefijo de «los datos cambiaron»: el mensaje de R28 ya explica el cruce y qué hacer.
+      return { ...abierto(conv, texto, propia ? opcionesR28(propia) : ["Cambiar horario"]),
+        reserva: publica(d), solicitud: resumenDe(sol, ctx.salas, sol.sala) };
+    }
     if (d.reglas_aplicadas.includes("R16")) {
       await repo.borrarConversacion(conv._id);
       return cerrado("solicitud_reserva",
@@ -387,11 +464,13 @@ async function confirmar(conv: Conversacion, repo: Repositorio): Promise<Respues
   let decision: DecisionReserva | undefined;
   const res = await repo.crearReservaAtomica(
     sol.fecha!, sala,
-    (actuales) => {
-      decision = evaluarReserva(sol, { ...ctx, reservasDelDia: actuales });
+    // R28 se revalida con TODAS las reservas programadas del día, no solo las de esta sala.
+    (_deSala, delDia) => {
+      decision = evaluarReserva(sol, { ...ctx, reservasDelDia: delDia });
       return decision;
     },
     (codigo) => reservaDoc(sol, codigo, decision!, "programada", jornadaDe(ctx)),
+    sol.carne,
   );
   if (res.reserva) {
     await repo.borrarConversacion(conv._id);
@@ -473,7 +552,21 @@ async function revisarTemprano(conv: Conversacion, repo: Repositorio): Promise<{
   const clave = claveHorario(d);
   // La fecha se revisa apenas llega: «para ayer» o «el sábado 13» se corrigen en el momento, sin esperar el horario.
   const fechaMal = d.fecha ? causaFecha(d.fecha, { fecha: h.fecha, minutos: h.minutos }) : null;
-  if (!fechaMal && !clave) return { ok: "" };
+  // 7.0.25: si el fin es anterior o igual al inicio, se explica apenas se conocen las horas, aunque falte la fecha
+  // («Quiero una sala de 4 a 2»). Con fecha, R15 ya da el mismo motivo y sus chips de corrección.
+  const invertido = Boolean(d.inicio && d.fin && aMin(d.fin) <= aMin(d.inicio));
+  if (!fechaMal && !clave && !invertido) return { ok: "" };
+  if (!d.fecha && !fechaMal && invertido) {
+    d.inicio = null;
+    d.fin = null;
+    conv.validado = null;
+    conv.propuesta = null;
+    conv.pendiente = "horario";
+    conv.intentos = 0;
+    await guardar(repo, conv);
+    const p = preguntaPara("horario", docenteDe(d), d);
+    return { corte: abierto(conv, `La hora final debe ser después de la inicial. ${p.texto}`, p.opciones) };
+  }
   const causa = fechaMal ?? causaR15(d.fecha!, d.inicio!, d.fin!, { fecha: h.fecha, minutos: h.minutos });
   if (causa) {
     const chips = !fechaMal && causa.campo === "horario" && d.inicio && d.fin
@@ -491,6 +584,23 @@ async function revisarTemprano(conv: Conversacion, repo: Repositorio): Promise<{
       ? `${capitalizar(causa.motivo)}: elige un rango dentro de ese horario.`
       : `${capitalizar(causa.motivo)}. ${p.texto}`;
     return { corte: abierto(conv, texto, chips.length ? chips : p.opciones) };
+  }
+  // R28 (7.0.25): con fecha y horario ya se sabe si se cruza con otra reserva del mismo carné, en cualquier sala.
+  // Se avisa en ese mismo turno (no se espera a la confirmación) y se ofrecen cancelar la existente o cambiar hora.
+  if (d.carne && d.fecha && d.inicio && d.fin) {
+    const propias = cruzanPropias(await repo.reservasDelDia(d.fecha), d.carne, aMin(d.inicio), aMin(d.fin))
+      .sort((a, b) => a.inicio_min - b.inicio_min);
+    if (propias.length) {
+      const r = propias[0];
+      d.inicio = null;
+      d.fin = null;
+      conv.validado = null;
+      conv.propuesta = null;
+      conv.pendiente = "horario";
+      conv.intentos = 0;
+      await guardar(repo, conv);
+      return { corte: abierto(conv, mensajeR28(r), opcionesR28(r)) };
+    }
   }
   // Sala ocupada: mientras no elija "Ver otras salas" o "Escalar al monitor", se repite el aviso.
   if (conv.pendiente === "ocupada" && clave === conv.validado && d.sala) {
@@ -551,6 +661,14 @@ function textoOcupada(conv: Conversacion, etiqueta: string, ocupada: ReservaDoc)
   return abierto(conv, `La ${etiqueta} está ocupada de ${ocupada.inicio} a ${ocupada.fin} por ${quien}.`,
     ["Ver otras salas", "Escalar al monitor"]);
 }
+
+// R28 (14-11-2026): su propia reserva se cruza con el horario pedido, en cualquier sala. Se dice cuál es y se
+// ofrecen los dos caminos: cancelarla o cambiar el horario. La reserva es del mismo carné, así que el código no
+// revela nada de otra persona.
+function mensajeR28(r: { codigo: string; sala: string; inicio: string; fin: string }): string {
+  return `Ya tienes ${r.codigo} (Sala ${r.sala.slice(5)}) de ${r.inicio} a ${r.fin}: no puedes tener dos salas a la misma hora. Elige otro horario o cancela ${r.codigo}.`;
+}
+const opcionesR28 = (r: { codigo: string }): string[] => [`Cancelar ${r.codigo}`, "Cambiar horario"];
 
 // 7.0.24: pedir la reserva de otra persona (cancelarla o que se la pasen) no es cancelar la solicitud.
 // Un mensaje que habla de una reserva sigue el flujo abierto; solo «cancelar», «olvídalo» o «salir» lo cierran.
@@ -652,6 +770,10 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   const h = ahora();
   const t = norm(texto);
   const pendientePrevio = conv.pendiente;
+  // 7.0.26: valores antes de este turno, para saber si el mensaje reemplazó fecha, sala o personas.
+  const fechaPrevia = conv.datos.fecha;
+  const salaPrevia = conv.datos.sala;
+  const personasPrevias = conv.datos.personas;
   // Chips "Revisar mañana" y "Revisar el {día}": cambian la fecha y conservan el horario pedido.
   if (/^revisar\b/.test(t)) {
     const f = extraer(texto, { hoy: h.fecha, pendiente: null }).fecha;
@@ -714,6 +836,16 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
   if (usar) conv.ofrecer = null;
 
   const ext = extraer(texto, { hoy: h.fecha, pendiente: conv.pendiente });
+  // 7.0.25: «somos 0», «somos -5», «somos 1000» o «equipos 0» se explican antes de tocar los datos: el esquema
+  // los rechaza y la conversación terminaba en Error interno. No se aplica el valor inválido.
+  const cantidad = await cantidadInvalida(ext, repo);
+  if (cantidad) {
+    conv.pendiente = cantidad.campo;
+    conv.propuesta = null;
+    conv.intentos = 0;
+    await guardar(repo, conv);
+    return abierto(conv, cantidad.texto, preguntaPara(cantidad.campo, docenteDe(conv.datos), conv.datos).opciones);
+  }
   // El carné de la reserva es siempre el de la sesión (inicio de sesión o carné identificado): ni «cambiar carné»
   // ni un carné escrito lo reemplazan (hallazgo de fuzzing, 14-11-2026: reservar a nombre de otra persona).
   const deSesion = (await repo.leerSesion(conv._id))?.carne ?? null;
@@ -764,7 +896,14 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
     cambio = true;
   }
 
-  cambio = aplicar(conv.datos, ext) || cambio;
+  cambio = aplicar(conv.datos, ext, true) || cambio;
+  // 7.0.26: una fecha, sala o personas explícitas distintas reemplazan a las anteriores. Se borra la validación
+  // temprana y la propuesta para que `revisarTemprano` vuelva a comprobar R15, ocupación y R28.
+  const cambioFecha = fechaPrevia !== null && conv.datos.fecha !== null && conv.datos.fecha !== fechaPrevia;
+  if (cambioFecha || conv.datos.sala !== salaPrevia || conv.datos.personas !== personasPrevias) {
+    conv.validado = null;
+    conv.propuesta = null;
+  }
   if (conv.pendiente === "materia" && espacios.length) {
     const eleccion = elegirEspacio(texto, espacios);
     if (eleccion) {
@@ -833,6 +972,16 @@ async function turnoReserva(conv: Conversacion, texto: string, repo: Repositorio
     const p = f === "materia" && espacios.length
       ? { texto: "¿Para cuál espacio académico la requieres?", opciones: espacios }
       : preguntaPara(f, docenteDe(conv.datos), conv.datos);
+    // 7.0.26: la fecha se cambió y aún falta el horario. Se confirma el cambio y se pregunta exactamente por él;
+    // la revisión temprana de R15/ocupación/R28 corre en el turno que traiga las horas.
+    if (f === "horario" && cambioFecha) {
+      const nueva = conv.datos.fecha!;
+      const cuando = nueva === sumarDias(h.fecha, 1)
+        ? `a mañana (${fechaLarga(nueva)})`
+        : `al ${fechaLarga(nueva)}`;
+      const pregunta = conv.datos.inicio && !conv.datos.fin ? p.texto : "¿De qué hora a qué hora?";
+      return abierto(conv, `${prefijo}Listo, cambio ${cuando}. ${pregunta}`, p.opciones);
+    }
     const aviso = temprano.ok ? `${temprano.ok}Ahora, ${minusculaInicial(p.texto)}` : p.texto;
     return abierto(conv, prefijo + aviso, p.opciones);
   }
@@ -888,12 +1037,15 @@ async function turnoRegistro(conv: Conversacion, texto: string, repo: Repositori
 async function guardarContextoDisponibilidad(
   repo: Repositorio, sesion: string, datos: SolicitudReserva, pendiente: string | null = null, duracion: number | null = null,
 ): Promise<void> {
+  const guardados: SolicitudReserva = {
+    ...VACIA(), fecha: datos.fecha, inicio: datos.inicio, fin: datos.fin,
+    personas: datos.personas, equipos: datos.equipos, computo_alto: datos.computo_alto,
+  };
+  // 7.0.25: ningún dato fuera del esquema llega a guardarse (el guardado valida con Zod y lanzaría un 500).
+  sanear(guardados);
   await repo.guardarConversacion({
     _id: sesion, flujo: "disponibilidad", pendiente,
-    datos: {
-      ...VACIA(), fecha: datos.fecha, inicio: datos.inicio, fin: datos.fin,
-      personas: datos.personas, equipos: datos.equipos, computo_alto: datos.computo_alto,
-    },
+    datos: guardados,
     duracion_min: duracion,
     intentos: 0, propuesta: null, actualizado: new Date(),
   });
@@ -964,6 +1116,24 @@ async function disponibilidadTurno(texto: string, sesion: string, repo: Reposito
   const ctx = await contextoPara(repo, null, fecha);
   const reservas = ctx.reservasDelDia;
   const N = duracionPedida(ext);
+  // 7.0.25: la disponibilidad aplica R15 antes de listar salas, con el mismo mensaje que la reserva. Un horario
+  // inválido no se guarda: el chip «Reservar Sala 13» después no debe arrastrarlo al flujo de reserva.
+  if (ext.inicio && ext.fin) {
+    const causa = causaR15(fecha, ext.inicio, ext.fin, { fecha: h.fecha, minutos: h.minutos });
+    if (causa) {
+      await repo.borrarConversacion(sesion);
+      const texto = causa.campo === "horario" && causa.motivo.startsWith("las salas abren de")
+        ? `${capitalizar(causa.motivo)}: elige un rango dentro de ese horario.`
+        : `${capitalizar(causa.motivo)}.`;
+      return cerrado("consulta_disponibilidad", texto);
+    }
+  }
+  // Mismo control de personas y equipos que la reserva: ningún dato fuera del esquema llega a guardarse.
+  const cantidad = await cantidadInvalida(ext, repo);
+  if (cantidad) {
+    await repo.borrarConversacion(sesion);
+    return cerrado("consulta_disponibilidad", cantidad.texto);
+  }
   const criterios: SolicitudReserva = {
     carne: null, fecha, inicio: ext.inicio, fin: ext.fin, sala: null,
     personas: ext.personas, equipos: ext.equipos, computo_alto: ext.computo_alto, materia: null,
@@ -1090,6 +1260,33 @@ export function rutaPorFecha(texto: string, exigirSala = true): "ocupacion" | "d
   const fs = fechas(texto, ahora().fecha);
   if (!fs.length) return null;
   return /\b(ocupad|reservad|tomad)\w*/.test(t) || fs.length >= 2 ? "ocupacion" : "disponibilidad";
+}
+
+// 7.0.25: «¿quién reservó la sala 13?» o «¿qué materia hay en la sala 5?» no son «fuera de alcance»: se responde
+// la ocupación sin nombres, carnés ni materias. Se reconoce por el texto, sin depender del modelo (el prompt del
+// intérprete está en el tope de caracteres, así que la línea no cabe allí).
+// «quién reservó», «quién tiene la sala», «qué materia hay», «a nombre de quién»: pide datos de la reserva.
+// No entra «quién puede reservar» (es una pregunta de cómo funciona, no de una reserva concreta).
+const PIDE_DATOS_RESERVA = /\b(quien(es)?\s+(reserv\w*|tiene[n]?|ocup\w*|esta\w*)|que materia|cual materia|a nombre de|que docente|cual docente)\b/;
+
+export async function ocupacionPrivadaTurno(texto: string, repo: Repositorio): Promise<RespuestaChat | null> {
+  const h = ahora();
+  const e = extraer(texto, { hoy: h.fecha, pendiente: null });
+  if (!e.sala || !PIDE_DATOS_RESERVA.test(norm(texto))) return null;
+  const fecha = e.fecha ?? h.fecha;
+  const etiqueta = `Sala ${e.sala.slice(5)}`;
+  const rs = (await repo.reservasDelDia(fecha, e.sala)).slice().sort((a, b) => a.inicio_min - b.inicio_min);
+  const cuando = fecha === h.fecha ? "hoy" : `el ${fechaLarga(fecha)}`;
+  const prefijo = "No comparto quién reserva ni la materia. ";
+  if (!rs.length) {
+    return cerrado("consulta_disponibilidad", `${prefijo}La ${etiqueta} no tiene reservas ${cuando}.`, ["Ver disponibilidad"]);
+  }
+  const bloques = rs.map((r) =>
+    `${r.inicio} a ${r.fin} por ${r.rol === "docente" ? "un docente" : "un grupo de estudiantes"}`);
+  const detalle = bloques.length === 1
+    ? `La ${etiqueta} está ocupada ${cuando} de ${bloques[0]}.`
+    : `La ${etiqueta} tiene reservas ${cuando}: ${bloques.join("; ")}.`;
+  return cerrado("consulta_disponibilidad", `${prefijo}${detalle}`, ["Ver disponibilidad"]);
 }
 
 // Ocupación por día, leída de la base: qué salas están reservadas y a qué hora. Sin carnés.

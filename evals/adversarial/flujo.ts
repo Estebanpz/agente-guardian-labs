@@ -1,8 +1,12 @@
 // Interpretación, flujo, bordes de R15, horas raras, salas inexistentes, prompt injection, textos límite.
+import { readFileSync } from "node:fs";
 import { anotar, hablar, imprimir, json, nuevoEntorno, restaurarLog, uuid } from "./comun.js";
-import { liberarReloj } from "../../agent/tools/reloj.js";
+import { aMin, liberarReloj } from "../../agent/tools/reloj.js";
 import { causaR15 } from "../../agent/tools/reservas.js";
 import { extraer } from "../../agent/tools/extraer.js";
+import type { DecisionReserva } from "../../agent/tools/esquemas-reservas.js";
+
+const VERSION_REGLAS = JSON.parse(readFileSync(new URL("../../agent/rules/reglas.json", import.meta.url), "utf-8")).version as string;
 
 const HOY = { fecha: "2026-11-09", minutos: 600 };
 const dur = (ini: string, fin: string) => `${ini}-${fin}`;
@@ -103,6 +107,136 @@ try {
     const s = await hablar(uuid(7), ["C-10000001", "reserva la sala 4 ayer de 10 a 12"]);
     anotar("F-10", "fecha/ayer", `"ayer"`, "se reconoce y se rechaza como fecha pasada (no se reserva)",
       `${String(s[1].respuesta).slice(0,140)}`, !/ya pasó/i.test(s[1].respuesta ?? ""));
+  }
+
+  // F-11 (7.0.25): R28. Juan tiene RS-0001 (Sala 6, mañana 13:00–15:00); otra sala a la misma hora se niega
+  // antes de confirmar y no crea nada.
+  {
+    const repo = nuevoEntorno();
+    const s = await hablar(uuid(8), ["C-10000002", "reserva la sala 4 mañana de 14 a 16 para 5"]);
+    const r = s[1] ?? {};
+    const creadas = await repo.reservasDelDia("2026-11-10", "sala-4");
+    anotar("F-11", "R28/cruce", "C-10000002 → Sala 4 mañana 14:00–16:00 (tiene RS-0001, Sala 6, 13:00–15:00)",
+      "mensaje de R28 con RS-0001, la Sala 6 y el horario; dos botones; no crea la reserva cruzada",
+      `${r.intencion}; ${String(r.respuesta).slice(0,160)};creadas=${creadas.length}`,
+      (r.respuesta ?? "") !== "Ya tienes RS-0001 (Sala 6) de 13:00 a 15:00: no puedes tener dos salas a la misma hora. Elige otro horario o cancela RS-0001."
+        || JSON.stringify(r.flujo?.opciones) !== JSON.stringify(["Cancelar RS-0001", "Cambiar horario"])
+        || creadas.length !== 0);
+  }
+
+  // F-12 (7.0.25): R28 no prohíbe dos reservas el mismo día si no se cruzan.
+  {
+    const repo = nuevoEntorno();
+    const s = await hablar(uuid(9), ["C-10000002", "reserva la sala 5 mañana de 16 a 18 para 5", "sí"]);
+    const propias = (await repo.reservasDelDia("2026-11-10")).filter((r) => r.carne === "C-10000002");
+    anotar("F-12", "R28/mismo día", "C-10000002 → Sala 5 mañana 16:00–18:00 → sí (RS-0001 es 13:00–15:00)",
+      "permite la segunda reserva del día si no se cruza y crea RS-0004",
+      `${String(s[1].respuesta).slice(0,100)} | ${String(s[2].respuesta).slice(0,120)}; propias=${propias.length}`,
+      !(s[1].respuesta ?? "").includes("La Sala 5 está libre el martes 10 de noviembre de 16:00 a 18:00 para 5 personas.")
+        || !(s[2].respuesta ?? "").includes("RS-0004")
+        || propias.length !== 2);
+  }
+
+  // F-13 (7.0.25): dos pestañas del mismo carné confirman a la vez; la segunda revalida con R28 y no inserta.
+  {
+    const repo = nuevoEntorno();
+    const a = await hablar(uuid(10), ["C-10000002", "reserva la sala 4 mañana de 10 a 12 para 5"]);
+    const b = await hablar(uuid(11), ["C-10000002", "reserva la sala 5 mañana de 10 a 12 para 5"]);
+    const ac = await hablar(uuid(10), ["sí"]);
+    const bc = await hablar(uuid(11), ["sí"]);
+    const aLas10 = (await repo.reservasDelDia("2026-11-10")).filter((r) => r.carne === "C-10000002" && r.inicio === "10:00");
+    anotar("F-13", "R28/dos pestañas", "Dos sesiones de C-10000002 preparan Sala 4 y Sala 5 mañana 10:00–12:00 → ambas confirman",
+      "solo una se crea; la segunda recibe R28 con los dos botones y no inserta",
+      `a=${a[1].flujo?.pendiente} b=${b[1].flujo?.pendiente} 1.ª=${String(ac[0].respuesta).slice(0,80)} 2.ª=${String(bc[0].respuesta).slice(0,140)}; a las 10:00=${aLas10.length}`,
+      a[1].flujo?.pendiente !== "confirmar" || b[1].flujo?.pendiente !== "confirmar"
+        || !(ac[0].respuesta ?? "").includes("RS-0004")
+        || !(bc[0].respuesta ?? "").includes("Ya tienes RS-0004 (Sala 4) de 10:00 a 12:00: no puedes tener dos salas a la misma hora.")
+        || JSON.stringify(bc[0].flujo?.opciones) !== JSON.stringify(["Cancelar RS-0004", "Cambiar horario"])
+        || aLas10.length !== 1);
+  }
+
+  // F-14 (7.0.25): cantidades fuera del esquema. Ningún dato del usuario debe terminar en «Error interno» (500).
+  {
+    nuevoEntorno();
+    const textos = ["C-10000001", "Quiero reservar la sala 8 mañana de 14 a 16", "somos 0", "somos -5", "somos 1000", "equipos 0", "equipos 1000"];
+    const s = await hablar(uuid(12), textos);
+    const todas = s.map((x) => String(x.respuesta ?? "")).join(" | ");
+    anotar("F-14", "cantidades/fuera de esquema", "sala 8 mañana 14–16 → somos 0 → somos -5 → somos 1000 → equipos 0 → equipos 1000",
+      "cada valor inválido se explica (mínimo, máximo de la sala más grande) sin Error interno",
+      todas.slice(0, 280),
+      /Error interno/.test(todas)
+        || !(s[2].respuesta ?? "").includes("El número de personas debe ser al menos 1. ¿Cuántas son?")
+        || !(s[3].respuesta ?? "").includes("El número de personas debe ser al menos 1. ¿Cuántas son?")
+        || !(s[4].respuesta ?? "").includes("Ninguna sala tiene cupo para 1000 personas; la más grande es de 30.")
+        || !(s[6].respuesta ?? "").includes("Ninguna sala tiene cupo para 1000 equipos; la más grande es de 30."));
+  }
+
+  // F-15 (7.0.25): horarios inválidos. La disponibilidad aplica R15 antes de listar; el chip posterior no arrastra
+  // el horario inválido.
+  {
+    nuevoEntorno();
+    const s = await hablar(uuid(13), [
+      "C-10000001", "¿Qué salas hay disponibles mañana de 2pm a 2pm?", "¿Qué salas hay disponibles mañana de 21:45 a 22:15?",
+      "Reservar Sala 13",
+    ]);
+    anotar("F-15", "horarios/inválidos", "disponibilidad 2pm–2pm → disponibilidad 21:45–22:15 → Reservar Sala 13",
+      "explica el fin igual al inicio y el horario 07:00–22:00; después pide la fecha sin arrastrar 21:45",
+      `${String(s[1].respuesta).slice(0,90)} | ${String(s[2].respuesta).slice(0,90)} | ${String(s[3].respuesta).slice(0,90)}`,
+      (s[1].respuesta ?? "") !== "La hora final debe ser después de la inicial."
+        || (s[2].respuesta ?? "") !== "Las salas abren de 07:00 a 22:00: elige un rango dentro de ese horario."
+        || s[3].flujo?.pendiente !== "fecha" || (s[3].respuesta ?? "").includes("21:45"));
+  }
+
+  // F-16 (7.0.25): la ocupación se informa sin datos personales, aunque se pregunte por quién o por la materia.
+  {
+    const repo = nuevoEntorno();
+    const programar = (): DecisionReserva => ({
+      decision: "programar", estado: "confirmado", accion: "programar_reserva", reglas_aplicadas: ["R25"],
+      sala_asignada: null, alternativas: [], conflictos: [], faltantes: [], notificar: [], fuentes: [],
+      version_reglas: VERSION_REGLAS, traza: [],
+    });
+    await repo.crearReservaAtomica("2026-11-09", "sala-13", programar, (codigo) => ({
+      codigo, sala: "sala-13", fecha: "2026-11-09", inicio: "19:00", fin: "21:00",
+      inicio_min: aMin("19:00"), fin_min: aMin("21:00"),
+      tipo: "estudiantes", carne: "C-10000003", rol: "estudiante", personas: 4, equipos: 4, computo_alto: false,
+      materia: "Física", estado: "programada", reglas_aplicadas: [], traza: [], version_reglas: VERSION_REGLAS,
+      creada: new Date(), origen: "chat",
+    }));
+    const s = await hablar(uuid(14), ["C-10000002", "¿quién reservó la sala 13?", "¿qué materia hay en la sala 5 mañana?"]);
+    const todo = json(s);
+    anotar("F-16", "privacidad/ocupación", "C-10000002 → ¿quién reservó la sala 13? → ¿qué materia hay en la sala 5 mañana?",
+      "responde la ocupación con horario y tipo de grupo, sin carné, nombre ni materia",
+      `${String(s[1].respuesta).slice(0,130)} | ${String(s[2].respuesta).slice(0,130)}`,
+      (s[1].respuesta ?? "") !== "No comparto quién reserva ni la materia. La Sala 13 está ocupada hoy de 19:00 a 21:00 por un grupo de estudiantes."
+        || (s[2].respuesta ?? "") !== "No comparto quién reserva ni la materia. La Sala 5 está ocupada el martes 10 de noviembre de 08:00 a 10:00 por un docente."
+        || /C-10000003|Física|Bases de Datos/.test(todo));
+  }
+  // F-17 (7.0.26): un dato explícito nuevo reemplaza al anterior dentro de la reserva. Juan tiene una reserva a
+  // las 21:00 de hoy; al cambiar el horario y decir «mañana mejor», la fecha debe pasar al martes 10 y las horas
+  // pedidas después se revisan para ese día, no para hoy (antes respondía «Ese horario de hoy ya pasó»).
+  {
+    const repo = nuevoEntorno("20:25");
+    const programar = (): DecisionReserva => ({
+      decision: "programar", estado: "confirmado", accion: "programar_reserva", reglas_aplicadas: ["R22"],
+      sala_asignada: null, alternativas: [], conflictos: [], faltantes: [], notificar: [], fuentes: [],
+      version_reglas: VERSION_REGLAS, traza: [],
+    });
+    await repo.crearReservaAtomica(HOY.fecha, "sala-6", programar, (codigo) => ({
+      codigo, sala: "sala-6", fecha: HOY.fecha, inicio: "21:00", fin: "22:00",
+      inicio_min: aMin("21:00"), fin_min: aMin("22:00"),
+      tipo: "estudiantes", carne: "C-10000002", rol: "estudiante", personas: 5, equipos: 5, computo_alto: false,
+      materia: null, estado: "programada", reglas_aplicadas: [], traza: [], version_reglas: VERSION_REGLAS,
+      creada: new Date(), origen: "chat",
+    }));
+    const s = await hablar(uuid(15), [
+      "C-10000002", "Quiero reservar la sala 4 hoy de 21 a 22 para 5", "Cambiar horario", "mañana mejor", "8am a 10am",
+    ]);
+    anotar("F-17", "flujo/fecha-nueva", "C-10000002 → sala 4 hoy 21–22 (R28) → Cambiar horario → mañana mejor → 8am a 10am",
+      "«mañana mejor» cambia al martes 10 y pide el horario; 8–10 del martes sigue la reserva, sin «Ese horario de hoy ya pasó»",
+      `${String(s[3].respuesta).slice(0,110)} | ${String(s[4].respuesta).slice(0,130)}`,
+      (s[3].respuesta ?? "") !== "Listo, cambio a mañana (martes 10 de noviembre). ¿De qué hora a qué hora?"
+        || !(s[4].respuesta ?? "").includes("La Sala 4 está libre el martes 10 de noviembre de 08:00 a 10:00 para 5 personas.")
+        || s.some((x) => (x.respuesta ?? "").includes("Ese horario de hoy ya pasó")));
   }
 } finally {
   liberarReloj();

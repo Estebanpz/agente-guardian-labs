@@ -143,6 +143,32 @@ export async function correr(): Promise<void> {
       return d.decision !== "programar" || programarEsCoherente(s, c, d.sala_asignada);
     }), 4000);
 
+  // R28 (7.0.25): una persona nunca termina con dos reservas programadas que se crucen, en ninguna sala.
+  await propiedad("R28: \"programar\" nunca deja dos reservas programadas del mismo carné cruzadas en el tiempo",
+    fc.property(escenario(false), ({ s, c }) => {
+      const d = evaluarReserva(s, c);
+      if (d.decision !== "programar" || !s.carne || !s.inicio || !s.fin) return true;
+      const i = aMin(s.inicio), f = aMin(s.fin);
+      return !c.reservasDelDia.some((r) =>
+        r.carne === s.carne && r.estado === "programada" && r.inicio_min < f && r.fin_min > i);
+    }), 4000);
+
+  // La otra cara: si hay una reserva propia que se cruza, R28 niega (antes que R22) y no asigna sala.
+  await propiedad("R28: con una reserva programada propia que se cruza, la decisión es negar [R28]",
+    fc.property(escenario(false), ({ s, c }) => {
+      // Solo cuando las reglas anteriores (R14–R17) no deciden: si no, R28 no llega a evaluarse.
+      const docente = s.carne?.startsWith("D-") ?? false;
+      if (!s.carne || s.fecha === null || s.inicio === null || s.fin === null || s.personas === null) return true;
+      if (docente && (s.equipos === null || s.computo_alto === null || !s.materia)) return true;
+      if (c.carne?._id !== s.carne || c.carne.vigencia !== "vigente" || !c.usuario) return true;
+      if (causaR15(s.fecha, s.inicio, s.fin, c.hoy)) return true;
+      const i = aMin(s.inicio), f = aMin(s.fin);
+      const propia = c.reservasDelDia.find((r) => r.carne === s.carne && r.estado === "programada" && r.inicio_min < f && r.fin_min > i);
+      if (!propia) return true;
+      const d = evaluarReserva(s, c);
+      return d.decision === "negar" && JSON.stringify(d.reglas_aplicadas) === '["R28"]' && d.sala_asignada === null;
+    }), 3000);
+
   await propiedad("evaluarReserva: las alternativas ofrecidas están activas, tienen aforo y no chocan en ese horario",
     fc.property(escenario(true), ({ s, c }) => {
       const d = evaluarReserva(s, c);

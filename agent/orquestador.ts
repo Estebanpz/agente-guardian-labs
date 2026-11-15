@@ -12,7 +12,7 @@ import { casos } from "../data/casos.js";
 import { equipos } from "../data/equipos.js";
 import { salas } from "../data/salas.js";
 import { crearRepositorio, type Repositorio } from "./store/repositorio.js";
-import { cancelacionTurno, continuar, misReservasTurno, esBotonCancelacion, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
+import { cancelacionTurno, continuar, misReservasTurno, esBotonCancelacion, escalarCarneDesconocido, estadoSalasDeBase, iniciar, ocupacionPrivadaTurno, ocupacionTurno, reanudar, rutaPorFecha, type RespuestaChat } from "./conversacion.js";
 import { CHIPS_SALUDO, PEDIR_CARNE, esSalida, esSaludo, saludoPara } from "./sesion.js";
 import { carne as carneDe, carnesEn, extraer, salaInexistente, sinCarnes } from "./tools/extraer.js";
 import { enmascarar } from "./tools/reservas.js";
@@ -50,11 +50,16 @@ function textoFuera(c: Interpretacion, texto: string): string {
 }
 
 // El mensaje trae datos de una reserva de sala (sala, fecha, horario, personas o la palabra sala/laboratorio).
+const NOMBRA_SALA = /\b(salas?|laboratorios?|computador(es)?|equipos?)\b/;
 function traeDatosDeSala(texto: string): boolean {
   const e = extraer(texto, { hoy: ahora().fecha, pendiente: null });
   return Boolean(e.sala || e.fecha || e.inicio || e.personas !== null || e.duracion_min)
-    || /\b(salas?|laboratorios?|computador(es)?|equipos?)\b/.test(normO(texto));
+    || NOMBRA_SALA.test(normO(texto));
 }
+// Respaldo de 7.0.25: para abrir una reserva desde «fuera_de_alcance» no basta un fragmento de horario
+// («mañana de 2 a 4»); tiene que nombrar la sala o los equipos. Así un mensaje de otra persona en la misma
+// sesión no se toma como una reserva nueva.
+const pideSalaConDatos = (texto: string): boolean => NOMBRA_SALA.test(normO(texto)) && traeDatosDeSala(texto);
 
 // Inyección para pruebas: repositorio y clasificador de mentira (sección 7.4).
 let inyeccion: { repo?: Repositorio; interpretar?: Clasificador } = {};
@@ -260,6 +265,11 @@ async function modoPublico(texto: string, sesion: string | undefined, repo: Repo
   if (ruta === "consulta_disponibilidad" && sesion) return iniciar("disponibilidad", texto, sesion, repo);
   if (esSaludo(texto)) return { intencion: "saludo", respuesta: SALUDO_PUBLICO, flujo: CHIPS_PUBLICOS };
 
+  // 7.0.25: «¿quién reservó la sala 13?» no es fuera de alcance ni requiere sesión: se informa la ocupación sin
+  // nombres, carnés ni materias.
+  const privada = await ocupacionPrivadaTurno(texto, repo);
+  if (privada) return privada;
+
   const c = await clasificar(texto);
   if (c.fallo && !temasDe(texto).length) {
     return { intencion: "error_modelo", respuesta: "No pude interpretar el mensaje porque el modelo no respondió. Intenta de nuevo o usa uno de estos botones.", flujo: CHIPS_PUBLICOS };
@@ -267,6 +277,8 @@ async function modoPublico(texto: string, sesion: string | undefined, repo: Repo
   if (c.intencion === "intento_eludir_reglas") return { intencion: c.intencion, respuesta: ALERTA_ELUSION, alerta: ALERTA_ELUSION, flujo: null };
   // Habla de sus reservas y el modelo no lo entendió: sin sesión se pide iniciar sesión; nunca se listan.
   if (c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && HABLA_DE_RESERVAS.test(normO(texto))) return requiereLogin();
+  // Pide una sala con fecha u horario: sin sesión se pide iniciar sesión, no se niega como fuera de alcance.
+  if (c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && traeDatosDeSala(texto)) return requiereLogin();
   if (c.recurso === "otro" || c.intencion === "fuera_de_alcance") return { intencion: "fuera_de_alcance", respuesta: textoFuera(c, texto), flujo: null };
   if (SOLO_CON_SESION.includes(c.intencion)) return requiereLogin();
   if (c.intencion === "consulta_salas" || c.intencion === "consulta_disponibilidad") {
@@ -429,6 +441,17 @@ async function mensajeBase(
     return r;
   }
 
+  // 7.0.25: «¿quién reservó la sala 13?» o «¿qué materia hay en la sala 5?» piden datos de una reserva ajena.
+  // No son «fuera de alcance»: se responde la ocupación sin nombres, carnés ni materias. Va antes del modelo
+  // porque el prompt del intérprete está en el tope de caracteres y la línea no cabe allí.
+  if (!eludir) {
+    const privada = await ocupacionPrivadaTurno(texto, repo);
+    if (privada) {
+      registrar({ texto: resumen, intencion: privada.intencion, respuesta: privada.respuesta });
+      return privada;
+    }
+  }
+
   // Paso 3: botones de la interfaz (texto fijo), sin modelo. Todo texto libre lo interpreta el modelo.
   const ruta = eludir ? null : rutaDeBoton(texto);
   if (ruta === "consulta_salas") {
@@ -479,6 +502,17 @@ async function mensajeBase(
   if (c.intencion === "cancelar_reserva" && sesion && !eludir) {
     const r = await cancelacionTurno(texto, sesion, repo);
     registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
+    return r;
+  }
+
+  // 7.0.25: el modelo dijo «fuera de alcance» pero el mensaje trae datos de sala u horario (p. ej. «una sala de
+  // 4 a 2»): es una solicitud de reserva y se abre el flujo. El motor explicará el horario si no es válido.
+  if (sesion && !eludir && c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && pideSalaConDatos(texto)) {
+    const r = await iniciar("reserva", texto, sesion, repo);
+    registrar({
+      texto: resumen, intencion: r.intencion, respuesta: r.respuesta,
+      validacion: "fuera_de_alcance → solicitud_reserva",
+    });
     return r;
   }
 

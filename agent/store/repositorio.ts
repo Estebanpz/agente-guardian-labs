@@ -31,11 +31,14 @@ export interface Repositorio {
   reservasDelDia(fecha: string, sala?: string): Promise<ReservaDoc[]>; // solo estado "programada"
   escaladasDelDia(fecha: string): Promise<ReservaDoc[]>;             // solo estado "escalada" (para la API)
   // Re-evalúa las reglas DENTRO de la operación atómica y solo inserta si sigue siendo "programar".
-  // `revalidar` recibe las reservas programadas de esa sala y ese día.
+  // `revalidar` recibe las reservas programadas de esa sala y de todo el día (R28 mira las del mismo carné en
+  // cualquier sala). Con `carne`, la transacción también bloquea ese carné y ese día: dos pestañas de la misma
+  // persona no pueden crear dos reservas cruzadas a la vez.
   crearReservaAtomica(
     fecha: string, sala: string,
-    revalidar: (reservasActuales: ReservaDoc[]) => DecisionReserva,
+    revalidar: (reservasDeSala: ReservaDoc[], reservasDelDia: ReservaDoc[]) => DecisionReserva,
     construir: (codigo: string) => ReservaDoc,
+    carne?: string | null,
   ): Promise<{ decision: DecisionReserva; reserva: ReservaDoc | null }>;
   // Asigna el siguiente RS-NNNN (mismo contador), guarda la reserva "escalada" y sus avisos, y devuelve
   // el código. Todo en una sola transacción.

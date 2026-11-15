@@ -63,7 +63,8 @@ export const CASOS: Caso[] = [
     esp: { decision: "escalar", reglas: ["R19"], estado: "contradictorio" } },
   { id: "RS-07", tipo: "Docente vs. estudiantes", regla: "R20", s: sol({ carne: "D-20000001", sala: "sala-6", inicio: "14:00", fin: "16:00", personas: 20, equipos: 20, computo_alto: false, materia: "Bases de datos" }),
     esp: { decision: "escalar", reglas: ["R20"], notificar: ["monitor"], conflicto: { codigo: "RS-0001", carne: "C-****0002" }, alternativas: ["sala-8", "sala-10", "sala-7"] } },
-  { id: "RS-08", tipo: "Docente vs. docente", regla: "R21", s: sol({ carne: "D-20000002", sala: "sala-5", inicio: "09:00", fin: "11:00", personas: 20, equipos: 20, computo_alto: false, materia: "Redes" }),
+  // 08:30–09:30 choca con RS-0002 (D-20000001, Sala 5, 08:00–10:00) sin cruzarse con la propia RS-0003 (10:00–12:00).
+  { id: "RS-08", tipo: "Docente vs. docente", regla: "R21", s: sol({ carne: "D-20000002", sala: "sala-5", inicio: "08:30", fin: "09:30", personas: 20, equipos: 20, computo_alto: false, materia: "Redes" }),
     esp: { decision: "escalar", reglas: ["R21"], notificar: ["monitor"] } },
   { id: "RS-09", tipo: "Estudiante vs. reserva", regla: "R22", s: sol({ carne: "C-10000003", sala: "sala-6", inicio: "14:00", fin: "15:00", personas: 3 }),
     esp: { decision: "negar", reglas: ["R22"] } },
@@ -83,6 +84,11 @@ export const CASOS: Caso[] = [
     esp: { decision: "programar", reglas: ["R25"], sala: "sala-11" } },
   { id: "RS-20", tipo: "Hoy ya pasó", regla: "R15", s: sol({ carne: "C-10000001", fecha: "2026-11-09", inicio: "07:30", fin: "09:00", personas: 5 }),
     esp: { decision: "negar", reglas: ["R15"] } },
+  // R28 (7.0.25): Juan tiene RS-0001 (Sala 6, 13:00–15:00). Otra sala a la misma hora se niega; sin cruzarse, se programa.
+  { id: "RS-27", tipo: "Cruce con reserva propia en otra sala", regla: "R28", s: sol({ carne: "C-10000002", sala: "sala-4", inicio: "14:00", fin: "16:00", personas: 5 }),
+    esp: { decision: "negar", reglas: ["R28"], conflicto: { codigo: "RS-0001", carne: "C-****0002" } } },
+  { id: "RS-28", tipo: "Mismo día sin cruce", regla: "R25", s: sol({ carne: "C-10000002", sala: "sala-5", inicio: "16:00", fin: "18:00", personas: 5 }),
+    esp: { decision: "programar", reglas: ["R25"], sala: "sala-5" } },
 ];
 
 const iguales = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -153,7 +159,8 @@ export async function correrEscenariosReservas(): Promise<FilaRes[]> {
         observado: `${repetido.decision} [${repetido.reglas_aplicadas.join(", ")}] · ${repetido.traza.join(" ")}`, ok: okRep });
     }
 
-    // RS-19: concurrencia. La primera crea RS-0004; la segunda, igual, sale en conflicto y no inserta.
+    // RS-19: concurrencia. La primera crea RS-0004; la segunda, igual (mismo carné, mismo horario), R28 la niega
+    // y no inserta: una persona no puede tener dos reservas cruzadas, aunque sean dos pestañas.
     {
       const repo = crearMemoria("2026-11-09");
       const s = sol({ carne: "C-10000001", sala: "sala-4", inicio: "16:00", fin: "18:00", personas: 5 });
@@ -165,11 +172,11 @@ export async function correrEscenariosReservas(): Promise<FilaRes[]> {
         computo_alto: false, materia: null, estado: "programada", reglas_aplicadas: ["R25"], traza: [],
         version_reglas: VERSION_REGLAS, creada: new Date(), origen: "chat",
       });
-      const primera = await repo.crearReservaAtomica(FECHA, "sala-4", revalidar, construir);
-      const segunda = await repo.crearReservaAtomica(FECHA, "sala-4", revalidar, construir);
-      const ok = primera.reserva?.codigo === "RS-0004" && segunda.reserva === null && iguales(segunda.decision.reglas_aplicadas, ["R22"]);
-      filas.push({ id: "RS-19", tipo: "Concurrencia", entrada: "dos reservas iguales", regla: "R22",
-        esperado: "1.ª crea RS-0004; 2.ª negar [R22] sin insertar",
+      const primera = await repo.crearReservaAtomica(FECHA, "sala-4", revalidar, construir, "C-10000001");
+      const segunda = await repo.crearReservaAtomica(FECHA, "sala-4", revalidar, construir, "C-10000001");
+      const ok = primera.reserva?.codigo === "RS-0004" && segunda.reserva === null && iguales(segunda.decision.reglas_aplicadas, ["R28"]);
+      filas.push({ id: "RS-19", tipo: "Concurrencia", entrada: "dos reservas iguales", regla: "R28",
+        esperado: "1.ª crea RS-0004; 2.ª negar [R28] sin insertar",
         observado: `1.ª ${primera.reserva?.codigo ?? "nada"}; 2.ª ${segunda.decision.decision} [${segunda.decision.reglas_aplicadas.join(", ")}]`, ok });
     }
 

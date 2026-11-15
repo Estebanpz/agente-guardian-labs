@@ -134,6 +134,9 @@ const FECHAS: [string, string[]][] = [
   ["mañana y pasado mañana", ["2026-11-10", "2026-11-11"]],
   ["lunes, martes y miércoles", ["2026-11-09", "2026-11-10", "2026-11-11"]],
   ["en la mañana", []],
+  ["por la mañana", []],
+  ["en la tarde", []],
+  ["la mañana", []],
 ];
 for (const [texto, esperado] of FECHAS) {
   const r = fechas(texto, HOY);

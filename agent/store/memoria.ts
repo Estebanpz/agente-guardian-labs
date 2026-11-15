@@ -71,8 +71,9 @@ export function crearMemoria(hoy: string): Repositorio {
     },
 
     async crearReservaAtomica(fecha, sala, revalidar, construir) {
-      const actuales = reservas.filter((r) => r.fecha === fecha && r.sala === sala && r.estado === "programada");
-      const decision = revalidar(actuales);
+      const delDia = reservas.filter((r) => r.fecha === fecha && r.estado === "programada");
+      const deSala = delDia.filter((r) => r.sala === sala);
+      const decision = revalidar(deSala, delDia);
       if (decision.decision !== "programar") return { decision, reserva: null };
       const reserva = construir(siguienteCodigo());
       reservas.push(reserva);
