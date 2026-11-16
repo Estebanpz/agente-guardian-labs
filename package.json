@@ -4,8 +4,8 @@
   "description": "Agente lógico local (Ollama + motor de reglas) para el control de ingreso a los laboratorios de sistemas de UniEspinal. Proyecto académico.",
   "scripts": {
     "dev": "tsx agent/index.ts",
-    "typecheck": "tsc",
-    "pruebas": "tsx evals/correr-pruebas.ts && tsx evals/regresion.ts && tsx evals/r12.ts && tsx evals/privacidad.ts && tsx evals/ayuda.ts && tsx evals/prueba-intencion.ts && tsx evals/reservas.ts && tsx evals/extraer.ts && tsx evals/conversacion.ts && tsx evals/semilla.ts && tsx evals/api-monitor.ts && tsx evals/acceso.ts",
+    "typecheck": "tsc && npm --prefix web run typecheck",
+    "pruebas": "tsx evals/correr-pruebas.ts && tsx evals/regresion.ts && tsx evals/r12.ts && tsx evals/privacidad.ts && tsx evals/ayuda.ts && tsx evals/prueba-intencion.ts && tsx evals/reservas.ts && tsx evals/extraer.ts && tsx evals/conversacion.ts && tsx evals/semilla.ts && tsx evals/api-monitor.ts && tsx evals/acceso.ts && tsx evals/auditoria.ts",
     "pruebas:rapidas": "tsx evals/guardia.ts && tsx evals/privacidad.ts && tsx evals/extraer.ts && tsx evals/reservas.ts && tsx evals/acceso.ts && tsx evals/conversacion.ts && tsx evals/api-monitor.ts && tsx evals/mutacion/extraer.ts && tsx evals/mutacion/privacidad.ts && tsx evals/mutacion/acceso.ts && tsx evals/mutacion/reservas.ts",
     "mutacion": "stryker run",
     "e2e": "tsx evals/e2e.ts",

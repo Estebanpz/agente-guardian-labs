@@ -1,4 +1,12 @@
-import { datosDeSala, enRevisionDe } from "../../pages/salas/filtros.js";
+import type { ReactNode } from "react";
+import type { SalaDelDia } from "../../../../agent/api-tipos";
+import { datosDeSala, enRevisionDe, type FiltroId } from "../../pages/salas/filtros";
+import type { AvisoVista } from "../../pages/salas/useDatosSalas";
+
+type Props = {
+  salas: SalaDelDia[]; esHoy: boolean; ahoraMin: number; avisosPendientes: AvisoVista[];
+  filtro: FiltroId; onFiltro: (id: FiltroId) => void; onVerAvisos: () => void;
+};
 
 // Cuatro indicadores con gráficas (plan de la vista, sección 2.1). Las gráficas son divs con alturas en %;
 // el número y el texto llevan la información, así que las gráficas van ocultas para lectores de pantalla.
@@ -13,7 +21,7 @@ const COLOR = {
 };
 const HORAS = Array.from({ length: 15 }, (_, i) => 7 + i); // 07 a 21: cada franja de una hora
 
-export default function Indicadores({ salas, esHoy, ahoraMin, avisosPendientes, filtro, onFiltro, onVerAvisos }) {
+export default function Indicadores({ salas, esHoy, ahoraMin, avisosPendientes, filtro, onFiltro, onVerAvisos }: Props) {
   const info = salas.map((s) => datosDeSala(s, { esHoy, ahoraMin, rango: null }));
 
   // Libres: salas libres ahora (hoy) o sin reservas (otro día). Una barra por sala.
@@ -36,7 +44,7 @@ export default function Indicadores({ salas, esHoy, ahoraMin, avisosPendientes, 
 
   const reglas = [...new Set(avisosPendientes.map((a) => a.regla))].slice(0, 5);
 
-  const tarjeta = (id, titulo, valor, nota, grafica) => (
+  const tarjeta = (id: FiltroId, titulo: string, valor: ReactNode, nota: string, grafica: ReactNode) => (
     <button
       type="button"
       className="sa-kpi"

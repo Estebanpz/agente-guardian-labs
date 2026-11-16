@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { api } from "../api.js";
-import { useSesion } from "../sesion.js";
-import TarjetaDecision from "../components/TarjetaDecision.jsx";
-import TarjetaReserva from "../components/TarjetaReserva.jsx";
+import { api } from "../api";
+import { useSesion } from "../sesion";
+import TarjetaDecision from "../components/TarjetaDecision";
+import TarjetaReserva from "../components/TarjetaReserva";
+import type { RespuestaMensaje, UsuarioSesion } from "../../../agent/api-tipos";
 import "../styles/chat.css";
+
+// Una respuesta del agente tal como se muestra: la de la API o un error de red.
+type RespuestaVista = RespuestaMensaje & { error?: string };
+type Mensaje =
+  | { id: string; de: "yo"; texto: string }
+  | { id: string; de: "agente"; r: RespuestaVista; opciones: string[] };
 
 // Ejemplos para probar el chat (se muestran plegados en la columna de historial).
 const SUGERENCIAS = [
@@ -20,7 +27,7 @@ const SUGERENCIAS = [
 ];
 
 // Accesos rápidos de la pantalla. "Mis reservas" lista las reservas propias con botones para cancelarlas.
-const ACCESOS = [
+const ACCESOS: { texto: string; ayuda: string; envia: string | null; icono: string }[] = [
   { texto: "Reservar sala", ayuda: "Crear solicitud", envia: "Quiero reservar una sala", icono: "bi-calendar-check" },
   { texto: "Ver disponibilidad", ayuda: "Horarios libres", envia: "Ver disponibilidad", icono: "bi-calendar3" },
   { texto: "Estado de salas", ayuda: "Equipos y cupos", envia: "¿Cuál es el estado de las salas?", icono: "bi-grid-3x3-gap" },
@@ -31,12 +38,12 @@ const MAX = 500;
 
 // El indicador de espera dice qué se está revisando: una sala o un horario, o cualquier otra solicitud.
 const NOMBRA_SALA_U_HORARIO = /\b(sala|salas|laboratorio)\b|\b\d{1,2}(:\d{2}|\.\d{2})?\s*(am|pm|a\.?\s?m\.?|p\.?\s?m\.?)(?!\w)|\bde\s+\d{1,2}\b|\b\d{1,2}:\d{2}\b|\b(hasta|a) las?\s+\d/i;
-const textoEspera = (t) => (NOMBRA_SALA_U_HORARIO.test(t)
+const textoEspera = (t: string): string => (NOMBRA_SALA_U_HORARIO.test(t)
   ? "Un momento, estoy revisando la disponibilidad…"
   : "Estoy trabajando en tu solicitud…");
 
 // Insignia de intención: icono y texto (nunca solo color).
-const ETIQUETAS = {
+const ETIQUETAS: Record<string, { texto: string; icono: string }> = {
   fuera_de_alcance: { texto: "Fuera de alcance", icono: "bi-slash-circle" },
   datos_prohibidos: { texto: "Datos personales bloqueados", icono: "bi-incognito" },
   intento_eludir_reglas: { texto: "Intento de eludir reglas", icono: "bi-shield-exclamation" },
@@ -55,8 +62,8 @@ const ETIQUETAS = {
 };
 
 // Primer mensaje del agente. La identidad viene del inicio de sesión (14-11-2026), no de un carné escrito.
-const puedeReservar = (u) => u?.rol === "estudiante" || u?.rol === "docente";
-const mensajeInicial = (usuario) => ({
+const puedeReservar = (u: UsuarioSesion | null): u is UsuarioSesion => u?.rol === "estudiante" || u?.rol === "docente";
+const mensajeInicial = (usuario: UsuarioSesion | null): Mensaje => ({
   id: "bienvenida",
   de: "agente",
   r: puedeReservar(usuario)
@@ -70,11 +77,11 @@ const mensajeInicial = (usuario) => ({
 const nuevaSesion = () => crypto.randomUUID();
 
 // Nombre visible: primer nombre y primer apellido ("Laura Gómez").
-const nombreVisible = (id) => `${id.nombres.split(" ")[0]} ${id.apellidos.split(" ")[0]}`;
+const nombreVisible = (id: { nombres: string; apellidos: string }): string => `${id.nombres.split(" ")[0]} ${id.apellidos.split(" ")[0]}`;
 
-const horaCorta = (fecha) => fecha.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+const horaCorta = (fecha: Date): string => fecha.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
 
-function Chips({ opciones, onElegir, deshabilitado }) {
+function Chips({ opciones, onElegir, deshabilitado }: { opciones: string[]; onElegir: (o: string) => void; deshabilitado: boolean }) {
   return (
     <div className="ch-chips" role="group" aria-label="Sugerencias de respuesta">
       {opciones.map((o) => (
@@ -87,14 +94,16 @@ function Chips({ opciones, onElegir, deshabilitado }) {
   );
 }
 
-function RespuestaAgente({ r, opciones, onElegir, cargando }) {
+function RespuestaAgente({ r, opciones, onElegir, cargando }: {
+  r: RespuestaVista; opciones: string[]; onElegir: (o: string) => void; cargando: boolean;
+}) {
   if (r.error) {
     return <div className="ch-burbuja ch-burbuja-agente ch-error"><i className="bi bi-wifi-off me-2" aria-hidden="true" />{r.error}</div>;
   }
   if (r.reserva) {
     return (
       <div className="ch-fila-tarjeta">
-        <TarjetaReserva resultado={r} onUsar={onElegir} />
+        <TarjetaReserva resultado={{ ...r, reserva: r.reserva }} onUsar={onElegir} />
         {opciones.length > 0 && <Chips opciones={opciones} onElegir={onElegir} deshabilitado={cargando} />}
       </div>
     );
@@ -102,7 +111,7 @@ function RespuestaAgente({ r, opciones, onElegir, cargando }) {
   if (r.decision) {
     return <div className="ch-fila-tarjeta"><TarjetaDecision resultado={r} compacta /></div>;
   }
-  const etiqueta = r.aclaracion ? ETIQUETAS.aclaracion : ETIQUETAS[r.intencion];
+  const etiqueta = r.aclaracion ? ETIQUETAS.aclaracion : r.intencion ? ETIQUETAS[r.intencion] : undefined;
   return (
     <div className="ch-burbuja ch-burbuja-agente">
       {etiqueta && (
@@ -122,15 +131,15 @@ function RespuestaAgente({ r, opciones, onElegir, cargando }) {
 export default function Chat() {
   const { usuario, salir } = useSesion();
   const navegar = useNavigate();
-  const [mensajes, setMensajes] = useState(() => [mensajeInicial(usuario)]);
+  const [mensajes, setMensajes] = useState<Mensaje[]>(() => [mensajeInicial(usuario)]);
   const [texto, setTexto] = useState("");
   const [sesion, setSesion] = useState(nuevaSesion);
   const [flujoActivo, setFlujoActivo] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [espera, setEspera] = useState("");
   const [inicio, setInicio] = useState(() => new Date());
-  const fin = useRef(null);
-  const entrada = useRef(null);
+  const fin = useRef<HTMLDivElement>(null);
+  const entrada = useRef<HTMLTextAreaElement>(null);
 
   // La caja crece con el texto (hasta un máximo) y vuelve a una línea al enviar.
   useEffect(() => {
@@ -161,7 +170,7 @@ export default function Chat() {
   }
 
   // Las llamadas a la API salen de los manejadores (enviar), no de un efecto.
-  async function enviar(t) {
+  async function enviar(t: string) {
     const limpio = t.trim();
     if (!limpio || cargando) return;
     setTexto("");
@@ -173,19 +182,20 @@ export default function Chat() {
     const aviso = setTimeout(() => setEspera("Sigo pensando tu mensaje; con el modelo local puede tardar hasta un minuto…"), 8000);
     try {
       // El indicador de espera se ve al menos 600 ms, aunque la respuesta llegue antes.
-      const [r] = await Promise.all([api.mensaje(limpio, sesion), new Promise((ok) => setTimeout(ok, 600))]);
+      const [r] = await Promise.all([api.mensaje(limpio, sesion), new Promise<void>((ok) => setTimeout(ok, 600))]);
       const opciones = r.flujo?.opciones ?? [];
       setFlujoActivo(Boolean(r.flujo?.pendiente) || r.flujo?.tipo === "reserva" || r.flujo?.tipo === "registro");
       // Un mensaje con datos personales (cédula, correo, teléfono) no queda visible en la burbuja ni en el historial.
       const ocultar = r.intencion === "datos_prohibidos";
       setMensajes((m) => [
-        ...m.map((x) => (ocultar && x.id === idYo ? { ...x, texto: "Mensaje oculto: contenía datos personales." } : x)),
+        ...m.map((x): Mensaje => (ocultar && x.id === idYo && x.de === "yo" ? { ...x, texto: "Mensaje oculto: contenía datos personales." } : x)),
         { id: crypto.randomUUID(), de: "agente", r, opciones },
       ]);
       // "salir" escrito en el chat cierra también la sesión de la cuenta.
       if (r.intencion === "cerrar_sesion" && usuario) await cerrarSesion();
     } catch (e) {
-      setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r: { error: e.message }, opciones: [] }]);
+      const error = e instanceof Error ? e.message : String(e);
+      setMensajes((m) => [...m, { id: crypto.randomUUID(), de: "agente", r: { error }, opciones: [] }]);
     } finally {
       clearTimeout(aviso);
       setCargando(false);
@@ -202,7 +212,8 @@ export default function Chat() {
 
   // Solo la última respuesta del agente muestra sus chips.
   const ultimo = mensajes.length - 1;
-  const primeraPregunta = mensajes.find((m) => m.de === "yo")?.texto ?? "Conversación nueva";
+  const primera = mensajes.find((m) => m.de === "yo");
+  const primeraPregunta = primera?.de === "yo" ? primera.texto : "Conversación nueva";
 
   const titulo = usuario ? `Hola, ${nombreVisible(usuario)}. ¿Qué necesitas hoy?` : "Hola. ¿Qué necesitas hoy?";
   let subtitulo = "Sin sesión: te informo la disponibilidad y el estado de las salas.";

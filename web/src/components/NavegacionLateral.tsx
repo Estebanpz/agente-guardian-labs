@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
-import { useSesion } from "../sesion.js";
+import { useSesion } from "../sesion";
 
 // Preferencia de la barra (expandida o contraída), recordada en este navegador. Si el almacenamiento no
 // está disponible, la barra arranca expandida.
@@ -12,7 +12,7 @@ const leerContraida = () => {
     return false;
   }
 };
-const guardarContraida = (v) => {
+const guardarContraida = (v: boolean): void => {
   try {
     localStorage.setItem(CLAVE, v ? "1" : "0");
   } catch {
@@ -22,7 +22,8 @@ const guardarContraida = (v) => {
 
 // Barra lateral de navegación, igual en todas las vistas (Laboratorios, Chat y Salas).
 // El botón la contrae a iconos para dar más ancho al contenido, y la vuelve a expandir.
-export default function NavegacionLateral({ etiquetaBase, proveedor }) {
+// `proveedor`: nombre del modelo; null mientras se consulta; false si la API no responde.
+export default function NavegacionLateral({ etiquetaBase, proveedor }: { etiquetaBase: string; proveedor: string | false | null }) {
   const [contraida, setContraida] = useState(leerContraida);
   const { usuario, salir } = useSesion();
   const navegar = useNavigate();

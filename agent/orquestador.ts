@@ -17,6 +17,8 @@ import { CHIPS_SALUDO, PEDIR_CARNE, esSalida, esSaludo, saludoPara } from "./ses
 import { carne as carneDe, carnesEn, extraer, salaInexistente, sinCarnes } from "./tools/extraer.js";
 import { enmascarar } from "./tools/reservas.js";
 import { ahora } from "./tools/reloj.js";
+import { norm } from "./tools/texto.js";
+import type { ResultadoEvaluar } from "./api-tipos.js";
 
 // Ingreso (vista Laboratorios): las tres salas de la evaluación (las reservas usan sala-1 a sala-16).
 type SalaId = "sala-1" | "sala-2" | "sala-3";
@@ -29,7 +31,6 @@ type Clasificador = (texto: string) => Promise<Interpretacion & { fallo?: string
 
 const FUERA_GENERAL = "Esa consulta está fuera de mi alcance. Te ayudo con reservas, disponibilidad y ocupación de las salas de sistemas.";
 const CHIPS_BOTONES = { tipo: "sugerencia", pendiente: null, opciones: ["Reservar una sala", "Ver disponibilidad", "Estado de salas"] };
-const normO = (t: string) => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
 // El mensaje habla de reservas propias, aunque el modelo no lo haya entendido (7.0.22): reserva(s), sus faltas
 // habituales o un código RS-0000. «Reservar» no entra: si es otra cosa, lo decide `recurso`.
@@ -39,7 +40,7 @@ const PIDE_CANCELAR = /\b(cancel\w*|anul\w*|elimin\w*|borr\w*|quit\w*)\b/;
 // «cancelar», «cancela», «cancélala», «anular», «cancelar esa»: sin más datos, es cancelar una reserva.
 const CANCELA_SOLA = /^(cancel\w*|anul\w*|elimin\w*|borr\w*|quit\w*)(\s+(esa|esta|la|mi|las|mis|el|una|unos|unas))?(\s+(reserva|reservas))?$/;
 const soloCancelar = (texto: string): boolean =>
-  CANCELA_SOLA.test(normO(texto).replace(/^[¡¿\s]+|[.!?¡¿,;:\s]+$/g, ""));
+  CANCELA_SOLA.test(norm(texto).replace(/^[¡¿\s]+|[.!?¡¿,;:\s]+$/g, ""));
 
 // Respuesta de fuera de alcance. Si el modelo entendió que quiere reservar otra cosa, se nombra lo que pidió
 // (solo con palabras que están en el mensaje).
@@ -54,12 +55,12 @@ const NOMBRA_SALA = /\b(salas?|laboratorios?|computador(es)?|equipos?)\b/;
 function traeDatosDeSala(texto: string): boolean {
   const e = extraer(texto, { hoy: ahora().fecha, pendiente: null });
   return Boolean(e.sala || e.fecha || e.inicio || e.personas !== null || e.duracion_min)
-    || NOMBRA_SALA.test(normO(texto));
+    || NOMBRA_SALA.test(norm(texto));
 }
 // Respaldo de 7.0.25: para abrir una reserva desde «fuera_de_alcance» no basta un fragmento de horario
 // («mañana de 2 a 4»); tiene que nombrar la sala o los equipos. Así un mensaje de otra persona en la misma
 // sesión no se toma como una reserva nueva.
-const pideSalaConDatos = (texto: string): boolean => NOMBRA_SALA.test(normO(texto)) && traeDatosDeSala(texto);
+const pideSalaConDatos = (texto: string): boolean => NOMBRA_SALA.test(norm(texto)) && traeDatosDeSala(texto);
 
 // Inyección para pruebas: repositorio y clasificador de mentira (sección 7.4).
 let inyeccion: { repo?: Repositorio; interpretar?: Clasificador } = {};
@@ -75,7 +76,7 @@ const clasificar: Clasificador = async (texto) => {
   return c.fallo ? c : { ...validarElusion(c, texto), fallo: c.fallo };
 };
 
-export async function solicitar(datos: unknown, alerta?: string) {
+export async function solicitar(datos: unknown, alerta?: string): Promise<ResultadoEvaluar> {
   // Validar contra el esquema.
   const entrada = EntradaEvaluar.parse(datos);
 
@@ -205,7 +206,7 @@ async function identificar(carneTxt: string, texto: string, sesion: string | und
 async function desvioDelFlujo(texto: string, sesion: string, repo: Repositorio): Promise<RespuestaChat | null> {
   const conv = await repo.leerConversacion(sesion);
   if (!conv || conv.flujo === "disponibilidad") return null;
-  const t = normO(texto).trim();
+  const t = norm(texto).trim();
   if (t.split(/\s+/).filter(Boolean).length < 3) return null;
   // Un número casi siempre responde la pregunta pendiente ("quiero la 11", "somos 4").
   if (/\d/.test(t)) return null;
@@ -281,7 +282,7 @@ async function modoPublico(texto: string, sesion: string | undefined, repo: Repo
   }
   if (c.intencion === "intento_eludir_reglas") return { intencion: c.intencion, respuesta: ALERTA_ELUSION, alerta: ALERTA_ELUSION, flujo: null };
   // Habla de sus reservas y el modelo no lo entendió: sin sesión se pide iniciar sesión; nunca se listan.
-  if (c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && HABLA_DE_RESERVAS.test(normO(texto))) return requiereLogin();
+  if (c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && HABLA_DE_RESERVAS.test(norm(texto))) return requiereLogin();
   // Pide una sala con fecha u horario: sin sesión se pide iniciar sesión, no se niega como fuera de alcance.
   if (c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && traeDatosDeSala(texto)) return requiereLogin();
   if (c.recurso === "otro" || c.intencion === "fuera_de_alcance") return { intencion: "fuera_de_alcance", respuesta: textoFuera(c, texto), flujo: null };
@@ -350,6 +351,24 @@ export async function mensaje(texto: string, contexto: Contexto = {}) {
   return r;
 }
 
+// ── Mensaje con la identidad ya resuelta ────────────────────────────────────
+// Hallazgo 4 de la auditoría (16-11-2026): `mensajeBase` era una cadena de ~290 líneas con 15 salidas. Ahora solo
+// ordena los pasos; cada paso devuelve una respuesta (corta el turno) o null (sigue). El ORDEN es la lógica del
+// negocio (guardia y datos prohibidos primero, flujo abierto antes del modelo, ingreso al final): no lo cambies sin
+// revisar las pruebas. Para un caso nuevo, agrega un paso con nombre; no metas ramas en `mensajeBase`.
+
+type PasoMensaje = {
+  texto: string; contexto: Contexto; sesion: string | undefined; repo: Repositorio; eludir: boolean; resumen: string;
+};
+type Corte = RespuestaChat | { intencion: string; respuesta: string };
+type Clase = Awaited<ReturnType<Clasificador>>;
+
+// Registra el turno en la traza y devuelve la respuesta. `extra` agrega o reemplaza campos de la traza.
+function responder<T extends { intencion: string; respuesta: string }>(p: PasoMensaje, r: T, extra: object = {}): T {
+  registrar({ texto: p.resumen, intencion: r.intencion, respuesta: r.respuesta, ...extra });
+  return r;
+}
+
 async function mensajeBase(
   texto: string,
   contexto: Contexto = {},
@@ -365,25 +384,41 @@ async function mensajeBase(
   }
 
   const sesion = contexto.sesion && z.uuid().safeParse(contexto.sesion).success ? contexto.sesion : undefined;
-  const repo = await repoActual();
-  const eludir = esIntentoDeElusion(texto);
-  const resumen = texto.slice(0, 200);
+  const p: PasoMensaje = {
+    texto, contexto, sesion, repo: await repoActual(), eludir: esIntentoDeElusion(texto), resumen: texto.slice(0, 200),
+  };
 
-  // Identidad: sin sesión identificada solo se pide el carné (la guardia responde igual).
+  // Pasos 2 y 3: lo que se resuelve sin el modelo.
+  const antes = await identidadDelMensaje(p)
+    ?? await botonesPropios(p)
+    ?? await salaQueNoExiste(p)
+    ?? await flujoAbierto(p)
+    ?? await pedidosSinFlujo(p)
+    ?? await botonesDeInterfaz(p);
+  if (antes) return antes;
+
+  // Paso 4: el modelo interpreta y propone datos candidatos; el código decide qué hacer con ellos.
+  const c = await clasificar(texto);
+  return modeloSinRespuesta(p, c)
+    ?? await consultaOReservasPropias(p, c)
+    ?? await pedidoDeReserva(p, c)
+    ?? respuestaInformativa(p, c)
+    ?? fueraDeAlcance(p, c)
+    ?? await evaluarIngreso(p, c);
+}
+
+// Identidad: sin sesión identificada solo se pide el carné (la guardia responde igual). Un carné solo con la sesión
+// ya identificada vuelve a identificar y saludar (7.0.9). Salir olvida el carné.
+async function identidadDelMensaje(p: PasoMensaje): Promise<Corte | null> {
+  const { texto, sesion, repo, eludir } = p;
   const sesionDoc = sesion ? await repo.leerSesion(sesion) : null;
-  if (!sesionDoc?.carne) {
-    const r = await sinIdentidad(texto, sesion, repo, eludir);
-    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-    return r;
-  }
+  if (!sesionDoc?.carne) return responder(p, await sinIdentidad(texto, sesion, repo, eludir));
   // Un carné solo (o "Soy C-…") con la sesión ya identificada: se vuelve a identificar y saludar, y se cierra
   // la conversación abierta. Pasa al recargar la página o al cambiar de persona (7.0.9).
   const carneNuevo = carneDe(texto);
   if (carneNuevo && sesion && sinCarnes(texto).replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(Boolean).length <= 2) {
     await repo.borrarConversacion(sesion);
-    const r = await identificar(carneNuevo, texto, sesion, repo);
-    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-    return r;
+    return responder(p, await identificar(carneNuevo, texto, sesion, repo));
   }
   // Salir o cerrar sesión: se olvida el carné y se cierra la conversación abierta.
   if (esSalida(texto) && sesion) {
@@ -391,216 +426,173 @@ async function mensajeBase(
     await repo.borrarConversacion(sesion);
     return { intencion: "cerrar_sesion", respuesta: "Sesión cerrada. Escribe tu carné cuando quieras continuar.", flujo: null };
   }
+  return null;
+}
 
-  // Botones de cancelación de una reserva propia (R27): llevan el código y se comprueban siempre contra el carné
-  // de la sesión. Van antes del flujo abierto para que «Sí, cancelar RS-…» no se tome como «cancelar» del flujo.
-  // «Mis reservas» (botón): se atiende aunque haya un flujo abierto, que queda como estaba.
-  if (sesion && !eludir && rutaDeBoton(texto) === "mis_reservas") {
-    const r = await misReservasTurno(sesion, repo);
-    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-    return r;
-  }
-  if (sesion && !eludir && esBotonCancelacion(texto)) {
-    const r = await cancelacionTurno(texto, sesion, repo);
-    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-    return r;
-  }
+// Botones de cancelación de una reserva propia (R27): llevan el código y se comprueban siempre contra el carné
+// de la sesión. Van antes del flujo abierto para que «Sí, cancelar RS-…» no se tome como «cancelar» del flujo.
+// «Mis reservas» (botón): se atiende aunque haya un flujo abierto, que queda como estaba.
+async function botonesPropios(p: PasoMensaje): Promise<Corte | null> {
+  const { texto, sesion, repo, eludir } = p;
+  if (!sesion || eludir) return null;
+  if (rutaDeBoton(texto) === "mis_reservas") return responder(p, await misReservasTurno(sesion, repo));
+  if (esBotonCancelacion(texto)) return responder(p, await cancelacionTurno(texto, sesion, repo));
+  return null;
+}
 
-  // ADV-09: una sala que no existe se dice, en vez de ignorarla y ofrecer otra.
+// ADV-09: una sala que no existe se dice, en vez de ignorarla y ofrecer otra.
+async function salaQueNoExiste(p: PasoMensaje): Promise<Corte | null> {
+  const { texto, sesion, repo, eludir } = p;
   const salaMala = eludir ? null : salaInexistente(texto);
-  if (salaMala !== null && sesion) {
-    const aviso = `La Sala ${salaMala} no existe: hay salas de la 1 a la 16.`;
-    const r = (await reanudar(sesion, repo, aviso)) ?? { intencion: "aclaracion", respuesta: `${aviso} ¿Cuál quieres?`, flujo: null };
-    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-    return r;
-  }
+  if (salaMala === null || !sesion) return null;
+  const aviso = `La Sala ${salaMala} no existe: hay salas de la 1 a la 16.`;
+  const r = (await reanudar(sesion, repo, aviso)) ?? { intencion: "aclaracion", respuesta: `${aviso} ¿Cuál quieres?`, flujo: null };
+  return responder(p, r);
+}
 
-  // Paso 2: flujo abierto. La guardia corre antes: con elusión, la alerta y la pregunta, sin cambiar datos.
+// Paso 2: flujo abierto. La guardia corre antes: con elusión, la alerta y la pregunta, sin cambiar datos.
+async function flujoAbierto(p: PasoMensaje): Promise<Corte | null> {
+  const { texto, sesion, repo, eludir } = p;
+  if (!sesion) return null;
+  if (eludir) {
+    const r = await reanudar(sesion, repo, ALERTA_ELUSION);
+    return r ? responder(p, { ...r, alerta: ALERTA_ELUSION }, { intencion: "intento_eludir_reglas" }) : null;
+  }
+  // Un mensaje que no responde a la pregunta pendiente lo interpreta el modelo antes de seguir el flujo.
+  const desvio = await desvioDelFlujo(texto, sesion, repo);
+  if (desvio) return responder(p, desvio);
+  const r = await continuar(texto, sesion, repo);
+  return r ? responder(p, r) : null;
+}
+
+// Sin flujo abierto: dos pedidos a la vez, «cancelar» a secas y preguntas por datos de reservas ajenas.
+async function pedidosSinFlujo(p: PasoMensaje): Promise<Corte | null> {
+  const { texto, sesion, repo, eludir } = p;
+  if (eludir) return null;
   if (sesion) {
-    if (eludir) {
-      const r = await reanudar(sesion, repo, ALERTA_ELUSION);
-      if (r) {
-        registrar({ texto: resumen, intencion: "intento_eludir_reglas", respuesta: r.respuesta });
-        return { ...r, alerta: ALERTA_ELUSION };
-      }
-    } else {
-      // Un mensaje que no responde a la pregunta pendiente lo interpreta el modelo antes de seguir el flujo.
-      const desvio = await desvioDelFlujo(texto, sesion, repo);
-      if (desvio) {
-        registrar({ texto: resumen, intencion: desvio.intencion, respuesta: desvio.respuesta });
-        return desvio;
-      }
-      const r = await continuar(texto, sesion, repo);
-      if (r) {
-        registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-        return r;
-      }
-    }
-  }
-
-  // Dos pedidos en un mismo mensaje (reservar y cancelar), sin flujo abierto: se atiende uno a la vez.
-  if (sesion && !eludir) {
+    // Dos pedidos en un mismo mensaje (reservar y cancelar), sin flujo abierto: se atiende uno a la vez.
     const mixto = await mixtoTurno(texto, sesion, repo);
-    if (mixto) {
-      registrar({ texto: resumen, intencion: mixto.intencion, respuesta: mixto.respuesta });
-      return mixto;
-    }
+    if (mixto) return responder(p, mixto);
+    // «cancelar» a secas, con sesión y sin una reserva o registro a medio hacer (el flujo abierto ya se atendió
+    // arriba): se trata como cancelar una reserva propia (7.0.23).
+    if (soloCancelar(texto)) return responder(p, await cancelacionTurno(texto, sesion, repo));
   }
-
-  // «cancelar» a secas, con sesión y sin una reserva o registro a medio hacer (el flujo abierto ya se atendió
-  // arriba): se trata como cancelar una reserva propia (7.0.23).
-  if (sesion && !eludir && soloCancelar(texto)) {
-    const r = await cancelacionTurno(texto, sesion, repo);
-    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-    return r;
-  }
-
   // 7.0.25: «¿quién reservó la sala 13?» o «¿qué materia hay en la sala 5?» piden datos de una reserva ajena.
   // No son «fuera de alcance»: se responde la ocupación sin nombres, carnés ni materias. Va antes del modelo
   // porque el prompt del intérprete está en el tope de caracteres y la línea no cabe allí.
-  if (!eludir) {
-    const privada = await ocupacionPrivadaTurno(texto, repo);
-    if (privada) {
-      registrar({ texto: resumen, intencion: privada.intencion, respuesta: privada.respuesta });
-      return privada;
-    }
-  }
+  const privada = await ocupacionPrivadaTurno(texto, repo);
+  return privada ? responder(p, privada) : null;
+}
 
-  // Paso 3: botones de la interfaz (texto fijo), sin modelo. Todo texto libre lo interpreta el modelo.
+// Paso 3: botones de la interfaz (texto fijo), sin modelo. Todo texto libre lo interpreta el modelo.
+async function botonesDeInterfaz(p: PasoMensaje): Promise<Corte | null> {
+  const { texto, sesion, repo, eludir } = p;
   const ruta = eludir ? null : rutaDeBoton(texto);
-  if (ruta === "consulta_salas") {
-    const respuesta = await estadoSalasDeBase(repo);
-    registrar({ texto: resumen, intencion: "consulta_salas", respuesta });
-    return { intencion: "consulta_salas", respuesta };
-  }
+  if (ruta === "consulta_salas") return responder(p, { intencion: "consulta_salas", respuesta: await estadoSalasDeBase(repo) });
   if (ruta && sesion) {
     const r = await flujoPara(ruta, texto, sesion, repo);
-    if (r) {
-      registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-      return r;
-    }
+    if (r) return responder(p, r);
   }
+  return null;
+}
 
-  // Paso 4: el modelo interpreta y propone datos candidatos.
-  const c = await clasificar(texto);
+// El modelo no respondió (apagado, sin red o límite de uso): se informa, no se supone nada.
+function modeloSinRespuesta(p: PasoMensaje, c: Clase): Corte | null {
+  if (!c.fallo || temasDe(p.texto).length) return null;
+  const respuesta =
+    "No pude interpretar el mensaje porque el modelo no respondió. Intenta de nuevo o usa uno de estos botones, que funcionan sin el modelo.";
+  // Con sesión, «Mis reservas» funciona sin el modelo.
+  const flujo = { ...CHIPS_BOTONES, opciones: ["Mis reservas", ...CHIPS_BOTONES.opciones] };
+  return responder(p, { intencion: "error_modelo", respuesta, flujo });
+}
 
-  // El modelo no respondió (apagado, sin red o límite de uso): se informa, no se supone nada.
-  if (c.fallo && !temasDe(texto).length) {
-    const respuesta =
-      "No pude interpretar el mensaje porque el modelo no respondió. Intenta de nuevo o usa uno de estos botones, que funcionan sin el modelo.";
-    // Con sesión, «Mis reservas» funciona sin el modelo.
-    const flujo = { ...CHIPS_BOTONES, opciones: ["Mis reservas", ...CHIPS_BOTONES.opciones] };
-    registrar({ texto: resumen, intencion: "error_modelo", respuesta });
-    return { intencion: "error_modelo", respuesta, flujo };
-  }
-
-  if (c.intencion === "consulta_salas" && !eludir) {
+// Consultas de salas y reservas propias (ver o cancelar, R27), según lo que entendió el modelo.
+async function consultaOReservasPropias(p: PasoMensaje, c: Clase): Promise<Corte | null> {
+  const { texto, sesion, repo, eludir } = p;
+  if (eludir) return null;
+  if (c.intencion === "consulta_salas") {
     // El modelo dijo "estado de salas" pero el texto trae fecha: no se responde con el estado de ahora.
     const r = await porFecha(rutaPorFecha(texto, false), texto, sesion, repo);
-    if (r) {
-      registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-      return r;
-    }
-    const respuesta = await estadoSalasDeBase(repo);
-    registrar({ texto: resumen, intencion: "consulta_salas", respuesta });
-    return { intencion: "consulta_salas", respuesta };
+    if (r) return responder(p, r);
+    return responder(p, { intencion: "consulta_salas", respuesta: await estadoSalasDeBase(repo) });
   }
-
+  if (!sesion) return null;
   // Ver las reservas propias, con botones para cancelar (R27).
-  if (c.intencion === "mis_reservas" && sesion && !eludir) {
-    const r = await misReservasTurno(sesion, repo);
-    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-    return r;
-  }
+  if (c.intencion === "mis_reservas") return responder(p, await misReservasTurno(sesion, repo));
   // Cancelar una reserva propia (R27): solo las del carné de la sesión.
-  if (c.intencion === "cancelar_reserva" && sesion && !eludir) {
-    const r = await cancelacionTurno(texto, sesion, repo);
-    registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-    return r;
-  }
+  if (c.intencion === "cancelar_reserva") return responder(p, await cancelacionTurno(texto, sesion, repo));
+  return null;
+}
 
+// Pedidos de reserva, disponibilidad o registro, y los «fuera de alcance» que en realidad hablan de salas o reservas.
+async function pedidoDeReserva(p: PasoMensaje, c: Clase): Promise<Corte | null> {
+  const { texto, sesion, repo, eludir } = p;
   // 7.0.25: el modelo dijo «fuera de alcance» pero el mensaje trae datos de sala u horario (p. ej. «una sala de
   // 4 a 2»): es una solicitud de reserva y se abre el flujo. El motor explicará el horario si no es válido.
   if (sesion && !eludir && c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && pideSalaConDatos(texto)) {
-    const r = await iniciar("reserva", texto, sesion, repo);
-    registrar({
-      texto: resumen, intencion: r.intencion, respuesta: r.respuesta,
-      validacion: "fuera_de_alcance → solicitud_reserva",
-    });
-    return r;
+    return responder(p, await iniciar("reserva", texto, sesion, repo), { validacion: "fuera_de_alcance → solicitud_reserva" });
   }
-
   // Reservar otra cosa (almuerzo, cancha, auditorio…): el modelo lo entendió; se dice qué no se puede reservar.
   if ((c.intencion === "solicitud_reserva" || c.intencion === "fuera_de_alcance") && c.recurso === "otro" && !eludir) {
     const respuesta = `${textoFuera(c, texto)} ¿Necesitas una sala?`;
-    registrar({ texto: resumen, intencion: "fuera_de_alcance", respuesta });
-    return { intencion: "fuera_de_alcance", respuesta, flujo: { tipo: "sugerencia", pendiente: null, opciones: ["Reservar una sala"] } };
+    return responder(p, { intencion: "fuera_de_alcance", respuesta, flujo: { tipo: "sugerencia", pendiente: null, opciones: ["Reservar una sala"] } });
   }
   // "Quiero reservar" sin decir qué ni traer datos de una sala: se pregunta, no se supone.
   if (c.intencion === "solicitud_reserva" && c.recurso !== "sala" && !traeDatosDeSala(texto) && !eludir) {
     const respuesta = "¿Qué quieres reservar? Solo reservo salas de los laboratorios de sistemas.";
-    registrar({ texto: resumen, intencion: "aclaracion", respuesta });
-    return { intencion: "aclaracion", respuesta, flujo: { tipo: "sugerencia", pendiente: null, opciones: ["Reservar una sala"] } };
+    return responder(p, { intencion: "aclaracion", respuesta, flujo: { tipo: "sugerencia", pendiente: null, opciones: ["Reservar una sala"] } });
   }
   // Ocupación o disponibilidad de un día concreto (7.0.4), cuando el modelo dijo que es una consulta.
   if (c.intencion === "consulta_disponibilidad" && !eludir) {
     const r = await porFecha(rutaPorFecha(texto, false), texto, sesion, repo);
-    if (r) {
-      registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-      return r;
-    }
+    if (r) return responder(p, r);
   }
-
   if (sesion && (c.intencion === "solicitud_reserva" || c.intencion === "consulta_disponibilidad" || c.intencion === "registro_usuario")) {
     const r = await flujoPara(c.intencion, texto, sesion, repo);
-    if (r) {
-      registrar({ texto: resumen, intencion: r.intencion, respuesta: r.respuesta });
-      return r;
-    }
+    if (r) return responder(p, r);
   }
-
   // El modelo no entendió el mensaje, pero la persona identificada habla de sus reservas: antes de negar se miran
   // las suyas (7.0.22). Si además pide cancelar, se atiende como cancelación (7.0.23): explica en curso/vencida.
   // Solo con sesión; el visitante recibe «inicia sesión» en modoPublico, nunca la lista.
-  if (sesion && !eludir && c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && HABLA_DE_RESERVAS.test(normO(texto))) {
-    const cancelar = PIDE_CANCELAR.test(normO(texto));
+  if (sesion && !eludir && c.intencion === "fuera_de_alcance" && c.recurso !== "otro" && HABLA_DE_RESERVAS.test(norm(texto))) {
+    const cancelar = PIDE_CANCELAR.test(norm(texto));
     const r = cancelar ? await cancelacionTurno(texto, sesion, repo) : await misReservasTurno(sesion, repo);
-    registrar({
-      texto: resumen, intencion: r.intencion, respuesta: r.respuesta,
-      validacion: cancelar ? "fuera_de_alcance → cancelar_reserva" : "fuera_de_alcance → mis_reservas",
-    });
-    return r;
+    return responder(p, r, { validacion: cancelar ? "fuera_de_alcance → cancelar_reserva" : "fuera_de_alcance → mis_reservas" });
   }
+  return null;
+}
 
-  // Preguntas informativas: respuestas armadas con los datos y las reglas, sin modelo.
-  // Si el mensaje trae varias preguntas, se responde cada tema detectado.
+// Preguntas informativas: respuestas armadas con los datos y las reglas, sin modelo.
+// Si el mensaje trae varias preguntas, se responde cada tema detectado.
+function respuestaInformativa(p: PasoMensaje, c: Clase) {
+  const { texto } = p;
   const temas = temasDe(texto);
   // Si el modelo dijo "fuera de alcance" pero el texto pregunta por el ID, las franjas, las reglas
   // o el agente mismo, se responde igual (pasa con preguntas de seguimiento sin contexto).
   const rescatables = temas.filter((t) => t !== "salas" && t !== "reserva");
   const reservaOTiempo = c.intencion === "solicitud_reserva" || c.intencion === "consulta_disponibilidad" || c.intencion === "registro_usuario";
   const informativa = c.intencion === "ayuda" || c.intencion === "consulta_salas" || reservaOTiempo;
-  if (informativa || (c.intencion === "fuera_de_alcance" && rescatables.length)) {
-    const intencion = informativa ? c.intencion : "ayuda";
-    const lista = informativa ? temas : rescatables;
-    let respuesta: string;
-    if (lista.length) respuesta = responderTemas(lista, texto);
-    else if (c.intencion === "consulta_salas") respuesta = estadoSalas(texto);
-    else if (reservaOTiempo) respuesta = TEXTO_RESERVA;
-    else respuesta = AYUDA_GENERAL;
-    registrar({ texto: resumen, intencion, temas: lista, respuesta });
-    return { intencion, temas: lista, respuesta };
-  }
+  if (!informativa && !(c.intencion === "fuera_de_alcance" && rescatables.length)) return null;
+  const intencion = informativa ? c.intencion : "ayuda";
+  const lista = informativa ? temas : rescatables;
+  let respuesta: string;
+  if (lista.length) respuesta = responderTemas(lista, texto);
+  else if (c.intencion === "consulta_salas") respuesta = estadoSalas(texto);
+  else if (reservaOTiempo) respuesta = TEXTO_RESERVA;
+  else respuesta = AYUDA_GENERAL;
+  return responder(p, { intencion, temas: lista, respuesta }, { temas: lista });
+}
 
-  if (c.intencion === "fuera_de_alcance") {
-    const respuesta = textoFuera(c, texto);
-    registrar({ texto: resumen, intencion: c.intencion, respuesta });
-    return { intencion: c.intencion, respuesta };
-  }
+function fueraDeAlcance(p: PasoMensaje, c: Clase): Corte | null {
+  if (c.intencion !== "fuera_de_alcance") return null;
+  return responder(p, { intencion: c.intencion, respuesta: textoFuera(c, p.texto) });
+}
 
+// Paso 5 (ingreso, vista Laboratorios): validar candidatos contra el texto. Lo que el modelo no pueda respaldar se
+// descarta; lo que falte se pregunta. El motor R1–R13 decide.
+async function evaluarIngreso(p: PasoMensaje, c: Clase) {
+  const { texto, contexto, resumen } = p;
   const alerta = c.intencion === "intento_eludir_reglas" ? ALERTA_ELUSION : undefined;
-
-  // Paso 5 (ingreso): validar candidatos contra el texto. Lo que el modelo no pueda respaldar se descarta.
   const rx = porRegex(texto);
   const idModelo = c.id_sintetico?.toUpperCase() ?? null;
   const id = idModelo !== null && idModelo === rx.id_sintetico ? idModelo : rx.id_sintetico;

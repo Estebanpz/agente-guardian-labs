@@ -5,8 +5,9 @@ import { crearMemoria } from "./memoria.js";
 import { hoyBogota } from "../tools/reloj.js";
 import { crearRepositorioMongo } from "./mongo.js";
 
-// Días con reservas de un mes (calendario del monitor): programadas y escaladas por fecha.
-export type DiaConReservas = { fecha: string; programadas: number; escaladas: number };
+// Días con reservas de un mes (calendario del monitor): programadas y escaladas por fecha (contrato en api-tipos.ts).
+import type { DiaConReservas } from "../api-tipos.js";
+export type { DiaConReservas };
 
 // Agrupa reservas (fecha y estado) por día, en orden de fecha. Lo usan los dos repositorios.
 export function contarDias(filas: { fecha: string; estado: string }[]): DiaConReservas[] {

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { chat, esTiempoAgotado } from "./proveedor.js";
 import { esIntentoDeElusion } from "./guardia.js";
 import { sala } from "../tools/extraer.js";
+import { norm } from "../tools/texto.js";
 
 // Salas 1 a 16 (las de reservas).
 const SALAS = Array.from({ length: 16 }, (_, i) => `sala-${i + 1}`) as [string, ...string[]];
@@ -112,7 +113,6 @@ export const porRegex = (texto: string) => {
   return { id_sintetico: id, laboratorio: sala(texto) };
 };
 
-const norm = (t: string) => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 const exacto = (texto: string) => norm(texto).trim().replace(/[\s.!?¡¿]+$/g, "").replace(/^[¡¿\s]+/, "").replace(/\s+/g, " ");
 
 // Botones de la interfaz: su texto es fijo, así que se atienden sin modelo. Cualquier texto libre lo interpreta

@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import type { Rol } from "../../../agent/api-tipos";
 import { Navigate, useLocation, useNavigate } from "react-router";
-import { useSesion } from "../sesion.js";
-import Ilustracion from "../components/Ilustracion.jsx";
+import { useSesion } from "../sesion";
+import Ilustracion from "../components/Ilustracion";
 
 // Destino por rol: el monitor a su vista Salas; estudiantes y docentes al chat.
-const inicioDe = (rol) => (rol === "monitor" ? "/salas" : "/chat");
+const inicioDe = (rol: Rol): string => (rol === "monitor" ? "/salas" : "/chat");
 
 export default function Ingresar() {
   const { usuario, entrar } = useSesion();
   const navegar = useNavigate();
-  const desde = useLocation().state?.desde;
+  const estado: unknown = useLocation().state;
+  const desde = typeof (estado as { desde?: unknown } | null)?.desde === "string" ? (estado as { desde: string }).desde : null;
   const [correo, setCorreo] = useState("");
   const [clave, setClave] = useState("");
   const [verClave, setVerClave] = useState(false);
@@ -18,7 +20,7 @@ export default function Ingresar() {
 
   if (usuario) return <Navigate to={inicioDe(usuario.rol)} replace />;
 
-  async function enviar(e) {
+  async function enviar(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (enviando) return;
     setError("");
@@ -28,7 +30,7 @@ export default function Ingresar() {
       setClave("");
       navegar(desde && u.rol === "monitor" ? desde : inicioDe(u.rol), { replace: true });
     } catch (err) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
       setClave("");
     } finally {
       setEnviando(false);

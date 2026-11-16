@@ -1,9 +1,7 @@
 // Extractores deterministas del chat de reservas (sin modelo).
 // Orden obligatorio en `extraer`: carné → fecha → sala → horario → números (cada fragmento leído se quita del texto).
 import { aHora, aMin, diaSemana, sumarDias } from "./reloj.js";
-
-// Minúsculas y sin tildes, para reconocer las frases.
-const norm = (t: string): string => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+import { norm } from "./texto.js";
 
 // ── Correcciones dentro del mismo mensaje (7.0.27) ───────────────────────
 // «sala 4 para 10 personas, bueno no, somos 40» tomaba 10: con un marcador de corrección manda el último valor

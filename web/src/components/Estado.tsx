@@ -1,7 +1,9 @@
-import Ilustracion from "./Ilustracion.jsx";
+import type { ReactNode } from "react";
+import Ilustracion from "./Ilustracion";
+import type { NombreIlustracion } from "../assets/ilustraciones";
 
 // Estados vacíos, de carga y de error con ilustración.
-export function Vacio({ nombre, titulo, texto }) {
+export function Vacio({ nombre, titulo, texto }: { nombre: NombreIlustracion; titulo: ReactNode; texto: string }) {
   return (
     <div className="card">
       <div className="card-body d-flex flex-column align-items-center text-center gl-vacio py-5">
@@ -13,7 +15,7 @@ export function Vacio({ nombre, titulo, texto }) {
   );
 }
 
-export function Cargando({ texto = "Evaluando reglas y redactando…" }) {
+export function Cargando({ texto = "Evaluando reglas y redactando…" }: { texto?: string }) {
   return (
     <Vacio
       nombre="pensando"
@@ -23,7 +25,7 @@ export function Cargando({ texto = "Evaluando reglas y redactando…" }) {
   );
 }
 
-export function ErrorApi({ mensaje }) {
+export function ErrorApi({ mensaje }: { mensaje: string }) {
   return (
     <Vacio
       nombre="sinConexion"

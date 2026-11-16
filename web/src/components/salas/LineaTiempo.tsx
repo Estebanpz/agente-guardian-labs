@@ -1,8 +1,15 @@
-import { posicion, posicionAhora } from "../../pages/salas/tiempo.js";
+import type { ReservaDelDia } from "../../../../agent/api-tipos";
+import type { RangoLibre } from "../../pages/salas/filtros";
+import { posicion, posicionAhora } from "../../pages/salas/tiempo";
+
+type Props = {
+  reservas: ReservaDelDia[]; esHoy: boolean; ahoraMin: number; rango: RangoLibre | null;
+  resaltada: string | null; onPick: (codigo: string) => void; nombreSala: string;
+};
 
 // Línea de tiempo 07:00–22:00 de una sala. Cada reserva es un botón (teclado y pantalla táctil).
 // El rango "libre desde / hasta" se marca en verde; la línea roja es la hora actual (solo hoy).
-export default function LineaTiempo({ reservas, esHoy, ahoraMin, rango, resaltada, onPick, nombreSala }) {
+export default function LineaTiempo({ reservas, esHoy, ahoraMin, rango, resaltada, onPick, nombreSala }: Props) {
   return (
     <div>
       <div className="sa-linea">

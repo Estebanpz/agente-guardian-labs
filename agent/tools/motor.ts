@@ -1,19 +1,11 @@
-import { readFileSync } from "node:fs";
 import { Decision, type Equipo, type EntradaEvaluar, type Hechos } from "./esquemas.js";
+import { cargarReglas, type Regla } from "./reglas.js";
+import { aMin } from "./reloj.js";
 
-type Regla = {
-  id: string; prioridad: number; especificidad: number;
-  tipo: string; efecto: string; descripcion: string;
-};
-
-const base = JSON.parse(
-  readFileSync(new URL("../rules/reglas.json", import.meta.url), "utf-8"),
-) as { version: string; parametros: { tolerancia_asistencia_min: number }; reglas: Regla[] };
-
-const aMin = (hhmm: string) => {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-};
+// Hallazgos 1 y 2 de la auditoría (16-11-2026), con autorización de Esteban para tocar este archivo: reglas.json
+// llega validado (tools/reglas.ts) y aMin es el de reloj.ts, que rechaza horas mal formadas en vez de dar NaN.
+// La lógica de R1–R13 no cambia.
+const base = cargarReglas();
 
 // Hechos críticos desconocidos (R2). No se interpretan como falsos.
 function desconocidos(h: Hechos): string[] {

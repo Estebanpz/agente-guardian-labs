@@ -1,8 +1,10 @@
-import { ilus, tam } from "../assets/ilustraciones/index.js";
+import { ilus, tam, type NombreIlustracion } from "../assets/ilustraciones";
+
+type Props = { nombre: NombreIlustracion; ancho?: number; prioridad?: boolean; className?: string };
 
 // Imagen con ancho y alto declarados (evita saltos de diseño), carga diferida
 // salvo las del encabezado (prioridad), y decodificación asíncrona.
-export default function Ilustracion({ nombre, ancho = 220, prioridad = false, className = "" }) {
+export default function Ilustracion({ nombre, ancho = 220, prioridad = false, className = "" }: Props) {
   const [w, h] = tam[nombre];
   return (
     <img

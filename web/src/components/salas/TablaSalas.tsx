@@ -1,9 +1,15 @@
-import LineaTiempo from "./LineaTiempo.jsx";
-import { enRevisionDe } from "../../pages/salas/filtros.js";
+import LineaTiempo from "./LineaTiempo";
+import { enRevisionDe, type EstadoSala, type InfoSala, type RangoLibre } from "../../pages/salas/filtros";
+
+type Props = {
+  filas: { x: InfoSala; estado: EstadoSala }[]; esHoy: boolean; ahoraMin: number; rango: RangoLibre | null;
+  resaltada: string | null; onAbrir: (id: string) => void; onPick: (id: string, codigo: string) => void;
+  hayFiltros: boolean; onLimpiar: () => void;
+};
 
 // Tabla de salas (variante A): sala, equipos, agenda en la línea de tiempo, estado y detalle.
 // En pantallas estrechas la tabla se desplaza dentro de su contenedor, no la página.
-export default function TablaSalas({ filas, esHoy, ahoraMin, rango, resaltada, onAbrir, onPick, hayFiltros, onLimpiar }) {
+export default function TablaSalas({ filas, esHoy, ahoraMin, rango, resaltada, onAbrir, onPick, hayFiltros, onLimpiar }: Props) {
   return (
     <div className="sa-tabla-scroll">
       <table className="sa-tabla">

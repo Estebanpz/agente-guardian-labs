@@ -1,6 +1,12 @@
 // Tarjeta de una respuesta de reserva: decisión del motor, datos de la solicitud, conflictos,
 // alternativas y la traza de reglas. Mismo esqueleto que TarjetaDecision.
-const CLASE = {
+import type { FlujoChat, ReservaPublica, ResumenSolicitud } from "../../../agent/api-tipos";
+
+export type ResultadoReserva = {
+  reserva: ReservaPublica; solicitud?: ResumenSolicitud; flujo?: FlujoChat | null; respuesta?: string;
+};
+
+const CLASE: Record<ReservaPublica["decision"], string> = {
   programar: "gl-decision-permitir",
   negar: "gl-decision-negar",
   escalar: "gl-decision-escalar",
@@ -9,7 +15,7 @@ const CLASE = {
 };
 
 // Título con ícono y texto (el color nunca es la única señal).
-function titulo(d, propuesta) {
+function titulo(d: ReservaPublica, propuesta: boolean): { icono: string; texto: string } {
   if (d.decision === "programar") {
     return propuesta
       ? { icono: "bi-calendar-event", texto: "Sala libre: falta confirmar" }
@@ -25,23 +31,23 @@ function titulo(d, propuesta) {
   return { icono: "bi-question-circle", texto: "Faltan datos" };
 }
 
-const fechaLarga = (fecha) =>
+const fechaLarga = (fecha: string): string =>
   new Date(`${fecha}T12:00:00-05:00`).toLocaleDateString("es-CO", {
     weekday: "long", day: "numeric", month: "long", timeZone: "America/Bogota",
   });
 
-const etiquetaSala = (id) => `Sala ${id.replace("sala-", "")}`;
+const etiquetaSala = (id: string): string => `Sala ${id.replace("sala-", "")}`;
 
-export default function TarjetaReserva({ resultado, onUsar }) {
+export default function TarjetaReserva({ resultado, onUsar }: { resultado: ResultadoReserva; onUsar: (texto: string) => void }) {
   const d = resultado.reserva;
-  const s = resultado.solicitud ?? {};
+  const s: Partial<ResumenSolicitud> = resultado.solicitud ?? {};
   const propuesta = resultado.flujo?.pendiente === "confirmar";
   const t = titulo(d, propuesta);
   // Una reserva confirmada ya no ofrece alternativas: solo una propuesta o una negativa las muestran.
   const confirmada = d.decision === "programar" && !propuesta;
 
   return (
-    <div className={`card gl-decision ${CLASE[d.decision] ?? "gl-decision-escalar"}`}>
+    <div className={`card gl-decision ${CLASE[d.decision]}`}>
       <div className="card-body">
         <div className="small text-uppercase fw-semibold text-secondary">Reserva</div>
         <h5 className="gl-estado my-2">

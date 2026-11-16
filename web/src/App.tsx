@@ -1,19 +1,20 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router";
-import { api } from "./api.js";
+import { api } from "./api";
+import type { TipoBase } from "../../agent/api-tipos";
 import "./styles/salas.css";
 import "./styles/login.css";
-import { SesionProvider } from "./components/SesionContexto.jsx";
-import { useSesion } from "./sesion.js";
-import SoloRol from "./components/SoloRol.jsx";
-import Ingresar from "./pages/Ingresar.jsx";
-import NavegacionLateral from "./components/NavegacionLateral.jsx";
-import Monitor from "./pages/Monitor.jsx";
-import Chat from "./pages/Chat.jsx";
-import Salas from "./pages/Salas.jsx";
+import { SesionProvider } from "./components/SesionContexto";
+import { useSesion } from "./sesion";
+import SoloRol from "./components/SoloRol";
+import Ingresar from "./pages/Ingresar";
+import NavegacionLateral from "./components/NavegacionLateral";
+import Monitor from "./pages/Monitor";
+import Chat from "./pages/Chat";
+import Salas from "./pages/Salas";
 
 // Etiqueta de la base según el tipo que informa la API (sin URI).
-const ETIQUETA_BASE = { local: "MongoDB local", atlas: "MongoDB Atlas", remota: "MongoDB remoto", memoria: "Memoria" };
+const ETIQUETA_BASE: Record<TipoBase, string> = { local: "MongoDB local", atlas: "MongoDB Atlas", remota: "MongoDB remoto", memoria: "Memoria" };
 
 export default function App() {
   return (
@@ -31,8 +32,9 @@ function Inicio() {
 }
 
 function Aplicacion() {
-  const [proveedor, setProveedor] = useState(null);
-  const [base, setBase] = useState(null);
+  // null mientras se consulta; false si la API no responde.
+  const [proveedor, setProveedor] = useState<string | false | null>(null);
+  const [base, setBase] = useState<TipoBase | null>(null);
 
   useEffect(() => {
     api.salud()
@@ -43,7 +45,7 @@ function Aplicacion() {
   return (
     <div className="salas-a">
       <div className="sa-shell">
-        <NavegacionLateral etiquetaBase={ETIQUETA_BASE[base] ?? "Memoria"} proveedor={proveedor} />
+        <NavegacionLateral etiquetaBase={base ? ETIQUETA_BASE[base] : "Memoria"} proveedor={proveedor} />
         <main className="sa-principal">
           <Routes>
             <Route path="/" element={<Inicio />} />

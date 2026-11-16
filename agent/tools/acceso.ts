@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { Carne, Rol, type CuentaDoc } from "./esquemas-reservas.js";
 import { enmascarar } from "./reservas.js";
 import type { Repositorio } from "../store/repositorio.js";
+import type { UsuarioSesion } from "../api-tipos.js";
 import { escalarCarneDesconocido } from "../conversacion.js";
 
 // ── Contraseñas ───────────────────────────────────────────────────────────
@@ -116,10 +117,8 @@ export const intentoDe = (correo: string) => fallos.get(correo) ?? null;
 export const revocadosRegistrados = () => revocados.size;
 
 // ── Inicio de sesión ──────────────────────────────────────────────────────
-export type Usuario = {
-  nombres: string; apellidos: string; rol: Rol; correo: string;
-  carne: string | null; programa: string | null;
-};
+// Datos públicos de quien inició sesión: contrato compartido con la interfaz (agent/api-tipos.ts).
+export type Usuario = UsuarioSesion;
 export type ResultadoLogin =
   | { ok: true; token: string; usuario: Usuario; registrado: boolean }
   | { ok: false; status: 400 | 401 | 403 | 429; error: string };

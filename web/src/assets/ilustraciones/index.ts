@@ -13,7 +13,9 @@ import elegir from "./choose.svg";
 export const ilus = { autenticacion, negado, escalar, permitir, chat, pensando, salas, sinConexion, elegir };
 
 // Proporciones (viewBox) para reservar el espacio de cada imagen y evitar saltos al cargar (CLS).
-export const tam = {
+export type NombreIlustracion = keyof typeof ilus;
+
+export const tam: Record<NombreIlustracion, [number, number]> = {
   autenticacion: [800, 626.6],
   negado: [742.4, 712.7],
   escalar: [800, 738.8],

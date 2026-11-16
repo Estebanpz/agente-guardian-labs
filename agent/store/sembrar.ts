@@ -1,4 +1,4 @@
-import type { Db, Document } from "mongodb";
+import type { AnyBulkWriteOperation, Db, Document, Filter } from "mongodb";
 import {
   carnetizacionSemilla, cuentasSemilla, equiposSemilla, reservasSemilla, salasSemilla, usuariosSemilla,
 } from "../../data/semilla.js";
@@ -81,8 +81,10 @@ const COLECCIONES = [
   "conversaciones", "bloqueos", "contadores", "sesiones",
 ];
 
-// El driver tipa _id como ObjectId en colecciones sin tipo; aquí los _id son strings del dominio.
-const porId = (id: unknown) => ({ _id: id }) as never;
+// El driver tipa _id como ObjectId en colecciones sin tipo; aquí los _id son strings del dominio. Las colecciones
+// se abren con este tipo en vez de apagar el chequeo con `as never` (hallazgo 9 de la auditoría, 16-11-2026).
+type ConId = { _id: string } & Document;
+const porId = (id: string): Filter<ConId> => ({ _id: id });
 
 // Índices de la sección 5.6. Los nombres salen del orden de las claves (sala_1_fecha_1_…).
 async function crearIndices(db: Db): Promise<void> {
@@ -128,14 +130,14 @@ export async function sembrar(db: Db, hoy: string): Promise<Record<string, numbe
   await aplicarEsquemas(db);
   await crearIndices(db);
 
-  const reemplazar = (docs: { _id: unknown }[]) => docs.map((d) => ({
-    replaceOne: { filter: { _id: d._id }, replacement: d, upsert: true },
-  })) as never[];
-  await db.collection("salas").bulkWrite(reemplazar(salasSemilla));
-  await db.collection("equipos").bulkWrite(reemplazar(equiposSemilla()));
-  await db.collection("carnetizacion").bulkWrite(reemplazar(carnetizacionSemilla));
-  await db.collection("usuarios").bulkWrite(reemplazar(usuariosSemilla));
-  await db.collection("cuentas").bulkWrite(reemplazar(cuentasSemilla));
+  const reemplazar = (docs: ConId[]): AnyBulkWriteOperation<ConId>[] => docs.map((d) => ({
+    replaceOne: { filter: porId(d._id), replacement: d, upsert: true },
+  }));
+  await db.collection<ConId>("salas").bulkWrite(reemplazar(salasSemilla));
+  await db.collection<ConId>("equipos").bulkWrite(reemplazar(equiposSemilla()));
+  await db.collection<ConId>("carnetizacion").bulkWrite(reemplazar(carnetizacionSemilla));
+  await db.collection<ConId>("usuarios").bulkWrite(reemplazar(usuariosSemilla));
+  await db.collection<ConId>("cuentas").bulkWrite(reemplazar(cuentasSemilla));
 
   // Reservas de semilla: solo se insertan si su código no existe.
   const semilla = reservasSemilla(hoy);
@@ -146,7 +148,7 @@ export async function sembrar(db: Db, hoy: string): Promise<Record<string, numbe
   if (nuevas.length) await db.collection("reservas").insertMany(nuevas.map((r) => ({ ...r })));
 
   // El contador nunca retrocede por debajo de las reservas de semilla.
-  await db.collection("contadores").updateOne(
+  await db.collection<ConId>("contadores").updateOne(
     porId("reservas"), { $max: { n: 3 } }, { upsert: true });
 
   const resumen: Record<string, number> = {};

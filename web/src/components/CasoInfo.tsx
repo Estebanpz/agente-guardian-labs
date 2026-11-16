@@ -1,7 +1,11 @@
 import { useState } from "react";
+import type { CasoDemo } from "../../../agent/api-tipos";
+
+type Hechos = CasoDemo["hechos"];
+type Formato = (h: Hechos) => string;
 
 // Nombre legible y formato de cada hecho del caso.
-const ETIQUETAS = [
+const ETIQUETAS: [string, string, Formato][] = [
   ["rol", "Rol", (h) => h.rol],
   ["carne_vigente", "Carné vigente", (h) => h.carne_vigente],
   ["induccion_seguridad", "Inducción de seguridad", (h) => h.induccion_seguridad],
@@ -18,12 +22,12 @@ const ETIQUETAS = [
 ];
 
 // Tarjeta "Qué se prueba": describe el caso elegido y resalta lo que cambia frente al caso base (E-001).
-export default function CasoInfo({ caso, base }) {
+export default function CasoInfo({ caso, base }: { caso: CasoDemo | undefined; base: CasoDemo | undefined }) {
   const [verHechos, setVerHechos] = useState(false);
   if (!caso) return null;
 
-  const distinto = (clave, fmt) => base && caso.id !== base.id && fmt(caso.hechos) !== fmt(base.hechos);
-  const cambios = ETIQUETAS.filter(([k, , fmt]) => distinto(k, fmt));
+  const distinto = (fmt: Formato): boolean => Boolean(base && caso.id !== base.id && fmt(caso.hechos) !== fmt(base.hechos));
+  const cambios = ETIQUETAS.filter(([, , fmt]) => distinto(fmt));
 
   return (
     <div className="card mb-4 border-start border-4" style={{ borderColor: "var(--gl-acento)" }}>
@@ -57,7 +61,7 @@ export default function CasoInfo({ caso, base }) {
           <table className="table table-sm small mt-2 mb-0">
             <tbody>
               {ETIQUETAS.map(([k, nombre, fmt]) => (
-                <tr key={k} className={distinto(k, fmt) ? "table-warning" : ""}>
+                <tr key={k} className={distinto(fmt) ? "table-warning" : ""}>
                   <td className="text-secondary">{nombre}</td>
                   <td className="fw-semibold">{fmt(caso.hechos)}</td>
                 </tr>

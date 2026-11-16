@@ -1,0 +1,19 @@
+{
+  // Hallazgo 10 de la auditoría (16-11-2026): la interfaz en TypeScript estricto. Los tipos de las respuestas de la
+  // API vienen de ../agent/api-tipos.ts (solo `import type`), el mismo contrato que usa el servidor.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["vite/client"]
+  },
+  "include": ["src"]
+}

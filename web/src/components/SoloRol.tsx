@@ -1,9 +1,11 @@
+import type { ReactNode } from "react";
 import { Link, Navigate, useLocation } from "react-router";
-import { useSesion } from "../sesion.js";
-import Ilustracion from "./Ilustracion.jsx";
+import type { Rol } from "../../../agent/api-tipos";
+import { useSesion } from "../sesion";
+import Ilustracion from "./Ilustracion";
 
 // Vista restringida a un rol. Sin sesión lleva al inicio de sesión (y vuelve después); con otro rol lo explica.
-export default function SoloRol({ rol, children }) {
+export default function SoloRol({ rol, children }: { rol: Rol; children: ReactNode }) {
   const { usuario } = useSesion();
   const ubicacion = useLocation();
   if (!usuario) return <Navigate to="/ingresar" replace state={{ desde: ubicacion.pathname }} />;

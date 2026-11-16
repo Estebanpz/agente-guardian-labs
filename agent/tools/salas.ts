@@ -1,15 +1,16 @@
 import { salas } from "../../data/salas.js";
 import { equipos } from "../../data/equipos.js";
 import type { Equipo } from "./esquemas.js";
+import { claseEquipo } from "./estados.js";
+import type { SalaLaboratorio } from "../api-tipos.js";
 
-// Estado visible de un equipo combinando las dos fuentes (inventario y mantenimiento).
+// Estado visible de un equipo combinando las dos fuentes (inventario y mantenimiento); clase de tools/estados.ts.
 const estadoVisible = (q: Equipo) => {
-  if (q.inventario === "desconocido" || q.mantenimiento === "desconocido") return "desconocido";
-  if (q.inventario !== q.mantenimiento) return "conflicto"; // misma condición que R3
-  return q.inventario;
+  const c = claseEquipo(q);
+  return c === "desconocido" ? "desconocido" : c === "contradictorio" ? "conflicto" : q.inventario;
 };
 
-export function resumenSalas() {
+export function resumenSalas(): SalaLaboratorio[] {
   return salas.map((s) => {
     const eq = equipos
       .filter((q) => q.sala === s.id)

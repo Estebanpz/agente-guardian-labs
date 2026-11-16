@@ -1,16 +1,21 @@
 import { useState } from "react";
-import Ilustracion from "./Ilustracion.jsx";
+import Ilustracion from "./Ilustracion";
+import type { Decision } from "../../../agent/api-tipos";
+import type { NombreIlustracion } from "../assets/ilustraciones";
 
-const META = {
+// Lo que la tarjeta necesita: la decisión del motor (o null), la explicación y la alerta de elusión.
+export type ResultadoDecision = { decision?: Decision | null; explicacion?: string; alerta?: string };
+
+const META: Record<Decision["decision"], { titulo: string; icono: string; img: NombreIlustracion }> = {
   permitir: { titulo: "Permitir ingreso", icono: "bi-check-circle-fill", img: "permitir" },
   negar: { titulo: "Negar", icono: "bi-x-octagon-fill", img: "negado" },
   escalar: { titulo: "Escalar a una persona", icono: "bi-exclamation-triangle-fill", img: "escalar" },
 };
 
-const ASISTENCIA = { presente: "Presente", tardia: "Tardía", sin_registro: "Sin registro", no_aplica: "No aplica" };
+const ASISTENCIA: Record<Decision["estado_asistencia"], string> = { presente: "Presente", tardia: "Tardía", sin_registro: "Sin registro", no_aplica: "No aplica" };
 
 // Muestra la recomendación del motor: decisión, explicación, reglas, versión y traza.
-export default function TarjetaDecision({ resultado, compacta = false }) {
+export default function TarjetaDecision({ resultado, compacta = false }: { resultado: ResultadoDecision | null; compacta?: boolean }) {
   const [verTraza, setVerTraza] = useState(false);
   const d = resultado?.decision;
 
@@ -35,15 +40,15 @@ export default function TarjetaDecision({ resultado, compacta = false }) {
               <i className={`bi ${m.icono} me-2`} />
               {m.titulo}
             </h4>
-            <p className="mb-3">{resultado.explicacion}</p>
+            <p className="mb-3">{resultado?.explicacion}</p>
           </div>
           {!compacta && <Ilustracion nombre={m.img} ancho={130} className="d-none d-md-block" />}
         </div>
 
-        {resultado.alerta && (
+        {resultado?.alerta && (
           <div className="alert alert-danger py-2 small">
             <i className="bi bi-shield-exclamation me-1" />
-            {resultado.alerta}
+            {resultado?.alerta}
           </div>
         )}
 

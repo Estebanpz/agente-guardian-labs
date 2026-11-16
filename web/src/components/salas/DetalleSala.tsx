@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { aHora, duracion, huecos, ABRE, CIERRA } from "../../pages/salas/tiempo.js";
-import { enRevisionDe } from "../../pages/salas/filtros.js";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import type { EquipoDelDia, SalaDelDia } from "../../../../agent/api-tipos";
+import { aHora, duracion, huecos, ABRE, CIERRA } from "../../pages/salas/tiempo";
+import { claseEquipo, enRevisionDe } from "../../pages/salas/filtros";
 
-const ESTADO_EQUIPO = {
+const ESTADO_EQUIPO: Record<EquipoDelDia["inventario"], string> = {
   disponible: "Disponible",
   mantenimiento: "En mantenimiento",
   diagnostico: "En diagnóstico",
   desconocido: "Desconocido",
 };
 // Explicación corta de cada regla que puede escalar una reserva (texto de la interfaz, sin códigos técnicos).
-const POR_REGLA = {
+const POR_REGLA: Record<string, string> = {
   R17: "el carné no se puede verificar",
   R19: "equipos con estado desconocido o en conflicto",
   R20: "la sala la tiene un grupo de estudiantes",
@@ -17,35 +18,38 @@ const POR_REGLA = {
   R22: "la sala ya está separada en ese horario",
 };
 
-const PESTANAS = [["agenda", "Agenda"], ["equipos", "Equipos"], ["huecos", "Huecos libres"]];
+const PESTANAS = [["agenda", "Agenda"], ["equipos", "Equipos"], ["huecos", "Huecos libres"]] as const;
+type Pestana = (typeof PESTANAS)[number][0];
 
 // Panel lateral de una sala (offcanvas a la derecha). Diálogo modal: foco al título, Esc y × lo cierran,
 // y el foco vuelve a quien lo abrió.
-export default function DetalleSala({ sala, fechaTexto, resaltada, onCerrar }) {
-  const [tab, setTab] = useState("agenda");
-  const titulo = useRef(null);
-  const dialogo = useRef(null);
+type Props = { sala: SalaDelDia; fechaTexto: string; resaltada: string | null; onCerrar: () => void };
+
+export default function DetalleSala({ sala, fechaTexto, resaltada, onCerrar }: Props) {
+  const [tab, setTab] = useState<Pestana>("agenda");
+  const titulo = useRef<HTMLHeadingElement>(null);
+  const dialogo = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const previo = document.activeElement;
+    const previo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     titulo.current?.focus();
     const bloqueo = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = bloqueo;
-      previo?.focus?.();
+      previo?.focus();
     };
   }, []);
 
-  const teclas = (e) => {
+  const teclas = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === "Escape") {
       e.stopPropagation();
       onCerrar();
       return;
     }
     if (e.key === "Tab" && dialogo.current) {
-      const enfocables = [...dialogo.current.querySelectorAll("button, [href], select, input, [tabindex]:not([tabindex='-1'])")]
-        .filter((el) => !el.disabled);
+      const enfocables = [...dialogo.current.querySelectorAll<HTMLElement>("button, [href], select, input, [tabindex]:not([tabindex='-1'])")]
+        .filter((el) => !(el as HTMLButtonElement).disabled);
       if (!enfocables.length) return;
       const primero = enfocables[0];
       const ultimo = enfocables[enfocables.length - 1];
@@ -162,8 +166,10 @@ export default function DetalleSala({ sala, fechaTexto, resaltada, onCerrar }) {
                   </thead>
                   <tbody>
                     {sala.equipos.map((e) => {
-                      const contra = e.inventario === "disponible" && e.mantenimiento !== "disponible" && e.mantenimiento !== "desconocido";
-                      const incierto = e.inventario === "desconocido" || e.mantenimiento === "desconocido";
+                      // La clase la calcula el servidor (agent/tools/estados.ts); sin ella, la misma regla aquí.
+                      const clase = claseEquipo(e);
+                      const contra = clase === "contradictorio";
+                      const incierto = clase === "desconocido";
                       const alerta = contra || incierto;
                       return (
                         <tr key={e._id} className={alerta ? "sa-equipo-alerta" : undefined}>

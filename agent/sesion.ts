@@ -1,8 +1,7 @@
 // Identidad y saludo (plan de identidad, sección 4). Los textos son plantillas fijas: el saludo lo arma el código,
 // no el modelo, para que las pruebas sean deterministas.
 import type { CarneDoc } from "./tools/esquemas-reservas.js";
-
-const norm = (t: string): string => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+import { norm } from "./tools/texto.js";
 
 export const PEDIR_CARNE = "¡Hola! Para atenderte, escríbeme tu carné (C- o D- seguido de 8 dígitos).";
 // Cierre tras una reserva (programada o escalada): despedida, sesión finalizada y carné olvidado.

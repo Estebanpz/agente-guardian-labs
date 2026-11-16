@@ -4,9 +4,12 @@ import { BrowserRouter } from "react-router";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "./index.css";
-import App from "./App.jsx";
+import App from "./App";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+const raiz = document.getElementById("root");
+if (!raiz) throw new Error("Falta el elemento #root en index.html.");
+
+ReactDOM.createRoot(raiz).render(
   <React.StrictMode>
     <BrowserRouter>
       <App />

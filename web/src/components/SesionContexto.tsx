@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-import { api } from "../api.js";
-import { ContextoSesion, EVENTO_SESION, borrarSesion, guardarSesion, leerSesion } from "../sesion.js";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { api } from "../api";
+import { ContextoSesion, EVENTO_SESION, borrarSesion, guardarSesion, leerSesion } from "../sesion";
 
 // Quién inició sesión. Al cargar, el token guardado se confirma con la API (/yo); si venció, se borra.
-export function SesionProvider({ children }) {
+export function SesionProvider({ children }: { children: ReactNode }) {
   const [sesion, setSesion] = useState(leerSesion);
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export function SesionProvider({ children }) {
     if (leerSesion()) api.yo().catch(() => {});
   }, []);
 
-  const entrar = useCallback(async (correo, clave) => {
+  const entrar = useCallback(async (correo: string, clave: string) => {
     const r = await api.login(correo, clave);
     guardarSesion(r.token, r.usuario);
     return r.usuario;

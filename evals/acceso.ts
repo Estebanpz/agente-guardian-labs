@@ -2,7 +2,7 @@
 // Uso: npm run pruebas (incluida). Servidor efímero en 127.0.0.1, no abre el puerto 3000.
 import type { AddressInfo } from "node:net";
 process.env.REPOSITORIO = "memoria";
-const { app } = await import("../agent/channels/http.js");
+const { app, demasiadosIntentos, reiniciarLimiteLogin } = await import("../agent/channels/http.js");
 const { crearRepositorio } = await import("../agent/store/repositorio.js");
 const { configurarParaPruebas } = await import("../agent/orquestador.js");
 const { crearToken, leerToken, hashClave, verificarClave, reiniciarIntentos } = await import("../agent/tools/acceso.js");
@@ -368,6 +368,29 @@ try {
   comprobar((await pedir("POST", "/logout", undefined, TL)).status === 200, "POST /logout → 200");
   comprobar((await chat("hola", uuid(6), TL)).status === 401, "el token revocado ya no sirve en /mensaje (401)");
   comprobar((await pedir("GET", "/yo", undefined, TL)).status === 401, "el token revocado ya no sirve en /yo (401)");
+
+  // 12) Hallazgo 5 de la auditoría (16-11-2026): límite de login por IP.
+  // a) Detrás del proxy de Vite (X-Forwarded-For desde 127.0.0.1) cada navegador tiene su propio contador.
+  reiniciarLimiteLogin();
+  // Un correo distinto en cada intento: así el bloqueo por correo (5 fallos) no se confunde con el de la IP.
+  let nCorreo = 0;
+  const loginDesde = (ip: string) => fetch(base + "/login", {
+    method: "POST", headers: { "Content-Type": "application/json", "X-Forwarded-For": ip },
+    body: JSON.stringify({ correo: `nadie${++nCorreo}@ejemplo.edu`, clave: "x" }),
+  }).then((x) => x.status);
+  for (let i = 0; i < 20; i++) await loginDesde("10.0.0.1");
+  comprobar(await loginDesde("10.0.0.1") === 429, "21 intentos desde la misma IP real → 429");
+  comprobar(await loginDesde("10.0.0.2") !== 429, "otra IP real detrás del mismo proxy no hereda el bloqueo");
+  // b) Pasado el tope de IPs no se borra todo: una IP bloqueada sigue bloqueada aunque lleguen 10.001 IPs nuevas.
+  reiniciarLimiteLogin();
+  const t0 = 1_000_000_000;
+  for (let i = 0; i < 21; i++) demasiadosIntentos("bloqueada", t0);
+  for (let i = 0; i < 10_001; i++) demasiadosIntentos(`otra-${i}`, t0 + 1);
+  comprobar(demasiadosIntentos("bloqueada", t0 + 2), "con más de 10.000 IPs, la IP bloqueada sigue bloqueada (no se borra todo)");
+  // c) Las ventanas vencidas sí se podan: pasado el minuto, la misma IP vuelve a empezar.
+  for (let i = 0; i < 10_001; i++) demasiadosIntentos(`tarde-${i}`, t0 + 120_000);
+  comprobar(!demasiadosIntentos("bloqueada", t0 + 120_001), "pasado el minuto, la ventana vencida se poda y la IP vuelve a empezar");
+  reiniciarLimiteLogin();
 } catch (e) {
   fallos++;
   console.error(`❌ Error: ${(e as Error).stack}`);

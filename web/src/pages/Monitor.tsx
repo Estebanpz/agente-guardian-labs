@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
-import { api } from "../api.js";
-import TarjetaDecision from "../components/TarjetaDecision.jsx";
-import CasoInfo from "../components/CasoInfo.jsx";
-import { Cargando, ErrorApi, Vacio } from "../components/Estado.jsx";
-import Ilustracion from "../components/Ilustracion.jsx";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import type { CasoDemo, EntradaEvaluar, ResultadoEvaluar, SalaLaboratorio } from "../../../agent/api-tipos";
+import { api } from "../api";
+import TarjetaDecision from "../components/TarjetaDecision";
+import CasoInfo from "../components/CasoInfo";
+import { Cargando, ErrorApi, Vacio } from "../components/Estado";
+import Ilustracion from "../components/Ilustracion";
 
 // Ids sintéticos de respaldo si la API no responde (los reales vienen de GET /casos).
 const CASOS = Array.from({ length: 12 }, (_, i) => `E-${String(i + 1).padStart(3, "0")}`);
@@ -16,27 +17,28 @@ const DEMOS = [
   { etiqueta: "Desconocido + contradicción", id: "E-006", icono: "bi-exclamation-diamond" },
 ];
 
-const INICIAL = { id_sintetico: "E-001", laboratorio: "sala-1", franja: "08:00–10:00", tipo_evento: "ingreso" };
+const INICIAL: EntradaEvaluar = { id_sintetico: "E-001", laboratorio: "sala-1", franja: "08:00–10:00", tipo_evento: "ingreso" };
 
 export default function Monitor() {
-  const [salas, setSalas] = useState([]);
-  const [casos, setCasos] = useState([]);
-  const [form, setForm] = useState(INICIAL);
-  const [resultado, setResultado] = useState(null);
+  const [salas, setSalas] = useState<SalaLaboratorio[]>([]);
+  const [casos, setCasos] = useState<CasoDemo[]>([]);
+  const [form, setForm] = useState<EntradaEvaluar>(INICIAL);
+  const [resultado, setResultado] = useState<ResultadoEvaluar | null>(null);
   const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.laboratorios().then(setSalas).catch(() => {});
     api.casos().then(setCasos).catch(() => {});
   }, []);
 
-  const casoDe = (id) => casos.find((c) => c.id === id);
+  const casoDe = (id: string): CasoDemo | undefined => casos.find((c) => c.id === id);
 
-  const cambiar = (campo) => (e) => {
+  // Los <select> solo ofrecen valores válidos del esquema (sala-1 a sala-3, ingreso/salida/cierre).
+  const cambiar = (campo: keyof EntradaEvaluar) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const valor = e.target.value;
     setForm((f) => {
-      const nuevo = { ...f, [campo]: valor };
+      const nuevo = { ...f, [campo]: valor } as EntradaEvaluar;
       // Algunos casos se prueban con otro evento (E-011: cierre de franja).
       if (campo === "id_sintetico") nuevo.tipo_evento = casoDe(valor)?.evento ?? "ingreso";
       if (campo === "laboratorio") {
@@ -47,26 +49,26 @@ export default function Monitor() {
     });
   };
 
-  async function evaluar(entrada) {
+  async function evaluar(entrada: EntradaEvaluar) {
     setCargando(true);
     setError(null);
     setResultado(null);
     try {
       setResultado(await api.evaluar(entrada));
     } catch (e) {
-      setError(e.message);
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setCargando(false);
     }
   }
 
-  const enviar = (e) => {
+  const enviar = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     evaluar(form);
   };
 
-  const probarDemo = (id) => {
-    const entrada = { ...INICIAL, id_sintetico: id, tipo_evento: casoDe(id)?.evento ?? "ingreso" };
+  const probarDemo = (id: string) => {
+    const entrada: EntradaEvaluar = { ...INICIAL, id_sintetico: id, tipo_evento: casoDe(id)?.evento ?? "ingreso" };
     setForm(entrada);
     evaluar(entrada);
   };
@@ -93,7 +95,7 @@ export default function Monitor() {
                   <label className="form-label" htmlFor="id">Identificador (caso sintético)</label>
                   <select id="id" className="form-select" value={form.id_sintetico} onChange={cambiar("id_sintetico")}>
                     {(casos.length ? casos.map((c) => c.id) : CASOS).map((c) => (
-                      <option key={c} value={c}>{c}{casoDe(c) ? ` · ${casoDe(c).titulo}` : ""}</option>
+                      <option key={c} value={c}>{c}{casoDe(c) ? ` · ${casoDe(c)?.titulo}` : ""}</option>
                     ))}
                   </select>
                 </div>

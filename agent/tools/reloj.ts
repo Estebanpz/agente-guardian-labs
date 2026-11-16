@@ -3,10 +3,13 @@ const ZONA = "America/Bogota";
 
 let fijo: { fecha: string; hhmm: string } | null = null;
 
-// "13:30" → 810
+// "13:30" → 810. Única conversión de hora a minutos (también la usa motor.ts). Hallazgo 1 de la auditoría
+// (16-11-2026): una hora mal formada ("7", "7-30", "830", "25:00") lanza un error claro en vez de devolver NaN,
+// que hacía falsa en silencio cualquier comparación (por ejemplo, la llegada tarde de R11).
 export const aMin = (hhmm: string): number => {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
+  const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(hhmm);
+  if (!m) throw new Error(`Hora inválida: "${hhmm}" (se espera HH:MM entre 00:00 y 23:59)`);
+  return Number(m[1]) * 60 + Number(m[2]);
 };
 
 // 810 → "13:30"

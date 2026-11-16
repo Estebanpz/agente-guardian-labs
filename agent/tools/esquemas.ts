@@ -24,7 +24,7 @@ export const Hechos = z.object({
 export const EntradaEvaluar = z.object({
     id_sintetico: z.string().min(1),
     laboratorio: z.enum(["sala-1", "sala-2", "sala-3"]),//Nombres reales de las salas - validar
-    franja: z.string().regex(/^\d{2}:\d{2}–\d{2}:\d{2}$/), // Ej. "09:00-11:00"
+    franja: z.string().regex(/^\d{2}:\d{2}–\d{2}:\d{2}$/), // Ej. "09:00–11:00" (guion largo; motor.ts parte por "–")
     tipo_evento: z.enum(["ingreso", "salida", "cierre"])
 });
 //Salida estructurada de la Herramienta

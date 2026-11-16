@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
-import SelectorFecha from "../components/salas/SelectorFecha.jsx";
-import Indicadores from "../components/salas/Indicadores.jsx";
-import BarraFiltros from "../components/salas/BarraFiltros.jsx";
-import TablaSalas from "../components/salas/TablaSalas.jsx";
-import DetalleSala from "../components/salas/DetalleSala.jsx";
-import PanelAvisos from "../components/salas/PanelAvisos.jsx";
-import { FILTRO_IDS, datosDeSala, estadoDeSala, pasa, rangoDe } from "./salas/filtros.js";
-import { HORAS, fechaLarga, hoyBogota, minutosAhora } from "./salas/tiempo.js";
-import { useDatosSalas } from "./salas/useDatosSalas.js";
+import SelectorFecha from "../components/salas/SelectorFecha";
+import Indicadores from "../components/salas/Indicadores";
+import BarraFiltros from "../components/salas/BarraFiltros";
+import TablaSalas from "../components/salas/TablaSalas";
+import DetalleSala from "../components/salas/DetalleSala";
+import PanelAvisos from "../components/salas/PanelAvisos";
+import { FILTRO_IDS, datosDeSala, esFiltro, estadoDeSala, pasa, rangoDe, type FiltroId } from "./salas/filtros";
+import type { EstadoAviso } from "../api";
+import { HORAS, fechaLarga, hoyBogota, minutosAhora } from "./salas/tiempo";
+import { useDatosSalas } from "./salas/useDatosSalas";
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -17,17 +18,20 @@ const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 export default function Salas() {
   const hoy = hoyBogota();
   const [params, setParams] = useSearchParams();
-  const fecha = FECHA_RE.test(params.get("fecha") ?? "") ? params.get("fecha") : hoy;
-  const filtro = FILTRO_IDS.includes(params.get("filtro")) ? params.get("filtro") : "todas";
-  const desde = HORAS.includes(params.get("desde")) ? params.get("desde") : "";
-  const hasta = HORAS.includes(params.get("hasta")) ? params.get("hasta") : "";
+  const enLista = (v: string | null, lista: string[]): string => (v !== null && lista.includes(v) ? v : "");
+  const fechaParam = params.get("fecha") ?? "";
+  const fecha = FECHA_RE.test(fechaParam) ? fechaParam : hoy;
+  const filtroParam = params.get("filtro");
+  const filtro: FiltroId = esFiltro(filtroParam) ? filtroParam : "todas";
+  const desde = enLista(params.get("desde"), HORAS);
+  const hasta = enLista(params.get("hasta"), HORAS);
   const q = params.get("q") ?? "";
   const salaId = params.get("sala");
   const resaltada = params.get("res");
 
   const [mes, setMes] = useState(fecha.slice(0, 7));
   const [ahoraMin, setAhoraMin] = useState(minutosAhora);
-  const [pestanaAvisos, setPestanaAvisos] = useState("pendiente");
+  const [pestanaAvisos, setPestanaAvisos] = useState<EstadoAviso>("pendiente");
 
   useEffect(() => {
     const id = setInterval(() => setAhoraMin(minutosAhora()), 60000);
@@ -37,7 +41,7 @@ export default function Salas() {
   const { salas, estadoSalas, dias, avisos, estadoAvisos, reintentar, marcarAtendida } = useDatosSalas(fecha, mes);
 
   // Cambia parámetros de la URL; un valor vacío quita el parámetro.
-  const actualizar = (cambios) => {
+  const actualizar = (cambios: Record<string, string | null | undefined>) => {
     const next = new URLSearchParams(params);
     for (const [k, v] of Object.entries(cambios)) {
       if (v === null || v === undefined || v === "") next.delete(k);
@@ -57,7 +61,7 @@ export default function Salas() {
   const base = info_.filter((x) =>
     (!qn || x.sala.nombre.toLowerCase().includes(qn) || x.sala.id.replace("sala-", "") === qn) && (!rango || x.libreRango));
   const visibles = base.filter((x) => pasa(filtro, x, { esHoy, rango }));
-  const conteos = Object.fromEntries(FILTRO_IDS.map((id) => [id, base.filter((x) => pasa(id, x, { esHoy, rango })).length]));
+  const conteos = Object.fromEntries(FILTRO_IDS.map((id) => [id, base.filter((x) => pasa(id, x, { esHoy, rango })).length])) as Record<FiltroId, number>;
   const filas = visibles.map((x) => ({ x, estado: estadoDeSala(x, { esHoy, ahoraMin }) }));
   const detalle = salaId ? todas.find((s) => s.id === salaId) ?? null : null;
 
@@ -66,7 +70,7 @@ export default function Salas() {
     : "Agenda del día elegido, equipos y avisos.";
   const fechaTexto = fechaLarga(fecha).replace(/^./, (c) => c.toUpperCase());
 
-  const elegirFecha = (f) => {
+  const elegirFecha = (f: string) => {
     setMes(f.slice(0, 7));
     actualizar({ fecha: f, sala: null, res: null });
   };

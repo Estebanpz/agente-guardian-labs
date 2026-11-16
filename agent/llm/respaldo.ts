@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { chat } from "./proveedor.js";
 import { fecha as fechaDe } from "../tools/extraer.js";
+import { norm } from "../tools/texto.js";
 
 export const RespaldoReserva = z.object({
   sala: z.string().nullable(),    // "sala-N" o null
@@ -54,7 +55,6 @@ export async function pedirRespaldo(texto: string, hoy: Hoy): Promise<RespaldoRe
 
 export type Propuesta = { sala?: string; fecha?: string; inicio?: string; fin?: string };
 
-const norm = (t: string): string => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const HORA_VALIDA = /^([01]\d|2[0-3]):[0-5]\d$/;
 // Número de la sala escrito con palabras ("sala uno"), además de con dígitos.
 const PALABRAS = ["", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez",

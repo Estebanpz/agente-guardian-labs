@@ -2,30 +2,35 @@ import { useEffect, useRef, useState } from "react";
 import { DayPicker } from "@daypicker/react";
 import { es } from "@daypicker/react/locale/es";
 import "@daypicker/react/style.css";
-import { fechaLarga, hoyBogota, sumarDias } from "../../pages/salas/tiempo.js";
+import { fechaLarga, hoyBogota, sumarDias } from "../../pages/salas/tiempo";
 
 // "2026-11-09" → Date local (medianoche) y de vuelta sin pasar por UTC.
-const aDate = (fecha) => {
+const aDate = (fecha: string): Date => {
   const [y, m, d] = fecha.split("-").map(Number);
   return new Date(y, m - 1, d);
 };
-const aTexto = (date) =>
+const aTexto = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 // Botón con la fecha elegida, Hoy y Mañana, y un popover con el calendario (DayPicker, en español).
 // El popover se cierra con Esc, al elegir un día y al hacer clic fuera. El foco vuelve al botón.
-export default function SelectorFecha({ fecha, onElegir, diasConReservas, mes, onMesCambio }) {
+type Props = {
+  fecha: string; onElegir: (f: string) => void; diasConReservas: string[]; mes: string; onMesCambio: (mes: string) => void;
+};
+
+export default function SelectorFecha({ fecha, onElegir, diasConReservas, mes, onMesCambio }: Props) {
   const [abierto, setAbierto] = useState(false);
-  const boton = useRef(null);
-  const popover = useRef(null);
+  const boton = useRef<HTMLButtonElement>(null);
+  const popover = useRef<HTMLDivElement>(null);
   const hoy = hoyBogota();
   const manana = sumarDias(hoy, 1);
 
   useEffect(() => {
     if (!abierto) return undefined;
     popover.current?.focus();
-    const alPulsar = (e) => {
-      if (!popover.current?.contains(e.target) && !boton.current?.contains(e.target)) setAbierto(false);
+    const alPulsar = (e: MouseEvent) => {
+      const destino = e.target instanceof Node ? e.target : null;
+      if (!popover.current?.contains(destino) && !boton.current?.contains(destino)) setAbierto(false);
     };
     document.addEventListener("mousedown", alPulsar);
     return () => document.removeEventListener("mousedown", alPulsar);
@@ -36,7 +41,7 @@ export default function SelectorFecha({ fecha, onElegir, diasConReservas, mes, o
     boton.current?.focus();
   };
 
-  const elegir = (f) => {
+  const elegir = (f: string) => {
     onElegir(f);
     cerrar();
   };

@@ -1,11 +1,20 @@
-import { FILTROS, etiquetaLibres } from "../../pages/salas/filtros.js";
-import { HORAS } from "../../pages/salas/tiempo.js";
+import { FILTROS, etiquetaLibres, type FiltroId, type RangoLibre } from "../../pages/salas/filtros";
+import { HORAS } from "../../pages/salas/tiempo";
 
 // Chips de estado con conteo, "Libre desde / hasta", búsqueda por número o nombre y "Limpiar filtros".
+type Props = {
+  filtro: FiltroId; onFiltro: (id: FiltroId) => void; conteos: Partial<Record<FiltroId, number>>; esHoy: boolean;
+  rango: RangoLibre | null; desde: string; hasta: string; onDesde: (v: string) => void; onHasta: (v: string) => void;
+  busca: string; onBusca: (v: string) => void; rangoInvalido: boolean; onLimpiar: () => void; hayFiltros: boolean;
+};
+
 export default function BarraFiltros({
   filtro, onFiltro, conteos, esHoy, rango, desde, hasta, onDesde, onHasta, busca, onBusca, rangoInvalido, onLimpiar, hayFiltros,
-}) {
-  const etiquetas = { ...Object.fromEntries(FILTROS), libres: etiquetaLibres({ rango: Boolean(rango), esHoy }) };
+}: Props) {
+  const etiquetas: Record<FiltroId, string> = {
+    ...(Object.fromEntries(FILTROS) as Record<FiltroId, string>),
+    libres: etiquetaLibres({ rango: Boolean(rango), esHoy }),
+  };
   return (
     <section aria-label="Filtros" className="sa-filtros">
       <div role="group" aria-label="Estado de la sala" className="sa-chips">

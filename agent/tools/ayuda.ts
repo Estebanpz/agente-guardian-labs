@@ -1,14 +1,10 @@
 // Respuestas informativas deterministas (sin modelo): ayuda, ID, franjas, reglas, reservas y salas.
 // Un mismo mensaje puede traer varias preguntas; se detectan los temas y se responde cada uno.
-import { readFileSync } from "node:fs";
 import { resumenSalas } from "./salas.js";
+import { cargarReglas } from "./reglas.js";
+import { norm } from "./texto.js";
 
-const base = JSON.parse(readFileSync(new URL("../rules/reglas.json", import.meta.url), "utf-8")) as {
-  version: string;
-  parametros: { tolerancia_asistencia_min: number };
-};
-
-const norm = (t: string) => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+const base = cargarReglas();
 
 export type Tema = "presentacion" | "id" | "induccion" | "carne" | "franjas" | "reglas" | "reserva" | "salas";
 

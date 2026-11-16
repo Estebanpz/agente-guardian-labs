@@ -1,4 +1,4 @@
-import { MongoClient, ObjectId, type Db, type ClientSession } from "mongodb";
+import { MongoClient, ObjectId, type ClientSession, type Db, type Document, type Filter } from "mongodb";
 import { z } from "zod";
 import {
   CarneDoc, Carne, Conversacion, CuentaDoc, SesionDoc, DecisionReserva, EquipoDoc, Fecha, NotificacionDoc, ReservaDoc,
@@ -19,8 +19,11 @@ function clienteUnico(uri: string): MongoClient {
   return cliente;
 }
 
-// El driver tipa _id como ObjectId en colecciones sin tipo; aquí los _id son strings del dominio.
-const porId = (id: unknown) => ({ _id: id }) as never;
+// Hallazgo 9 de la auditoría (16-11-2026): el driver tipa _id como ObjectId en colecciones sin tipo y antes se
+// apagaba el chequeo con `as never`. Las colecciones cuyo _id es un string del dominio (carnetizacion, usuarios,
+// cuentas, conversaciones, sesiones, contadores y bloqueos) se abren con este tipo.
+type ConId = { _id: string } & Document;
+const porId = (id: string): Filter<ConId> => ({ _id: id });
 
 // Proyecciones explícitas: solo los campos que usa la interfaz.
 const PROY_SALA = { _id: 1, nombre: 1, capacidad: 1, computo: 1, activa: 1, fuente: 1 };
@@ -41,7 +44,7 @@ const PROY_CONVERSACION = { _id: 1, flujo: 1, pendiente: 1, datos: 1, intentos: 
 
 // Código siguiente RS-NNNN con el contador de la transacción (se revierte si la transacción falla).
 async function siguienteCodigo(db: Db, session: ClientSession): Promise<string> {
-  const doc = await db.collection("contadores").findOneAndUpdate(
+  const doc = await db.collection<ConId>("contadores").findOneAndUpdate(
     porId("reservas"),
     { $inc: { n: 1 } },
     { upsert: true, returnDocument: "after", session },
@@ -75,28 +78,28 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
     async carne(id) {
       const v = Carne.safeParse(id);
       if (!v.success) return null;
-      const d = await db.collection("carnetizacion").findOne(porId(v.data), { projection: PROY_CARNE });
+      const d = await db.collection<ConId>("carnetizacion").findOne(porId(v.data), { projection: PROY_CARNE });
       return d ? CarneDoc.parse(d) : null;
     },
 
     async usuario(id) {
       const v = Carne.safeParse(id);
       if (!v.success) return null;
-      const d = await db.collection("usuarios").findOne(porId(v.data), { projection: PROY_USUARIO });
+      const d = await db.collection<ConId>("usuarios").findOne(porId(v.data), { projection: PROY_USUARIO });
       return d ? UsuarioDoc.parse(d) : null;
     },
 
     async cuenta(correo) {
       const v = CuentaDoc.shape._id.safeParse(correo.trim());
       if (!v.success) return null;
-      const d = await db.collection("cuentas").findOne(porId(v.data), { projection: PROY_CUENTA });
+      const d = await db.collection<ConId>("cuentas").findOne(porId(v.data), { projection: PROY_CUENTA });
       return d ? CuentaDoc.parse(d) : null;
     },
 
     async registrarUsuario(u) {
       const v = UsuarioDoc.parse(u);
       try {
-        await db.collection("usuarios").insertOne({ ...v } as never);
+        await db.collection<ConId>("usuarios").insertOne({ ...v });
         return "creado";
       } catch (e) {
         if ((e as { code?: number }).code === 11000) return "existente";
@@ -125,10 +128,10 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
       const salida: { r?: { decision: DecisionReserva; reserva: ReservaDoc | null } } = {};
       await c.withSession((session) => session.withTransaction(async (s) => {
         // 1) candados: sala|día (choques en la sala) y carné|día (R28: dos pestañas de la misma persona).
-        await db.collection("bloqueos").updateOne(
+        await db.collection<ConId>("bloqueos").updateOne(
           porId(`${sala}|${fecha}`), { $inc: { v: 1 } }, { upsert: true, session: s });
         if (carne) {
-          await db.collection("bloqueos").updateOne(
+          await db.collection<ConId>("bloqueos").updateOne(
             porId(`carne|${carne}|${fecha}`), { $inc: { v: 1 } }, { upsert: true, session: s });
         }
         // 2) reservas programadas del día (todas las salas: R28) y, por separado, las de la sala pedida.
@@ -222,34 +225,34 @@ export async function crearRepositorioMongo(uri: string, nombreBase: string): Pr
 
     async leerConversacion(id) {
       if (!z.uuid().safeParse(id).success) return null;
-      const d = await db.collection("conversaciones").findOne(porId(id), { projection: PROY_CONVERSACION });
+      const d = await db.collection<ConId>("conversaciones").findOne(porId(id), { projection: PROY_CONVERSACION });
       return d ? Conversacion.parse(d) : null;
     },
 
     async guardarConversacion(conv) {
       const v = Conversacion.parse(conv);
-      await db.collection("conversaciones").replaceOne(porId(v._id), { ...v }, { upsert: true });
+      await db.collection<ConId>("conversaciones").replaceOne(porId(v._id), { ...v }, { upsert: true });
     },
 
     async borrarConversacion(id) {
       if (!z.uuid().safeParse(id).success) return;
-      await db.collection("conversaciones").deleteOne(porId(id));
+      await db.collection<ConId>("conversaciones").deleteOne(porId(id));
     },
 
     async leerSesion(id) {
       if (!z.uuid().safeParse(id).success) return null;
-      const d = await db.collection("sesiones").findOne(porId(id), { projection: PROY_SESION });
+      const d = await db.collection<ConId>("sesiones").findOne(porId(id), { projection: PROY_SESION });
       return d ? SesionDoc.parse(d) : null;
     },
 
     async guardarSesion(s) {
       const v = SesionDoc.parse(s);
-      await db.collection("sesiones").replaceOne(porId(v._id), { ...v }, { upsert: true });
+      await db.collection<ConId>("sesiones").replaceOne(porId(v._id), { ...v }, { upsert: true });
     },
 
     async borrarSesion(id) {
       if (!z.uuid().safeParse(id).success) return;
-      await db.collection("sesiones").deleteOne(porId(id));
+      await db.collection<ConId>("sesiones").deleteOne(porId(id));
     },
 
     async cerrar() {

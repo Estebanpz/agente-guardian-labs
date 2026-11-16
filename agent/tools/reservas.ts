@@ -1,23 +1,16 @@
 // Motor de reservas (R14–R28). Decide con reglas; el modelo nunca interviene aquí.
-import { readFileSync } from "node:fs";
 import {
   Carne, DecisionReserva,
   type CarneDoc, type Conflicto, type EquipoDoc, type ReservaDoc, type SalaDoc,
   type SolicitudReserva, type UsuarioDoc,
 } from "./esquemas-reservas.js";
 import { aHora, aMin, sumarDias } from "./reloj.js";
+import { claseEquipo, esIncierto } from "./estados.js";
 
-type Regla = { id: string; descripcion: string };
-const base = JSON.parse(
-  readFileSync(new URL("../rules/reglas.json", import.meta.url), "utf-8"),
-) as {
-  version: string;
-  parametros: {
-    horario_abre: string; horario_cierra: string;
-    duracion_min_min: number; duracion_max_min: number | null; dias_adelante_max: number;
-  };
-  reglas: Regla[];
-};
+import { cargarReglas } from "./reglas.js";
+
+// reglas.json validado con Zod al arrancar (tools/reglas.ts).
+const base = cargarReglas();
 const P = base.parametros;
 
 export type Contexto = {
@@ -65,15 +58,16 @@ function decidir(d: {
   });
 }
 
-// Estado de una sala según sus equipos: operativos, inciertos y si hay contradicción.
-function estadoSala(sala: SalaDoc, equipos: EquipoDoc[]) {
-  const propios = equipos.filter((q) => q.sala === sala._id);
-  const operativos = propios.filter((q) => q.inventario === "disponible" && q.mantenimiento === "disponible").length;
-  const inciertos = propios.filter((q) =>
-    q.inventario === "desconocido" || q.mantenimiento === "desconocido" || q.inventario !== q.mantenimiento).length;
-  const contradictorio = propios.some((q) =>
-    q.inventario !== "desconocido" && q.mantenimiento !== "desconocido" && q.inventario !== q.mantenimiento);
-  return { operativos, inciertos, contradictorio };
+// Estado de una sala (la clase de cada equipo sale de tools/estados.ts) según sus equipos: operativos, inciertos, si hay contradicción o datos desconocidos.
+export function estadoSala(sala: Pick<SalaDoc, "_id">, equipos: EquipoDoc[]) {
+  const clases = equipos.filter((q) => q.sala === sala._id).map(claseEquipo);
+  return {
+    operativos: clases.filter((c) => c === "operativo").length,
+    inciertos: clases.filter(esIncierto).length,
+    en_revision: clases.filter((c) => c !== "operativo").length,
+    contradictorio: clases.includes("contradictorio"),
+    desconocido: clases.includes("desconocido"),
+  };
 }
 
 const solapa = (r: ReservaDoc, inicio: number, fin: number): boolean =>

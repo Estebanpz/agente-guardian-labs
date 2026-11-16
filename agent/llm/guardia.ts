@@ -1,5 +1,5 @@
 // Filtro determinista previo al modelo: primera capa contra intentos de manipulación.
-const norm = (t: string) => t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+import { norm } from "../tools/texto.js";
 
 const PATRONES: RegExp[] = [
   /\b(ignora|ignore|ignorar|olvida|olvidar|omite|omitir|salta|saltate)\b.{0,40}\b(reglas?|instrucciones|restricciones|politicas?|rules|instructions)\b/,
