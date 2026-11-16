@@ -80,4 +80,21 @@ Usa CodeGraph antes de abrir archivos: la herramienta MCP `codegraph_explore`, o
 - `agent/rules/reglas.json`: base de reglas versionada.
 - `data/`: hechos sintéticos.
 - `evals/`: pruebas.
-- `web/`: React 19 + Bootstrap 5.3, tokens de diseño en `web/src/index.css` (no agregues otro sistema visual).
+- `web/`: React 19 + Bootstrap 5.3 en TypeScript estricto, tokens de diseño en `web/src/index.css` (no agregues otro sistema visual).
+
+## Definiciones únicas (auditoría del 16-11-2026, `AUDITORIA.md`)
+
+Cada una vive en un solo lugar. No la copies en otro módulo: impórtala. `npm run typecheck` revisa `agent/` y `web/`.
+
+| Qué | Dónde |
+|---|---|
+| Contrato de cada respuesta de la API (servidor y `web/`, este último con `import type`) | `agent/api-tipos.ts` |
+| Estado de un equipo (operativo, desconocido, contradictorio, no operativo) | `agent/tools/estados.ts` (`claseEquipo`); copia de respaldo en `web/src/pages/salas/filtros.ts`, comprobada por `evals/auditoria.ts` |
+| Carga y validación de `reglas.json` | `agent/tools/reglas.ts` (`cargarReglas`, esquema Zod): si cambia la forma del JSON, cambia el esquema |
+| Hora a minutos (lanza error si no es HH:MM) | `aMin` de `agent/tools/reloj.ts` |
+| Normalización de texto (minúsculas, sin tildes) | `norm` de `agent/tools/texto.ts` |
+| Manejo de errores de las rutas | `ruta()` en `agent/channels/http.ts` |
+
+- `turnoReserva` (`conversacion.ts`) y `mensajeBase` (`orquestador.ts`) son orquestadores de pasos con nombre: el
+  orden es la lógica del negocio. Un caso nuevo va en un paso nuevo o ampliado, no como rama dentro de ellos.
+- `stryker.config.json` muta rangos de líneas de `reservas.ts`: si esas funciones se mueven, actualiza los rangos.

@@ -42,6 +42,20 @@ Lectura de los sobrevivientes:
 Mutantes equivalentes conocidos (no cambian el comportamiento): `cuenta !== null` en el login (la huella ficticia
 nunca verifica), `f.hasta === 0` (un bloqueo guarda `n: 0`) y volver a registrar a un usuario ya registrado.
 
-## Corrida 2
+## Corrida 2 (16-11-2026, 30 min 3 s)
 
-Pendiente: correr `npm run mutacion` con las pruebas nuevas y anotar aquí la tabla.
+Con las pruebas nuevas de arriba y las correcciones de `AUDITORIA.md`. Las funciones de `reservas.ts` se movieron
+de línea, así que los rangos de `stryker.config.json` pasaron a `37-37`, `327-328` y `340-351`; mutan el mismo código
+que antes (`enmascarar`, `ocupadaPublica` y `evaluarCancelacion`). La normalización de texto ya no está en
+`extraer.ts`: ahora vive en `agent/tools/texto.ts`.
+
+| Archivo | Puntuación | Muertos | Sobrevivientes |
+|---|---|---|---|
+| acceso.ts | 92,08 % | 221 | 19 |
+| extraer.ts | 90,66 % | 524 | 54 |
+| privacidad.ts | 89,78 % | 202 | 23 |
+| reservas.ts | 100,00 % | 53 | 0 |
+| **Total** | **91,24 %** | **1000** | **96** |
+
+Sin mutantes con tiempo agotado ni sin cobertura. `extraer.ts` tiene más mutantes que en la corrida 1 (578 frente a
+471) porque creció con las correcciones del fuzzing y del rango horario.
